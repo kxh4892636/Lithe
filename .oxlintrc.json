@@ -1,0 +1,9 @@
+{
+  "options": {
+    "typeAware": true
+  },
+  "rules": {
+    "no-console": "error",
+    "react/jsx-no-useless-fragment": "error"
+  }
+}

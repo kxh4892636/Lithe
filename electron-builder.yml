@@ -1,0 +1,38 @@
+appId: com.kxh.lithe
+productName: Lithe
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+  - LICENSE
+extraResources:
+  - from: drizzle
+    to: drizzle
+npmRebuild: false
+win:
+  executableName: lithe
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  createDesktopShortcut: always
+  shortcutName: Lithe
+mac:
+  identity: null
+  notarize: false
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+dmg:
+  artifactName: ${name}-${version}-${arch}.${ext}
+linux:
+  category: Utility
+  target:
+    - target: AppImage
+      arch: [x64]
+appImage:
+  artifactName: ${name}-${version}-${arch}.${ext}
+publish: null

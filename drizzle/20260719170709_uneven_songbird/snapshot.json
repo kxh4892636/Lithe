@@ -1,0 +1,131 @@
+{
+  "dialect": "sqlite",
+  "id": "7a3fcf5c-cf60-4db3-81b1-7739d026c996",
+  "prevIds": ["00000000-0000-0000-0000-000000000000"],
+  "version": "7",
+  "ddl": [
+    {
+      "name": "app_preferences",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "key",
+      "table": "app_preferences",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["key"],
+      "nameExplicit": false,
+      "name": "app_preferences_pk",
+      "table": "app_preferences",
+      "entityType": "pks"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "value",
+      "table": "app_preferences",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "table": "app_preferences",
+      "entityType": "columns"
+    },
+    {
+      "name": "window_state",
+      "entityType": "tables"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "table": "window_state",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "window_state_pk",
+      "table": "window_state",
+      "entityType": "pks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "x",
+      "table": "window_state",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "y",
+      "table": "window_state",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "width",
+      "table": "window_state",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "height",
+      "table": "window_state",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "is_maximized",
+      "table": "window_state",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "table": "window_state",
+      "entityType": "columns"
+    }
+  ],
+  "renames": []
+}
