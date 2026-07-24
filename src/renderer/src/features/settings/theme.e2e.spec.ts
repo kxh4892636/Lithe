@@ -1,6 +1,8 @@
-import { expect, test } from '../../test/electron-application'
+import { expect, test, type ElectronTestFixtures } from '../../test/electron-application'
 
-test('E2E-LITHE-002 theme persists after application restart', async ({ electronSession }): Promise<void> => {
+test('E2E-LITHE-002 theme persists after application restart', async ({
+  electronSession,
+}: ElectronTestFixtures): Promise<void> => {
   let window = await electronSession.application.firstWindow()
 
   await window.getByRole('link', { name: '设置' }).click()
