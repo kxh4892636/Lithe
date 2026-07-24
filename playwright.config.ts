@@ -6,7 +6,8 @@ export default defineConfig({
   outputDir: 'test-results',
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   retries: 0,
-  testDir: './tests/e2e',
+  testDir: './src/renderer/src/features',
+  testMatch: '**/*.e2e.spec.ts',
   timeout: 60_000,
   workers: 1,
 })

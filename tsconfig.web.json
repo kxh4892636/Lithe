@@ -7,6 +7,7 @@
     "src/preload/*.d.ts",
     "src/shared/**/*"
   ],
+  "exclude": ["src/renderer/src/features/**/*.e2e.spec.ts", "src/renderer/src/test/electron-application.ts"],
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",

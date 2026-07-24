@@ -1,8 +1,8 @@
 import { createHashHistory, createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 
+import { HomePage } from '../features/home/home-page'
+import { SettingsPage } from '../features/settings/settings-page'
 import { AppShell } from './app-shell'
-import { HomePage } from './features/home/home-page'
-import { SettingsPage } from './features/settings/settings-page'
 
 const rootRoute = createRootRoute({ component: AppShell })
 const homeRoute = createRoute({ component: HomePage, getParentRoute: (): typeof rootRoute => rootRoute, path: '/' })

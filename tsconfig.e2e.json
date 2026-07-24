@@ -1,0 +1,12 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": [
+    "playwright.config.ts",
+    "src/renderer/src/features/**/*.e2e.spec.ts",
+    "src/renderer/src/test/electron-application.ts"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "types": ["node"]
+  }
+}
