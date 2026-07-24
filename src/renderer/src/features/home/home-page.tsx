@@ -8,11 +8,15 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { findActiveProject, useProjectStore } from '@/features/projects/project-store'
 
 dayjs.extend(utc)
 
 export const HomePage = (): React.JSX.Element => {
   const { t } = useTranslation()
+  const activeWorkspaceId = useProjectStore((state) => state.activeWorkspaceId)
+  const projects = useProjectStore((state) => state.projects)
+  const activeProject = findActiveProject(projects, activeWorkspaceId)
   const runtimeQuery = useQuery({
     queryFn: window.lithe.runtime.getInfo,
     queryKey: ['runtime-info'],
@@ -23,8 +27,11 @@ export const HomePage = (): React.JSX.Element => {
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8 lg:p-12">
       <header className="max-w-2xl space-y-3">
         <p className="text-primary text-xs font-semibold tracking-[0.22em] uppercase">{t('home.eyebrow')}</p>
-        <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">{t('home.title')}</h1>
-        <p className="text-muted-foreground text-sm leading-6">{t('home.emptyHint')}</p>
+        <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">{activeProject?.name ?? t('home.title')}</h1>
+        <p className="text-muted-foreground text-sm leading-6">
+          {activeProject ? activeProject.rootPath : t('home.emptyHint')}
+        </p>
+        {activeProject ? <h2 className="sr-only">{t('home.title')}</h2> : null}
       </header>
 
       <Card className="runtime-card relative overflow-hidden border-black/8 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.45)] dark:border-white/10">

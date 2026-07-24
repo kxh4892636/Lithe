@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { RuntimeInfo, Theme } from '../../../../shared/app-contract'
+import type { LitheBridge, RuntimeInfo, Theme } from '../../../../shared/app-contract'
 import { HomePage } from './home-page'
 
 describe('home page', (): void => {
@@ -26,8 +26,23 @@ describe('home page', (): void => {
       })
     window.lithe = {
       preferences: {
+        getPinnedGroupOpen: vi.fn<LitheBridge['preferences']['getPinnedGroupOpen']>().mockResolvedValue(true),
+        getProjectGroupOpen: vi.fn<LitheBridge['preferences']['getProjectGroupOpen']>().mockResolvedValue(true),
+        getSidebarOpen: vi.fn<LitheBridge['preferences']['getSidebarOpen']>().mockResolvedValue(true),
+        getSidebarWidth: vi.fn<LitheBridge['preferences']['getSidebarWidth']>().mockResolvedValue(256),
         getTheme: vi.fn<() => Promise<Theme>>(),
+        setPinnedGroupOpen: vi.fn<LitheBridge['preferences']['setPinnedGroupOpen']>().mockResolvedValue(undefined),
+        setProjectGroupOpen: vi.fn<LitheBridge['preferences']['setProjectGroupOpen']>().mockResolvedValue(undefined),
+        setSidebarOpen: vi.fn<LitheBridge['preferences']['setSidebarOpen']>().mockResolvedValue(undefined),
+        setSidebarWidth: vi.fn<LitheBridge['preferences']['setSidebarWidth']>().mockResolvedValue(undefined),
         setTheme: vi.fn<(theme: Theme) => Promise<void>>(),
+      },
+      projects: {
+        addDirectory: vi.fn<LitheBridge['projects']['addDirectory']>().mockResolvedValue(null),
+        getNavigation: vi
+          .fn<LitheBridge['projects']['getNavigation']>()
+          .mockResolvedValue({ activeWorkspaceId: null, projects: [] }),
+        selectWorkspace: vi.fn<LitheBridge['projects']['selectWorkspace']>().mockResolvedValue(undefined),
       },
       runtime: { getInfo: getRuntimeInfo },
     }

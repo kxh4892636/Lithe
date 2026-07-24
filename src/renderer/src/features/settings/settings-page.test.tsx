@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { RuntimeInfo, Theme } from '../../../../shared/app-contract'
+import type { LitheBridge, RuntimeInfo, Theme } from '../../../../shared/app-contract'
 import { SettingsPage } from './settings-page'
 import { useThemeStore } from './theme-store'
 
@@ -11,8 +11,23 @@ describe('settings page', (): void => {
     const setTheme = vi.fn<(theme: Theme) => Promise<void>>().mockResolvedValue(undefined)
     window.lithe = {
       preferences: {
+        getPinnedGroupOpen: vi.fn<LitheBridge['preferences']['getPinnedGroupOpen']>().mockResolvedValue(true),
+        getProjectGroupOpen: vi.fn<LitheBridge['preferences']['getProjectGroupOpen']>().mockResolvedValue(true),
+        getSidebarOpen: vi.fn<LitheBridge['preferences']['getSidebarOpen']>().mockResolvedValue(true),
+        getSidebarWidth: vi.fn<LitheBridge['preferences']['getSidebarWidth']>().mockResolvedValue(256),
         getTheme: vi.fn<() => Promise<Theme>>().mockResolvedValue('system'),
+        setPinnedGroupOpen: vi.fn<LitheBridge['preferences']['setPinnedGroupOpen']>().mockResolvedValue(undefined),
+        setProjectGroupOpen: vi.fn<LitheBridge['preferences']['setProjectGroupOpen']>().mockResolvedValue(undefined),
+        setSidebarOpen: vi.fn<LitheBridge['preferences']['setSidebarOpen']>().mockResolvedValue(undefined),
+        setSidebarWidth: vi.fn<LitheBridge['preferences']['setSidebarWidth']>().mockResolvedValue(undefined),
         setTheme,
+      },
+      projects: {
+        addDirectory: vi.fn<LitheBridge['projects']['addDirectory']>().mockResolvedValue(null),
+        getNavigation: vi
+          .fn<LitheBridge['projects']['getNavigation']>()
+          .mockResolvedValue({ activeWorkspaceId: null, projects: [] }),
+        selectWorkspace: vi.fn<LitheBridge['projects']['selectWorkspace']>().mockResolvedValue(undefined),
       },
       runtime: { getInfo: vi.fn<() => Promise<RuntimeInfo>>() },
     }

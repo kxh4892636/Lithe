@@ -1,5 +1,16 @@
 export const ipcChannels = {
   getRuntimeInfo: 'runtime:get-info',
+  getPinnedGroupOpen: 'preferences:get-pinned-group-open',
+  getProjectGroupOpen: 'preferences:get-project-group-open',
+  getSidebarOpen: 'preferences:get-sidebar-open',
+  getSidebarWidth: 'preferences:get-sidebar-width',
   getTheme: 'preferences:get-theme',
+  setPinnedGroupOpen: 'preferences:set-pinned-group-open',
+  setProjectGroupOpen: 'preferences:set-project-group-open',
+  setSidebarOpen: 'preferences:set-sidebar-open',
+  setSidebarWidth: 'preferences:set-sidebar-width',
   setTheme: 'preferences:set-theme',
+  addProjectDirectory: 'projects:add-directory',
+  getWorkspaceNavigation: 'projects:get-navigation',
+  selectWorkspace: 'projects:select-workspace',
 } as const

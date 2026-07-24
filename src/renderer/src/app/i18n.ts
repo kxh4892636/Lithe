@@ -12,6 +12,11 @@ void i18n.use(initReactI18next).init({
           description: '轻、快、可信的本地工具底座',
           name: 'Lithe',
         },
+        appMenu: {
+          about: '关于',
+          archive: '归档',
+          user: '用户菜单',
+        },
         home: {
           architecture: '架构',
           emptyHint: '应用已经就绪，可以从这个轻量底座开始构建。',
@@ -25,6 +30,14 @@ void i18n.use(initReactI18next).init({
         navigation: {
           home: '首页',
           settings: '设置',
+          resizeSidebar: '调整侧栏宽度',
+          toggleSidebar: '切换侧栏',
+        },
+        projects: {
+          add: '添加项目',
+          label: '项目',
+          noPinned: '暂无置顶工作区',
+          pinned: '置顶',
         },
         settings: {
           dark: '深色',

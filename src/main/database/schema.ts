@@ -15,3 +15,29 @@ export const windowState = sqliteTable('window_state', {
   isMaximized: integer('is_maximized', { mode: 'boolean' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
+
+export const projects = sqliteTable('projects', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  rootPath: text('root_path').notNull().unique(),
+  isValid: integer('is_valid', { mode: 'boolean' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
+export const workspaces = sqliteTable('workspaces', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  rootPath: text('root_path').notNull().unique(),
+  gitBranch: text('git_branch'),
+  kind: text('kind', { enum: ['default', 'derived'] }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
+export const navigationState = sqliteTable('navigation_state', {
+  id: integer('id').primaryKey(),
+  activeWorkspaceId: text('active_workspace_id').references(() => workspaces.id, { onDelete: 'set null' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})

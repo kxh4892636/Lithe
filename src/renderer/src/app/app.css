@@ -112,7 +112,7 @@
   }
 
   body {
-    @apply bg-background text-foreground m-0 overflow-hidden font-sans antialiased;
+    @apply text-foreground m-0 overflow-hidden bg-transparent font-sans antialiased;
     user-select: none;
   }
 

@@ -35,9 +35,14 @@ const createWindow = (): BrowserWindow => {
   const window = new BrowserWindow({
     ...resolveWindowOptions(savedState),
     autoHideMenuBar: true,
-    backgroundColor: '#f6f8fb',
+    backgroundColor: '#00000000',
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset', vibrancy: 'under-window', visualEffectState: 'active' }
+      : { titleBarOverlay: { color: '#00000000', height: 56, symbolColor: '#64748b' }, titleBarStyle: 'hidden' }),
+    ...(process.platform === 'win32' ? { backgroundMaterial: 'mica' } : {}),
     show: false,
     title: 'Lithe',
+    transparent: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

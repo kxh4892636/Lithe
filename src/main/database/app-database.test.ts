@@ -34,6 +34,24 @@ describe('app database', (): void => {
     expect(database.preferences.getTheme()).toBe('dark')
   })
 
+  it('persists navigation appearance', (): void => {
+    const database = createTestDatabase()
+
+    expect(database.preferences.getSidebarOpen()).toBe(true)
+    expect(database.preferences.getSidebarWidth()).toBe(256)
+    expect(database.preferences.getPinnedGroupOpen()).toBe(true)
+    expect(database.preferences.getProjectGroupOpen()).toBe(true)
+    database.preferences.setSidebarOpen(false)
+    database.preferences.setSidebarWidth(304)
+    database.preferences.setPinnedGroupOpen(false)
+    database.preferences.setProjectGroupOpen(false)
+
+    expect(database.preferences.getSidebarOpen()).toBe(false)
+    expect(database.preferences.getSidebarWidth()).toBe(304)
+    expect(database.preferences.getPinnedGroupOpen()).toBe(false)
+    expect(database.preferences.getProjectGroupOpen()).toBe(false)
+  })
+
   it('persists the latest window state', (): void => {
     const database = createTestDatabase()
     const state = { x: 120, y: 80, width: 1100, height: 720, isMaximized: true }
@@ -41,5 +59,59 @@ describe('app database', (): void => {
     database.windowState.save(state)
 
     expect(database.windowState.get()).toEqual(state)
+  })
+
+  it('persists projects, their default workspace, and active navigation', (): void => {
+    const database = createTestDatabase()
+    const project = {
+      id: 'project-1',
+      name: 'lithe',
+      rootPath: 'D:\\projects\\lithe',
+      isValid: true,
+      createdAt: new Date('2026-07-25T00:00:00.000Z'),
+    }
+    const workspace = {
+      id: 'workspace-1',
+      projectId: project.id,
+      name: '默认',
+      rootPath: project.rootPath,
+      gitBranch: 'main',
+      kind: 'default' as const,
+      createdAt: project.createdAt,
+    }
+
+    database.projects.addAndSelect(project, workspace)
+
+    expect(database.projects.list()).toEqual([{ ...project, workspaces: [workspace] }])
+    expect(database.navigation.getActiveWorkspace()).toBe(workspace.id)
+  })
+
+  it('rejects a second project for the same root directory', (): void => {
+    const database = createTestDatabase()
+    const project = {
+      id: 'project-1',
+      name: 'lithe',
+      rootPath: 'D:\\projects\\lithe',
+      isValid: true,
+      createdAt: new Date('2026-07-25T00:00:00.000Z'),
+    }
+    const workspace = {
+      id: 'workspace-1',
+      projectId: project.id,
+      name: '默认',
+      rootPath: project.rootPath,
+      gitBranch: null,
+      kind: 'default' as const,
+      createdAt: project.createdAt,
+    }
+
+    database.projects.add(project, workspace)
+
+    expect(() =>
+      database.projects.add(
+        { ...project, id: 'project-2' },
+        { ...workspace, id: 'workspace-2', projectId: 'project-2' },
+      ),
+    ).toThrow('UNIQUE constraint failed')
   })
 })
