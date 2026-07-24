@@ -41,3 +41,11 @@ export const navigationState = sqliteTable('navigation_state', {
   activeWorkspaceId: text('active_workspace_id').references(() => workspaces.id, { onDelete: 'set null' }),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
+
+export const workspaceLayouts = sqliteTable('workspace_layouts', {
+  workspaceId: text('workspace_id')
+    .primaryKey()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  snapshot: text('snapshot').notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})

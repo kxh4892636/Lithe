@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { findActiveProject, useProjectStore } from '@/features/projects/project-store'
+import { WorkspaceView } from '@/features/workspace/workspace-view'
 
 dayjs.extend(utc)
 
@@ -17,11 +18,14 @@ export const HomePage = (): React.JSX.Element => {
   const activeWorkspaceId = useProjectStore((state) => state.activeWorkspaceId)
   const projects = useProjectStore((state) => state.projects)
   const activeProject = findActiveProject(projects, activeWorkspaceId)
+  const activeWorkspace = activeProject?.workspaces.find((workspace): boolean => workspace.id === activeWorkspaceId)
   const runtimeQuery = useQuery({
     queryFn: window.lithe.runtime.getInfo,
     queryKey: ['runtime-info'],
     staleTime: Number.POSITIVE_INFINITY,
   })
+
+  if (activeWorkspace) return <WorkspaceView workspace={activeWorkspace} />
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8 lg:p-12">

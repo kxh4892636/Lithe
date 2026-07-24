@@ -9,6 +9,7 @@ import { useThemeStore } from './theme-store'
 describe('settings page', (): void => {
   it('persists and applies a selected theme', async (): Promise<void> => {
     const setTheme = vi.fn<(theme: Theme) => Promise<void>>().mockResolvedValue(undefined)
+    const setDefaultShell = vi.fn<LitheBridge['shells']['setDefault']>().mockResolvedValue(undefined)
     window.lithe = {
       preferences: {
         getPinnedGroupOpen: vi.fn<LitheBridge['preferences']['getPinnedGroupOpen']>().mockResolvedValue(true),
@@ -30,7 +31,12 @@ describe('settings page', (): void => {
         selectWorkspace: vi.fn<LitheBridge['projects']['selectWorkspace']>().mockResolvedValue(undefined),
       },
       runtime: { getInfo: vi.fn<() => Promise<RuntimeInfo>>() },
-    }
+      shells: {
+        getDefault: vi.fn<LitheBridge['shells']['getDefault']>().mockResolvedValue('pwsh.exe'),
+        list: vi.fn<LitheBridge['shells']['list']>().mockResolvedValue(['pwsh.exe', 'cmd.exe']),
+        setDefault: setDefaultShell,
+      },
+    } as unknown as LitheBridge
     useThemeStore.setState({ theme: 'system', isHydrated: true })
 
     render(<SettingsPage />)
@@ -39,5 +45,8 @@ describe('settings page', (): void => {
     expect(setTheme).toHaveBeenCalledWith('dark')
     expect(useThemeStore.getState().theme).toBe('dark')
     expect(document.documentElement).toHaveClass('dark')
+
+    await userEvent.selectOptions(await screen.findByRole('combobox', { name: '默认 Shell' }), 'cmd.exe')
+    expect(setDefaultShell).toHaveBeenCalledWith('cmd.exe')
   })
 })

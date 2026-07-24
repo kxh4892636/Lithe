@@ -3,9 +3,17 @@ import { join } from 'node:path'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { app, BrowserWindow, dialog } from 'electron'
 
+import { ipcChannels } from '../shared/ipc-channels'
 import type { AppDatabase } from './database/app-database'
 import { createAppDatabase } from './database/app-database'
 import { registerIpcHandlers, removeIpcHandlers } from './ipc-handlers'
+import { createNodePtyAdapter } from './terminal/node-pty-adapter'
+import { createPtyRuntime, type PtyRuntime } from './terminal/pty-runtime'
+import { registerTerminalIpc, removeTerminalIpc } from './terminal/terminal-ipc'
+import {
+  createWorkspaceLayoutPersistence,
+  type WorkspaceLayoutPersistence,
+} from './terminal/workspace-layout-persistence'
 import { resolveWindowOptions } from './window-state'
 
 const userDataOverride = process.env.LITHE_USER_DATA_DIR
@@ -14,6 +22,8 @@ if (userDataOverride) app.setPath('userData', userDataOverride)
 let appDatabase: AppDatabase | undefined
 let mainWindow: BrowserWindow | undefined
 let persistTimer: NodeJS.Timeout | undefined
+let ptyRuntime: PtyRuntime | undefined
+let workspaceLayoutPersistence: WorkspaceLayoutPersistence | undefined
 
 const resolveMigrationsFolder = (): string =>
   is.dev ? join(app.getAppPath(), 'drizzle') : join(process.resourcesPath, 'drizzle')
@@ -76,8 +86,24 @@ const createWindow = (): BrowserWindow => {
 const openMainWindow = (): void => {
   if (!appDatabase) return
   removeIpcHandlers()
+  removeTerminalIpc()
+  ptyRuntime?.closeAll()
   mainWindow = createWindow()
   registerIpcHandlers({ database: appDatabase, window: mainWindow })
+  ptyRuntime = createPtyRuntime({
+    adapter: createNodePtyAdapter(),
+    onData: (panelId, data): void => mainWindow?.webContents.send(ipcChannels.terminalData, { panelId, data }),
+    onExit: (panelId, exitCode): void => mainWindow?.webContents.send(ipcChannels.terminalExit, { panelId, exitCode }),
+  })
+  if (!workspaceLayoutPersistence) {
+    workspaceLayoutPersistence = createWorkspaceLayoutPersistence(appDatabase.workspaceLayouts)
+  }
+  registerTerminalIpc({
+    database: appDatabase,
+    runtime: ptyRuntime,
+    window: mainWindow,
+    workspaceLayouts: workspaceLayoutPersistence,
+  })
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -117,6 +143,11 @@ if (!app.requestSingleInstanceLock()) {
     if (persistTimer) clearTimeout(persistTimer)
     persistWindowState()
     removeIpcHandlers()
+    removeTerminalIpc()
+    ptyRuntime?.closeAll()
+    ptyRuntime = undefined
+    workspaceLayoutPersistence?.flushAll(false)
+    workspaceLayoutPersistence = undefined
     appDatabase?.close()
     appDatabase = undefined
   })

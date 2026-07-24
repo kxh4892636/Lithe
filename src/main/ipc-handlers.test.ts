@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ipcChannels } from '../shared/ipc-channels'
 import { createAppDatabase, type AppDatabase } from './database/app-database'
+import type { PtyRuntime } from './terminal/pty-runtime'
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...arguments_: unknown[]) => unknown
 
@@ -34,17 +35,119 @@ vi.mock('electron', () => ({
 }))
 
 import { registerIpcHandlers, removeIpcHandlers } from './ipc-handlers'
+import { registerTerminalIpc, removeTerminalIpc } from './terminal/terminal-ipc'
+import { createWorkspaceLayoutPersistence } from './terminal/workspace-layout-persistence'
 
 const temporaryDirectories: string[] = []
 const openDatabases: AppDatabase[] = []
 
 afterEach((): void => {
   removeIpcHandlers()
+  removeTerminalIpc()
   vi.clearAllMocks()
   for (const database of openDatabases.splice(0)) database.close()
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { force: true, recursive: true })
   }
+})
+
+describe('terminal IPC', (): void => {
+  it('creates a PTY only inside the requested workspace', async (): Promise<void> => {
+    const userDataDirectory = mkdtempSync(join(tmpdir(), 'lithe-terminal-ipc-'))
+    const projectDirectory = mkdtempSync(join(tmpdir(), 'lithe-terminal-project-'))
+    const terminalDirectory = join(projectDirectory, 'nested')
+    const outsideLink = join(projectDirectory, 'outside-link')
+    mkdirSync(terminalDirectory)
+    symlinkSync(userDataDirectory, outsideLink, 'junction')
+    temporaryDirectories.push(userDataDirectory, projectDirectory)
+    const database = createAppDatabase({ databasePath: join(userDataDirectory, 'lithe.db') })
+    openDatabases.push(database)
+    const createdAt = new Date('2026-07-25T00:00:00.000Z')
+    database.projects.add(
+      { createdAt, id: 'project-1', isValid: true, name: 'terminal', rootPath: projectDirectory },
+      {
+        createdAt,
+        gitBranch: null,
+        id: 'workspace-1',
+        kind: 'default',
+        name: '默认',
+        projectId: 'project-1',
+        rootPath: projectDirectory,
+      },
+    )
+    const runtime: PtyRuntime = {
+      close: vi.fn<(sessionId: string) => void>(),
+      closeAll: vi.fn<() => void>(),
+      create: vi.fn<PtyRuntime['create']>(),
+      resize: vi.fn<PtyRuntime['resize']>(),
+      write: vi.fn<PtyRuntime['write']>(),
+    }
+    const webContents = { mainFrame: {} }
+    const window = { webContents } as unknown as BrowserWindow
+    const event = { sender: webContents, senderFrame: webContents.mainFrame } as unknown as IpcMainInvokeEvent
+    registerTerminalIpc({
+      database,
+      detectShells: async (): Promise<string[]> => ['pwsh.exe', 'cmd.exe'],
+      runtime,
+      window,
+      workspaceLayouts: createWorkspaceLayoutPersistence(database.workspaceLayouts),
+    })
+    const createTerminal = electronMocks.handlers.get(ipcChannels.createTerminal)
+    const saveWorkspaceLayout = electronMocks.handlers.get(ipcChannels.saveWorkspaceLayout)
+    const setDefaultShell = electronMocks.handlers.get(ipcChannels.setDefaultShell)
+    if (!createTerminal) throw new Error('终端创建 IPC 未注册')
+
+    const session = await createTerminal(event, {
+      columns: 80,
+      cwd: terminalDirectory,
+      panelId: 'panel-1',
+      rows: 24,
+      shell: 'cmd.exe',
+      workspaceId: 'workspace-1',
+    })
+
+    expect(runtime.create).toHaveBeenCalledWith({
+      columns: 80,
+      cwd: terminalDirectory,
+      rows: 24,
+      sessionId: 'panel-1',
+      shell: 'cmd.exe',
+    })
+    expect(session).toEqual({ cwd: terminalDirectory, panelId: 'panel-1', shell: 'cmd.exe' })
+    const isolatedSession = await createTerminal(event, {
+      columns: 80,
+      cwd: userDataDirectory,
+      panelId: 'panel-2',
+      rows: 24,
+      workspaceId: 'workspace-1',
+    })
+    expect(runtime.create).toHaveBeenLastCalledWith({
+      columns: 80,
+      cwd: projectDirectory,
+      rows: 24,
+      sessionId: 'panel-2',
+      shell: 'pwsh.exe',
+    })
+    expect(isolatedSession).toEqual({ cwd: projectDirectory, panelId: 'panel-2', shell: 'pwsh.exe' })
+    const linkedSession = await createTerminal(event, {
+      columns: 80,
+      cwd: outsideLink,
+      panelId: 'panel-3',
+      rows: 24,
+      workspaceId: 'workspace-1',
+    })
+    expect(linkedSession).toEqual({ cwd: projectDirectory, panelId: 'panel-3', shell: 'pwsh.exe' })
+    await expect(
+      createTerminal(event, { columns: '80', panelId: 'invalid', rows: 24, workspaceId: 'workspace-1' }),
+    ).rejects.toThrow('expected number')
+    await expect(setDefaultShell?.(event, 'missing.exe')).rejects.toThrow('Shell 不可用')
+    expect(() =>
+      saveWorkspaceLayout?.(event, 'workspace-1', {
+        layout: { oversized: 'x'.repeat(2_097_152) },
+        version: 1,
+      }),
+    ).toThrow('无效工作区布局')
+  })
 })
 
 describe('project IPC', (): void => {

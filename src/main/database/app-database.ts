@@ -9,10 +9,12 @@ import {
   createPreferenceRepository,
   createProjectRepository,
   createWindowStateRepository,
+  createWorkspaceLayoutRepository,
   type NavigationRepository,
   type PreferenceRepository,
   type ProjectRepository,
   type WindowStateRepository,
+  type WorkspaceLayoutRepository,
 } from './repositories'
 
 interface CreateAppDatabaseOptions {
@@ -26,6 +28,7 @@ export interface AppDatabase {
   preferences: PreferenceRepository
   projects: ProjectRepository
   windowState: WindowStateRepository
+  workspaceLayouts: WorkspaceLayoutRepository
 }
 
 export const createAppDatabase = ({
@@ -45,5 +48,6 @@ export const createAppDatabase = ({
     preferences: createPreferenceRepository(database),
     projects: createProjectRepository(database, sqlite),
     windowState: createWindowStateRepository(database),
+    workspaceLayouts: createWorkspaceLayoutRepository(database),
   }
 }

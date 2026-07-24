@@ -1,3 +1,9 @@
+import type { TerminalCreateRequest } from './terminal-schema'
+import type { WorkspaceLayoutSnapshot } from './workspace-layout-schema'
+
+export type { TerminalCreateRequest } from './terminal-schema'
+export type { WorkspaceLayoutSnapshot } from './workspace-layout-schema'
+
 export const themeValues = ['light', 'dark', 'system'] as const
 
 export type Theme = (typeof themeValues)[number]
@@ -47,6 +53,22 @@ export interface WorkspaceNavigation {
   projects: ProjectWithWorkspaces[]
 }
 
+export interface TerminalSession {
+  cwd: string
+  panelId: string
+  shell: string
+}
+
+export interface TerminalDataEvent {
+  data: string
+  panelId: string
+}
+
+export interface TerminalExitEvent {
+  exitCode: number
+  panelId: string
+}
+
 export interface LitheBridge {
   preferences: {
     getPinnedGroupOpen: () => Promise<boolean>
@@ -67,5 +89,22 @@ export interface LitheBridge {
     addDirectory: () => Promise<ProjectWithWorkspaces | null>
     getNavigation: () => Promise<WorkspaceNavigation>
     selectWorkspace: (workspaceId: string) => Promise<void>
+  }
+  shells: {
+    getDefault: () => Promise<string>
+    list: () => Promise<string[]>
+    setDefault: (shell: string) => Promise<void>
+  }
+  terminals: {
+    close: (panelId: string) => Promise<void>
+    create: (request: TerminalCreateRequest) => Promise<TerminalSession>
+    onData: (listener: (event: TerminalDataEvent) => void) => () => void
+    onExit: (listener: (event: TerminalExitEvent) => void) => () => void
+    resize: (panelId: string, columns: number, rows: number) => Promise<void>
+    write: (panelId: string, data: string) => Promise<void>
+  }
+  workspaceLayouts: {
+    get: (workspaceId: string) => Promise<WorkspaceLayoutSnapshot | null>
+    save: (workspaceId: string, snapshot: WorkspaceLayoutSnapshot) => Promise<void>
   }
 }

@@ -6,6 +6,7 @@ import { _electron as electron, expect, test as base, type ElectronApplication }
 
 export interface ElectronTestSession {
   application: ElectronApplication
+  close: () => Promise<void>
   restart: () => Promise<ElectronApplication>
 }
 
@@ -84,6 +85,11 @@ export const test = base.extend<ElectronTestFixtures>({
       application = await launchApplication(userDataDirectory)
       const electronSession: ElectronTestSession = {
         application,
+        close: async (): Promise<void> => {
+          if (!application) return
+          await closeApplication(application)
+          application = undefined
+        },
         restart: async (): Promise<ElectronApplication> => {
           if (!application) throw new Error('Electron 应用尚未启动')
           await closeApplication(application)

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import type { WorkspaceLayoutSnapshot } from '../../shared/app-contract'
 import { createAppDatabase, type AppDatabase } from './app-database'
 
 const temporaryDirectories: string[] = []
@@ -113,5 +114,39 @@ describe('app database', (): void => {
         { ...workspace, id: 'workspace-2', projectId: 'project-2' },
       ),
     ).toThrow('UNIQUE constraint failed')
+  })
+
+  it('persists a workspace layout snapshot without terminal output', (): void => {
+    const database = createTestDatabase()
+    const project = {
+      id: 'project-layout',
+      name: 'layout',
+      rootPath: 'D:\\projects\\layout',
+      isValid: true,
+      createdAt: new Date('2026-07-25T00:00:00.000Z'),
+    }
+    const workspace = {
+      id: 'workspace-layout',
+      projectId: project.id,
+      name: '默认',
+      rootPath: project.rootPath,
+      gitBranch: null,
+      kind: 'default' as const,
+      createdAt: project.createdAt,
+    }
+    const snapshot: WorkspaceLayoutSnapshot = {
+      version: 1,
+      layout: {
+        borders: [],
+        global: {},
+        layout: { type: 'row', children: [{ type: 'tabset', id: 'root-group', children: [] }] },
+      },
+    }
+    database.projects.add(project, workspace)
+
+    database.workspaceLayouts.save(workspace.id, snapshot)
+
+    expect(database.workspaceLayouts.get(workspace.id)).toEqual(snapshot)
+    expect(JSON.stringify(database.workspaceLayouts.get(workspace.id))).not.toContain('secret output')
   })
 })

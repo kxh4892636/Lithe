@@ -10,12 +10,15 @@ import {
   type Theme,
   type WindowState,
   type Workspace,
+  type WorkspaceLayoutSnapshot,
 } from '../../shared/app-contract'
-import { appPreferences, navigationState, projects, windowState, workspaces } from './schema'
+import { parseWorkspaceLayoutSnapshot, workspaceLayoutMaxLength } from '../../shared/workspace-layout-schema'
+import { appPreferences, navigationState, projects, windowState, workspaceLayouts, workspaces } from './schema'
 
 type Database = ReturnType<typeof drizzle>
 
 export interface PreferenceRepository {
+  getDefaultShell: () => string | null
   getPinnedGroupOpen: () => boolean
   getProjectGroupOpen: () => boolean
   getSidebarOpen: () => boolean
@@ -26,6 +29,7 @@ export interface PreferenceRepository {
   setSidebarOpen: (isOpen: boolean) => void
   setSidebarWidth: (width: number) => void
   setTheme: (theme: Theme) => void
+  setDefaultShell: (shell: string) => void
 }
 
 export interface WindowStateRepository {
@@ -37,11 +41,17 @@ export interface ProjectRepository {
   add: (project: Project, workspace: Workspace) => void
   addAndSelect: (project: Project, workspace: Workspace) => void
   list: () => ProjectWithWorkspaces[]
+  getWorkspace: (workspaceId: string) => Workspace | undefined
 }
 
 export interface NavigationRepository {
   getActiveWorkspace: () => string | null
   setActiveWorkspace: (workspaceId: string) => void
+}
+
+export interface WorkspaceLayoutRepository {
+  get: (workspaceId: string) => WorkspaceLayoutSnapshot | undefined
+  save: (workspaceId: string, snapshot: WorkspaceLayoutSnapshot) => void
 }
 
 const isTheme = (value: string): value is Theme => themeValues.some((theme: Theme): boolean => theme === value)
@@ -64,6 +74,14 @@ export const createPreferenceRepository = (database: Database): PreferenceReposi
   }
 
   return {
+    getDefaultShell: (): string | null => {
+      const preference = database
+        .select({ value: appPreferences.value })
+        .from(appPreferences)
+        .where(eq(appPreferences.key, 'default-shell'))
+        .get()
+      return preference?.value ?? null
+    },
     getPinnedGroupOpen: (): boolean => getBoolean('pinned-group-open', true),
     getProjectGroupOpen: (): boolean => getBoolean('project-group-open', true),
     getSidebarOpen: (): boolean => getBoolean('sidebar-open', true),
@@ -89,6 +107,7 @@ export const createPreferenceRepository = (database: Database): PreferenceReposi
     setSidebarOpen: (isOpen: boolean): void => set('sidebar-open', String(isOpen)),
     setSidebarWidth: (width: number): void => set('sidebar-width', String(width)),
     setTheme: (theme: Theme): void => set('theme', theme),
+    setDefaultShell: (shell: string): void => set('default-shell', shell),
   }
 }
 
@@ -141,6 +160,8 @@ export const createProjectRepository = (database: Database, sqlite: DatabaseSync
   return {
     add: (project: Project, workspace: Workspace): void => add(project, workspace, false),
     addAndSelect: (project: Project, workspace: Workspace): void => add(project, workspace, true),
+    getWorkspace: (workspaceId: string): Workspace | undefined =>
+      database.select().from(workspaces).where(eq(workspaces.id, workspaceId)).get(),
     list: (): ProjectWithWorkspaces[] => {
       const projectRows = database.select().from(projects).orderBy(asc(projects.createdAt)).all()
       const workspaceRows = database.select().from(workspaces).orderBy(asc(workspaces.createdAt)).all()
@@ -173,6 +194,29 @@ export const createWindowStateRepository = (database: Database): WindowStateRepo
       .onConflictDoUpdate({
         target: windowState.id,
         set: { ...state, updatedAt: new Date() },
+      })
+      .run()
+  },
+})
+
+export const createWorkspaceLayoutRepository = (database: Database): WorkspaceLayoutRepository => ({
+  get: (workspaceId: string): WorkspaceLayoutSnapshot | undefined => {
+    const row = database
+      .select({ snapshot: workspaceLayouts.snapshot })
+      .from(workspaceLayouts)
+      .where(eq(workspaceLayouts.workspaceId, workspaceId))
+      .get()
+    if (!row) return undefined
+    if (row.snapshot.length > workspaceLayoutMaxLength) throw new TypeError('工作区布局过大')
+    return parseWorkspaceLayoutSnapshot(JSON.parse(row.snapshot))
+  },
+  save: (workspaceId: string, snapshot: WorkspaceLayoutSnapshot): void => {
+    database
+      .insert(workspaceLayouts)
+      .values({ workspaceId, snapshot: JSON.stringify(snapshot), updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: workspaceLayouts.workspaceId,
+        set: { snapshot: JSON.stringify(snapshot), updatedAt: new Date() },
       })
       .run()
   },

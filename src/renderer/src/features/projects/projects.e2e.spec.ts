@@ -19,12 +19,13 @@ test('E2E-LITHE-003 adds a directory and restores its default workspace', async 
     let window = await electronSession.application.firstWindow()
 
     await window.getByRole('button', { name: '添加项目' }).click()
-    await expect(window.getByRole('heading', { name: basename(projectDirectory) })).toBeVisible()
+    await expect(window.getByRole('button', { name: basename(projectDirectory) })).toBeVisible()
+    await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()
     await expect(window.getByRole('button', { name: '默认' })).toBeVisible()
 
     await electronSession.restart()
     window = await electronSession.application.firstWindow()
-    await expect(window.getByRole('heading', { name: basename(projectDirectory) })).toBeVisible()
+    await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()
   } finally {
     rmSync(projectDirectory, { force: true, recursive: true })
   }
@@ -48,7 +49,8 @@ test('E2E-LITHE-004 adds a newly created directory from the system picker', asyn
 
     await window.getByRole('button', { name: '添加项目' }).click()
 
-    await expect(window.getByRole('heading', { name: 'new-project' })).toBeVisible()
+    await expect(window.getByRole('button', { name: 'new-project' })).toBeVisible()
+    await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()
     await expect(window.getByRole('button', { name: '默认' })).toBeVisible()
   } finally {
     rmSync(parentDirectory, { force: true, recursive: true })

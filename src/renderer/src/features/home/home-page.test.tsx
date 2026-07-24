@@ -45,7 +45,7 @@ describe('home page', (): void => {
         selectWorkspace: vi.fn<LitheBridge['projects']['selectWorkspace']>().mockResolvedValue(undefined),
       },
       runtime: { getInfo: getRuntimeInfo },
-    }
+    } as unknown as LitheBridge
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
