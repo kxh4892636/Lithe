@@ -9,7 +9,7 @@ Lithe 是一个轻、快、可信的本地桌面应用底座，基于 Electron�
 - TanStack Router（代码路由 + hash history）、TanStack React Query、Zustand
 - i18next、dayjs、es-toolkit
 - Electron 内置 `node:sqlite`、Drizzle ORM RC、代码优先 SQL migrations
-- Oxlint（含类型感知检查）、Oxfmt、Vitest、Testing Library、Playwright Electron
+- Oxlint（含类型感知检查）、Oxfmt、Commitlint、lint-staged、Vitest、Testing Library、Playwright Electron
 
 ## 环境要求
 
@@ -36,6 +36,8 @@ pnpm run test
 pnpm run build
 pnpm run test:e2e
 ```
+
+`pnpm install` 会通过 Husky 启用 Git hooks：提交前仅对暂存文件运行 Oxfmt/Oxlint，创建提交前使用 Conventional Commits 规则校验提交信息。
 
 ## 打包
 
