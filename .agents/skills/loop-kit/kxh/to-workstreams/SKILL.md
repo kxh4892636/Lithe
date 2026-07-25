@@ -1,7 +1,7 @@
 ---
 name: to-workstreams
 description: 工作流拆分与交接文档生成：创建工作流并确认边界与依赖，并为每个工作流创建独立会话。
-argument-hint: "要把什么工作拆成独立工作流？"
+argument-hint: '要把什么工作拆成独立工作流？'
 disable-model-invocation: true
 ---
 
@@ -68,3 +68,7 @@ disable-model-invocation: true
 每次创建成功后立即记录工作流与会话的映射；重试时只处理创建失败的工作流。
 
 向用户报告完整的工作流与会话映射、工作流的依赖关系，以及仍未成功的创建失败。
+
+## 约束
+
+- 用户参数优先级高于 skill。
