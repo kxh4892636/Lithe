@@ -64,10 +64,10 @@ program
 const task = program.command('task').description('Manage Lithe tasks')
 task
   .command('create')
-  .requiredOption('--workspace-id <id>')
+  .option('--workspace-id <id>')
   .requiredOption('--name <name>')
   .action(
-    (options: { workspaceId: string; name: string }): Promise<void> =>
+    (options: { workspaceId?: string; name: string }): Promise<void> =>
       execute('task.create', { workspaceId: options.workspaceId, name: options.name }),
   )
 task
@@ -78,6 +78,24 @@ task
     (options: { taskId: string; name: string }): Promise<void> =>
       execute('task.rename', { taskId: options.taskId, name: options.name }),
   )
+
+for (const operation of ['unread', 'archive', 'delete'] as const) {
+  task
+    .command(operation)
+    .option('--task-id <id>')
+    .action((options: { taskId?: string }): Promise<void> => execute(`task.${operation}`, { taskId: options.taskId }))
+}
+
+for (const operation of ['running', 'idle'] as const) {
+  task
+    .command(operation)
+    .option('--task-id <id>')
+    .option('--instance-id <id>')
+    .action(
+      (options: { instanceId?: string; taskId?: string }): Promise<void> =>
+        execute(`task.${operation}`, { instanceId: options.instanceId, taskId: options.taskId }),
+    )
+}
 
 const agent = program.command('agent').description('Manage coding Agent processes')
 agent

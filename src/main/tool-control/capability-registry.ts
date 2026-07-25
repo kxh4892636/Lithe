@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 
 export interface AgentBinding {
   instanceId: string
-  projectId: string
+  projectId: string | null
   workspaceId: string
   taskId: string
 }

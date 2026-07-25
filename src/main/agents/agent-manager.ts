@@ -17,12 +17,14 @@ interface AgentManagerOptions {
   capabilities: CapabilityRegistry
   createId?: () => string
   database: AppDatabase
+  onInstanceExit?: (instanceId: string) => void
   runtime: PtyRuntime
 }
 
 export interface AgentManager {
   bind: (capability: string, providerSessionId: string) => Task
   handleExit: (sessionId: string) => void
+  isRunning: (taskId: string) => boolean
   launch: (taskId: string, operation: AdapterOperation, sourceAgentSessionId?: string) => AgentLaunch
   stop: (taskId: string) => void
 }
@@ -31,6 +33,7 @@ export const createAgentManager = ({
   capabilities,
   createId = randomUUID,
   database,
+  onInstanceExit = (): void => undefined,
   runtime,
 }: AgentManagerOptions): AgentManager => {
   const runningByTask = new Map<string, RunningAgent>()
@@ -42,6 +45,7 @@ export const createAgentManager = ({
     runningByTask.delete(taskId)
     taskBySession.delete(running.sessionId)
     capabilities.revokeInstance(running.instanceId)
+    onInstanceExit(running.instanceId)
     runtime.close(running.sessionId)
   }
 
@@ -57,6 +61,7 @@ export const createAgentManager = ({
       const taskId = taskBySession.get(sessionId)
       if (taskId) stop(taskId)
     },
+    isRunning: (taskId: string): boolean => runningByTask.has(taskId),
     launch: (taskId: string, operation: AdapterOperation, sourceAgentSessionId?: string): AgentLaunch => {
       const task = database.tasks.get(taskId)
       if (!task) throw new TypeError('Task does not exist')
@@ -73,6 +78,7 @@ export const createAgentManager = ({
         taskName: task.name,
         workspacePath: workspace.rootPath,
       })
+      database.tasks.setAutoRestore?.(taskId, true)
       const instanceId = createId()
       const sessionId = `agent:${task.id}`
       const capability = capabilities.issue({

@@ -1,0 +1,1 @@
+ALTER TABLE `tasks` ADD `should_auto_restore` integer DEFAULT true NOT NULL;

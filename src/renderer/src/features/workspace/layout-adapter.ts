@@ -22,13 +22,14 @@ interface AddPanelOptions {
 }
 
 export interface WorkspaceLayoutAdapter {
-  openAgent: (panel: AgentPanelConfig, taskName: string, afterPanelId?: string) => void
+  openAgent: (panel: AgentPanelConfig, taskName: string, afterPanelId?: string, select?: boolean) => void
   addTerminal: (panel: TerminalPanelConfig, options?: AddPanelOptions) => void
   getActiveGroupId: () => string
   getActiveTerminalConfig: () => TerminalPanelConfig | undefined
   getModel: () => Model
   listPanelIds: () => string[]
   movePanel: (panelId: string, targetGroupId: string) => void
+  removePanel: (panelId: string) => void
   serialize: () => WorkspaceLayoutSnapshot
   toggleMaximize: (groupId: string) => void
   updateTerminal: (panelId: string, panel: TerminalPanelConfig) => void
@@ -112,9 +113,12 @@ export const createLayoutAdapter = (snapshot?: WorkspaceLayoutSnapshot): Workspa
     movePanel: (panelId: string, targetGroupId: string): void => {
       model.doAction(Actions.moveNode(panelId, targetGroupId, DockLocation.CENTER, -1, true))
     },
-    openAgent: (panel: AgentPanelConfig, taskName: string, afterPanelId?: string): void => {
+    removePanel: (panelId: string): void => {
+      if (model.getNodeById(panelId)) model.doAction(Actions.deleteTab(panelId))
+    },
+    openAgent: (panel: AgentPanelConfig, taskName: string, afterPanelId?: string, select = true): void => {
       if (model.getNodeById(panel.panelId)) {
-        model.doAction(Actions.selectTab(panel.panelId))
+        if (select) model.doAction(Actions.selectTab(panel.panelId))
         return
       }
       const tab: IJsonTabNode = {
@@ -129,7 +133,7 @@ export const createLayoutAdapter = (snapshot?: WorkspaceLayoutSnapshot): Workspa
       const sourceGroup = source?.getParent()
       const targetGroup = sourceGroup instanceof TabSetNode ? sourceGroup : activeGroup()
       const targetIndex = source ? targetGroup.getChildren().indexOf(source) + 1 : -1
-      model.doAction(Actions.addTab(tab, targetGroup.getId(), DockLocation.CENTER, targetIndex, true))
+      model.doAction(Actions.addTab(tab, targetGroup.getId(), DockLocation.CENTER, targetIndex, select))
     },
     serialize: (): WorkspaceLayoutSnapshot =>
       parseWorkspaceLayoutSnapshot({ version: 1, layout: sanitizeLayout(model) }),

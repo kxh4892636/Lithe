@@ -20,12 +20,16 @@ describe('settings page', (): void => {
         update: vi.fn<LitheBridge['adapters']['update']>(),
       },
       preferences: {
+        getNotificationsEnabled: vi.fn<LitheBridge['preferences']['getNotificationsEnabled']>().mockResolvedValue(true),
         getPinnedGroupOpen: vi.fn<LitheBridge['preferences']['getPinnedGroupOpen']>().mockResolvedValue(true),
         getProjectGroupOpen: vi.fn<LitheBridge['preferences']['getProjectGroupOpen']>().mockResolvedValue(true),
         getSidebarOpen: vi.fn<LitheBridge['preferences']['getSidebarOpen']>().mockResolvedValue(true),
         getSidebarWidth: vi.fn<LitheBridge['preferences']['getSidebarWidth']>().mockResolvedValue(256),
         getTheme: vi.fn<() => Promise<Theme>>().mockResolvedValue('system'),
         setPinnedGroupOpen: vi.fn<LitheBridge['preferences']['setPinnedGroupOpen']>().mockResolvedValue(undefined),
+        setNotificationsEnabled: vi
+          .fn<LitheBridge['preferences']['setNotificationsEnabled']>()
+          .mockResolvedValue(undefined),
         setProjectGroupOpen: vi.fn<LitheBridge['preferences']['setProjectGroupOpen']>().mockResolvedValue(undefined),
         setSidebarOpen: vi.fn<LitheBridge['preferences']['setSidebarOpen']>().mockResolvedValue(undefined),
         setSidebarWidth: vi.fn<LitheBridge['preferences']['setSidebarWidth']>().mockResolvedValue(undefined),
@@ -35,7 +39,7 @@ describe('settings page', (): void => {
         addDirectory: vi.fn<LitheBridge['projects']['addDirectory']>().mockResolvedValue(null),
         getNavigation: vi
           .fn<LitheBridge['projects']['getNavigation']>()
-          .mockResolvedValue({ activeWorkspaceId: null, projects: [] }),
+          .mockResolvedValue({ activeWorkspaceId: null, projects: [], scratchWorkspaces: [] }),
         selectWorkspace: vi.fn<LitheBridge['projects']['selectWorkspace']>().mockResolvedValue(undefined),
       },
       runtime: { getInfo: vi.fn<() => Promise<RuntimeInfo>>() },

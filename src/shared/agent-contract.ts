@@ -45,7 +45,14 @@ export interface Task {
   name: string
   adapterVersionId: string
   agentSessionId: string | null
+  archivedAt?: Date | null
   createdAt: Date
+  isRunning?: boolean
+  isUnread?: boolean
+  lifecycle?: 'active' | 'archived'
+  lastAttentionAt?: Date | null
+  lastViewedAt?: Date | null
+  shouldAutoRestore?: boolean
 }
 
 export interface AgentLaunch {

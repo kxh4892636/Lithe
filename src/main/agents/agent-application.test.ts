@@ -12,7 +12,14 @@ const source: Task = {
   name: 'Review',
   adapterVersionId: 'adapter-v1',
   agentSessionId: 'provider-1',
+  archivedAt: null,
   createdAt: new Date(0),
+  isRunning: false,
+  isUnread: false,
+  lifecycle: 'active',
+  lastAttentionAt: null,
+  lastViewedAt: null,
+  shouldAutoRestore: true,
 }
 const adapter: AdapterVersion = {
   id: 'adapter-v1',

@@ -1,4 +1,4 @@
-import { Layout, type TabNode } from 'flexlayout-react'
+import { Layout, TabNode } from 'flexlayout-react'
 import { Columns2Icon, Rows2Icon, SquareTerminalIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -143,6 +143,8 @@ export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Elem
   const { t } = useTranslation()
   const [layout, setLayout] = useState<WorkspaceLayoutAdapter>()
   const createTask = useTaskStore((state: TaskState) => state.createTask)
+  const backgroundPanels = useTaskStore((state: TaskState) => state.backgroundPanels)
+  const deletedTaskIds = useTaskStore((state: TaskState) => state.deletedTaskIds)
   const taskError = useTaskStore((state: TaskState) => state.error)
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
   const openTaskId = useTaskStore((state: TaskState) => state.openTaskId)
@@ -181,6 +183,61 @@ export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Elem
     )
   }, [layout, openTaskAfterId, openTaskId, tasks])
 
+  useEffect((): void => {
+    if (!layout) return
+    let changed = false
+    for (const event of backgroundPanels) {
+      if (event.launch.task.workspaceId !== workspace.id) continue
+      const panelId = `agent:${event.launch.task.id}`
+      if (layout.listPanelIds().includes(panelId)) continue
+      layout.openAgent(
+        { panelId, taskId: event.launch.task.id },
+        event.launch.task.name,
+        event.afterTaskId ? `agent:${event.afterTaskId}` : undefined,
+        false,
+      )
+      changed = true
+    }
+    if (changed) {
+      void window.lithe.workspaceLayouts.save(workspace.id, layout.serialize()).catch(globalThis.console.error)
+    }
+  }, [backgroundPanels, layout, workspace.id])
+
+  useEffect((): void => {
+    if (!layout) return
+    let changed = false
+    for (const taskId of deletedTaskIds) {
+      const panelId = `agent:${taskId}`
+      if (!layout.listPanelIds().includes(panelId)) continue
+      layout.removePanel(panelId)
+      changed = true
+    }
+    if (changed) {
+      void window.lithe.workspaceLayouts.save(workspace.id, layout.serialize()).catch(globalThis.console.error)
+    }
+  }, [deletedTaskIds, layout, workspace.id])
+
+  useEffect((): (() => void) | undefined => {
+    if (!layout) return undefined
+    const reportVisibleTask = (): void => {
+      const selected = layout.getModel().getActiveTabset()?.getSelectedNode()
+      const taskId =
+        selected instanceof TabNode && selected.getComponent() === 'agent'
+          ? (selected.getConfig() as AgentPanelConfig).taskId
+          : null
+      void window.lithe.tasks
+        .setVisible(taskId)
+        .then((): Promise<Task> | undefined => (taskId ? window.lithe.tasks.markViewed(taskId) : undefined))
+        .catch(globalThis.console.error)
+    }
+    reportVisibleTask()
+    globalThis.addEventListener('focus', reportVisibleTask)
+    return (): void => {
+      globalThis.removeEventListener('focus', reportVisibleTask)
+      void window.lithe.tasks.setVisible(null).catch(globalThis.console.error)
+    }
+  }, [layout])
+
   const addTerminal = async (placement: TerminalPlacement): Promise<void> => {
     if (!layout) return
     const source = placement === 'center' ? undefined : layout.getActiveTerminalConfig()
@@ -217,6 +274,15 @@ export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Elem
           factory={createPanelFactory(layout, tasks, workspace.id)}
           model={layout.getModel()}
           onModelChange={(): void => {
+            const selected = layout.getModel().getActiveTabset()?.getSelectedNode()
+            const taskId =
+              selected instanceof TabNode && selected.getComponent() === 'agent'
+                ? (selected.getConfig() as AgentPanelConfig).taskId
+                : null
+            void window.lithe.tasks
+              .setVisible(taskId)
+              .then((): Promise<Task> | undefined => (taskId ? window.lithe.tasks.markViewed(taskId) : undefined))
+              .catch(globalThis.console.error)
             void window.lithe.workspaceLayouts.save(workspace.id, layout.serialize()).catch((error: unknown): void => {
               globalThis.console.error('Lithe workspace layout persistence failed', error)
             })

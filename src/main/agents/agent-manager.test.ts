@@ -13,7 +13,14 @@ const task: Task = {
   name: 'Review',
   adapterVersionId: 'adapter-v1',
   agentSessionId: null,
+  archivedAt: null,
   createdAt: new Date(0),
+  isRunning: false,
+  isUnread: false,
+  lifecycle: 'active',
+  lastAttentionAt: null,
+  lastViewedAt: null,
+  shouldAutoRestore: true,
 }
 const workspace: Workspace = {
   id: 'workspace-1',
@@ -22,6 +29,7 @@ const workspace: Workspace = {
   rootPath: 'D:\\projects\\lithe',
   gitBranch: 'main',
   kind: 'default',
+  pinnedAt: null,
   createdAt: new Date(0),
 }
 const adapter: AdapterVersion = {

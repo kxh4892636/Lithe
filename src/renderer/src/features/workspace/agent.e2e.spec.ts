@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -76,6 +77,57 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
         })
       })
       .toBe('fake-session-fork-1')
+
+    const sourceTaskId = await page.evaluate(async (): Promise<string> => {
+      const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
+      const navigation = await bridge.projects.getNavigation()
+      if (!navigation.activeWorkspaceId) throw new Error('Active workspace is missing')
+      const source = (await bridge.tasks.list(navigation.activeWorkspaceId)).find(
+        (task): boolean => task.name === 'Review',
+      )
+      if (!source) throw new Error('Source task is missing')
+      await bridge.tasks.setVisible(null)
+      return source.id
+    })
+    const runTool = (...arguments_: string[]): ReturnType<typeof spawnSync> =>
+      spawnSync(process.execPath, [cliPath, ...arguments_], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          LITHE_CONTROL_DISCOVERY_PATH: electronSession.controlDiscoveryPath,
+        },
+      })
+
+    expect(runTool('task', 'create', '--name', 'Scratch review').status).toBe(0)
+    await expect
+      .poll(async (): Promise<boolean> => {
+        if (!page) return false
+        return page.evaluate(async (): Promise<boolean> => {
+          const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
+          const navigation = await bridge.projects.getNavigation()
+          const scratch = navigation.scratchWorkspaces.find((workspace): boolean => workspace.kind === 'scratch')
+          if (!scratch || !scratch.rootPath.includes('.lithe')) return false
+          return (await bridge.tasks.list(scratch.id)).some((task): boolean => task.name === 'Scratch review')
+        })
+      })
+      .toBe(true)
+
+    expect(runTool('task', 'unread', '--task-id', sourceTaskId).status).toBe(0)
+    await expect(page.getByLabel('未读').first()).toBeVisible()
+
+    expect(runTool('task', 'running', '--task-id', sourceTaskId, '--instance-id', 'e2e-external-agent').status).toBe(0)
+    expect(runTool('task', 'archive', '--task-id', sourceTaskId).status).toBe(1)
+    expect(runTool('task', 'idle', '--task-id', sourceTaskId, '--instance-id', 'e2e-external-agent').status).toBe(0)
+    expect(runTool('task', 'archive', '--task-id', sourceTaskId).status).toBe(0)
+    await expect
+      .poll(async (): Promise<boolean> => {
+        if (!page) return false
+        return page.evaluate(async (taskId: string): Promise<boolean> => {
+          const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
+          return (await bridge.tasks.listArchived()).some((task): boolean => task.id === taskId)
+        }, sourceTaskId)
+      })
+      .toBe(true)
   } finally {
     await electronSession.close()
     page = undefined

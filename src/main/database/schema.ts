@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const appPreferences = sqliteTable('app_preferences', {
   key: text('key').primaryKey(),
@@ -26,13 +26,12 @@ export const projects = sqliteTable('projects', {
 
 export const workspaces = sqliteTable('workspaces', {
   id: text('id').primaryKey(),
-  projectId: text('project_id')
-    .notNull()
-    .references(() => projects.id, { onDelete: 'cascade' }),
+  projectId: text('project_id').references(() => projects.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   rootPath: text('root_path').notNull().unique(),
   gitBranch: text('git_branch'),
-  kind: text('kind', { enum: ['default', 'derived'] }).notNull(),
+  kind: text('kind', { enum: ['default', 'derived', 'scratch'] }).notNull(),
+  pinnedAt: integer('pinned_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })
 
@@ -86,10 +85,40 @@ export const tasks = sqliteTable(
       .notNull()
       .references(() => adapterVersions.id),
     agentSessionId: text('agent_session_id'),
+    lifecycle: text('lifecycle', { enum: ['active', 'archived'] })
+      .notNull()
+      .default('active'),
+    archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
+    lastViewedAt: integer('last_viewed_at', { mode: 'timestamp_ms' }),
+    shouldAutoRestore: integer('should_auto_restore', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
     uniqueIndex('tasks_workspace_name_unique').on(table.workspaceId, table.nameKey),
     uniqueIndex('tasks_agent_session_unique').on(table.agentSessionId),
   ],
+)
+
+export const taskAttentionEvents = sqliteTable(
+  'task_attention_events',
+  {
+    id: text('id').primaryKey(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [index('task_attention_events_task_created_idx').on(table.taskId, table.createdAt)],
+)
+
+export const taskRunMarkers = sqliteTable(
+  'task_run_markers',
+  {
+    instanceId: text('instance_id').primaryKey(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [index('task_run_markers_task_idx').on(table.taskId)],
 )

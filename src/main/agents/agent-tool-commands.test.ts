@@ -16,13 +16,15 @@ describe('Agent tool commands', (): void => {
     const application = {} as AgentApplication
     const capabilities = createCapabilityRegistry()
     const commands = createToolCommandDispatcher({
-      executeAgent: (): { activeWorkspaceId: string; projects: [] } => ({
+      executeAgent: () => ({
         activeWorkspaceId: 'workspace-1',
         projects: [],
+        scratchWorkspaces: [],
       }),
-      executeExternal: (): { activeWorkspaceId: null; projects: [] } => ({
+      executeExternal: () => ({
         activeWorkspaceId: null,
         projects: [],
+        scratchWorkspaces: [],
       }),
     })
     registerAgentToolCommands({ application, capabilities, commands, manager })
@@ -45,9 +47,10 @@ describe('Agent tool commands', (): void => {
   it('rejects bind from a normal external terminal', async (): Promise<void> => {
     const commands = createToolCommandDispatcher({
       executeAgent: (): undefined => undefined,
-      executeExternal: (): { activeWorkspaceId: null; projects: [] } => ({
+      executeExternal: () => ({
         activeWorkspaceId: null,
         projects: [],
+        scratchWorkspaces: [],
       }),
     })
     registerAgentToolCommands({
@@ -80,9 +83,10 @@ describe('Agent tool commands', (): void => {
       taskId: 'task-1',
     })
     const commands = createToolCommandDispatcher({
-      executeAgent: (): { activeWorkspaceId: string; projects: [] } => ({
+      executeAgent: () => ({
         activeWorkspaceId: 'workspace-1',
         projects: [],
+        scratchWorkspaces: [],
       }),
       executeExternal: (): undefined => undefined,
     })

@@ -1,4 +1,10 @@
-import { parseToolJson, type ToolContext, type ToolRequest, type ToolResponse } from '../../shared/tool-protocol'
+import {
+  parseToolJson,
+  type ToolContext,
+  type ToolErrorCode,
+  type ToolRequest,
+  type ToolResponse,
+} from '../../shared/tool-protocol'
 
 interface ContextCommand {
   executeAgent: (capability: string) => ToolContext | undefined
@@ -12,7 +18,18 @@ export interface ToolCommandDispatcher {
 
 export interface ToolCommandContext {
   authorization: ToolRequest['authorization']
+  connectionId: string
   context: ToolContext
+  requestId: string
+}
+
+export class ToolCommandError extends Error {
+  readonly code: ToolErrorCode
+
+  constructor(code: ToolErrorCode, message: string) {
+    super(message)
+    this.code = code
+  }
 }
 
 export type ToolCommandHandler = (
@@ -23,7 +40,7 @@ export type ToolCommandHandler = (
 export const createToolCommandDispatcher = (context: ContextCommand): ToolCommandDispatcher => {
   const handlers = new Map<string, ToolCommandHandler>()
   return {
-    dispatch: async (request: ToolRequest, _connectionId: string): Promise<ToolResponse> => {
+    dispatch: async (request: ToolRequest, connectionId: string): Promise<ToolResponse> => {
       const authorizedContext =
         request.authorization.kind === 'external'
           ? context.executeExternal(request.authorization.token)
@@ -47,7 +64,9 @@ export const createToolCommandDispatcher = (context: ContextCommand): ToolComman
       try {
         const result = await handler(request.payload ?? {}, {
           authorization: request.authorization,
+          connectionId,
           context: authorizedContext,
+          requestId: request.id,
         })
         const data = parseToolJson(JSON.parse(JSON.stringify(result ?? null)))
         return { id: request.id, ok: true, data }
@@ -56,7 +75,7 @@ export const createToolCommandDispatcher = (context: ContextCommand): ToolComman
           id: request.id,
           ok: false,
           error: {
-            code: 'INVALID_REQUEST',
+            code: error instanceof ToolCommandError ? error.code : 'INVALID_REQUEST',
             message: error instanceof Error ? error.message : 'Invalid command payload',
           },
         }

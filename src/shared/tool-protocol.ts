@@ -33,12 +33,15 @@ export interface ToolContextWorkspace {
   name: string
   rootPath: string
   gitBranch: string | null
-  kind: 'default' | 'derived'
+  kind: 'default' | 'derived' | 'scratch'
   tasks: ToolContextTask[]
 }
 
 export interface ToolContextTask {
   id: string
+  isRunning?: boolean
+  isUnread?: boolean
+  lifecycle?: 'active' | 'archived'
   name: string
 }
 
@@ -53,6 +56,7 @@ export interface ToolContextProject {
 export interface ToolContext {
   activeWorkspaceId: string | null
   projects: ToolContextProject[]
+  scratchWorkspaces: ToolContextWorkspace[]
 }
 
 export type ToolJson = boolean | null | number | string | ToolJson[] | { [key: string]: ToolJson }
@@ -91,14 +95,22 @@ const toolJsonSchema: z.ZodType<ToolJson> = z.lazy(() =>
     z.record(z.string(), toolJsonSchema),
   ]),
 )
-const toolContextTaskSchema = z.object({ id: z.string(), name: z.string() }).strict()
+const toolContextTaskSchema = z
+  .object({
+    id: z.string(),
+    isRunning: z.boolean().optional(),
+    isUnread: z.boolean().optional(),
+    lifecycle: z.enum(['active', 'archived']).optional(),
+    name: z.string(),
+  })
+  .strict()
 const toolContextWorkspaceSchema = z
   .object({
     id: z.string(),
     name: z.string(),
     rootPath: z.string(),
     gitBranch: z.string().nullable(),
-    kind: z.enum(['default', 'derived']),
+    kind: z.enum(['default', 'derived', 'scratch']),
     tasks: z.array(toolContextTaskSchema),
   })
   .strict()
@@ -116,6 +128,7 @@ const toolContextSchema = z
         })
         .strict(),
     ),
+    scratchWorkspaces: z.array(toolContextWorkspaceSchema).default([]),
   })
   .strict()
 const toolResponseSchema = z.discriminatedUnion('ok', [

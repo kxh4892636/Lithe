@@ -4,6 +4,7 @@ import type {
   AdapterDefinition,
   AdapterSummary,
   AgentLaunch,
+  BackgroundAgentLaunch,
   LitheBridge,
   ProjectWithWorkspaces,
   RuntimeInfo,
@@ -12,7 +13,9 @@ import type {
   TerminalExitEvent,
   TerminalSession,
   Task,
+  TaskChangeEvent,
   Theme,
+  Workspace,
   WorkspaceLayoutSnapshot,
   WorkspaceNavigation,
 } from '../shared/app-contract'
@@ -36,15 +39,25 @@ const bridge: LitheBridge = {
   agents: {
     fork: async (taskId: string): Promise<AgentLaunch> =>
       ipcRenderer.invoke(ipcChannels.agentFork, taskId) as Promise<AgentLaunch>,
+    onBackgroundLaunch: (listener: (event: BackgroundAgentLaunch) => void): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, value: BackgroundAgentLaunch): void => listener(value)
+      ipcRenderer.on(ipcChannels.agentBackgroundLaunch, wrapped)
+      return (): void => {
+        ipcRenderer.removeListener(ipcChannels.agentBackgroundLaunch, wrapped)
+      }
+    },
     resume: async (taskId: string): Promise<AgentLaunch> =>
       ipcRenderer.invoke(ipcChannels.agentResume, taskId) as Promise<AgentLaunch>,
     start: async (taskId: string): Promise<AgentLaunch> =>
       ipcRenderer.invoke(ipcChannels.agentStart, taskId) as Promise<AgentLaunch>,
     stop: async (taskId: string): Promise<void> => ipcRenderer.invoke(ipcChannels.agentStop, taskId) as Promise<void>,
+    shouldRestore: async (): Promise<boolean> => ipcRenderer.invoke(ipcChannels.agentShouldRestore) as Promise<boolean>,
   },
   preferences: {
     getPinnedGroupOpen: async (): Promise<boolean> =>
       ipcRenderer.invoke(ipcChannels.getPinnedGroupOpen) as Promise<boolean>,
+    getNotificationsEnabled: async (): Promise<boolean> =>
+      ipcRenderer.invoke(ipcChannels.getNotificationsEnabled) as Promise<boolean>,
     getProjectGroupOpen: async (): Promise<boolean> =>
       ipcRenderer.invoke(ipcChannels.getProjectGroupOpen) as Promise<boolean>,
     getSidebarOpen: async (): Promise<boolean> => ipcRenderer.invoke(ipcChannels.getSidebarOpen) as Promise<boolean>,
@@ -52,6 +65,8 @@ const bridge: LitheBridge = {
     getTheme: async (): Promise<Theme> => ipcRenderer.invoke(ipcChannels.getTheme) as Promise<Theme>,
     setPinnedGroupOpen: async (isOpen: boolean): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.setPinnedGroupOpen, isOpen) as Promise<void>,
+    setNotificationsEnabled: async (isEnabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.setNotificationsEnabled, isEnabled) as Promise<void>,
     setProjectGroupOpen: async (isOpen: boolean): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.setProjectGroupOpen, isOpen) as Promise<void>,
     setSidebarOpen: async (isOpen: boolean): Promise<void> =>
@@ -68,8 +83,17 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.addProjectDirectory) as Promise<ProjectWithWorkspaces | null>,
     getNavigation: async (): Promise<WorkspaceNavigation> =>
       ipcRenderer.invoke(ipcChannels.getWorkspaceNavigation) as Promise<WorkspaceNavigation>,
+    onNavigationChanged: (listener: () => void): (() => void) => {
+      const wrapped = (): void => listener()
+      ipcRenderer.on(ipcChannels.workspaceNavigationChanged, wrapped)
+      return (): void => {
+        ipcRenderer.removeListener(ipcChannels.workspaceNavigationChanged, wrapped)
+      }
+    },
     selectWorkspace: async (workspaceId: string): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.selectWorkspace, workspaceId) as Promise<void>,
+    setWorkspacePinned: async (workspaceId: string, isPinned: boolean): Promise<Workspace> =>
+      ipcRenderer.invoke(ipcChannels.setWorkspacePinned, workspaceId, isPinned) as Promise<Workspace>,
   },
   shells: {
     getDefault: async (): Promise<string> => ipcRenderer.invoke(ipcChannels.getDefaultShell) as Promise<string>,
@@ -102,12 +126,37 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.writeTerminal, panelId, data) as Promise<void>,
   },
   tasks: {
+    archive: async (taskId: string): Promise<Task> =>
+      ipcRenderer.invoke(ipcChannels.taskArchive, taskId) as Promise<Task>,
     create: async (workspaceId: string, name: string): Promise<AgentLaunch> =>
       ipcRenderer.invoke(ipcChannels.taskCreate, workspaceId, name) as Promise<AgentLaunch>,
+    delete: async (taskId: string): Promise<boolean> =>
+      ipcRenderer.invoke(ipcChannels.taskDelete, taskId) as Promise<boolean>,
     list: async (workspaceId: string): Promise<Task[]> =>
       ipcRenderer.invoke(ipcChannels.taskList, workspaceId) as Promise<Task[]>,
+    listArchived: async (): Promise<Task[]> => ipcRenderer.invoke(ipcChannels.taskListArchived) as Promise<Task[]>,
+    markViewed: async (taskId: string): Promise<Task> =>
+      ipcRenderer.invoke(ipcChannels.taskViewed, taskId) as Promise<Task>,
+    onChanged: (listener: (event: TaskChangeEvent) => void): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, value: TaskChangeEvent): void => listener(value)
+      ipcRenderer.on(ipcChannels.taskChanged, wrapped)
+      return (): void => {
+        ipcRenderer.removeListener(ipcChannels.taskChanged, wrapped)
+      }
+    },
+    onNavigate: (listener: (taskId: string) => void): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, taskId: string): void => listener(taskId)
+      ipcRenderer.on(ipcChannels.taskNavigate, wrapped)
+      return (): void => {
+        ipcRenderer.removeListener(ipcChannels.taskNavigate, wrapped)
+      }
+    },
     rename: async (taskId: string, name: string): Promise<Task> =>
       ipcRenderer.invoke(ipcChannels.taskRename, taskId, name) as Promise<Task>,
+    restore: async (taskId: string): Promise<Task> =>
+      ipcRenderer.invoke(ipcChannels.taskRestore, taskId) as Promise<Task>,
+    setVisible: async (taskId: string | null): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.taskSetVisible, taskId) as Promise<void>,
   },
   workspaceLayouts: {
     get: async (workspaceId: string): Promise<WorkspaceLayoutSnapshot | null> =>

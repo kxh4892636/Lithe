@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { app, type BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 
-import type { ProjectWithWorkspaces, RuntimeInfo, Theme, WorkspaceNavigation } from '../shared/app-contract'
+import type { ProjectWithWorkspaces, RuntimeInfo, Theme, Workspace, WorkspaceNavigation } from '../shared/app-contract'
 import { themeValues } from '../shared/app-contract'
 import { ipcChannels } from '../shared/ipc-channels'
 import type { AppDatabase } from './database/app-database'
@@ -84,6 +84,10 @@ export const registerIpcHandlers = ({ database, window }: RegisterIpcHandlersOpt
     assertTrustedSender(event, window)
     return database.preferences.getPinnedGroupOpen()
   })
+  ipcMain.handle(ipcChannels.getNotificationsEnabled, (event): boolean => {
+    assertTrustedSender(event, window)
+    return database.preferences.getNotificationsEnabled()
+  })
   ipcMain.handle(ipcChannels.getProjectGroupOpen, (event): boolean => {
     assertTrustedSender(event, window)
     return database.preferences.getProjectGroupOpen()
@@ -103,6 +107,10 @@ export const registerIpcHandlers = ({ database, window }: RegisterIpcHandlersOpt
   ipcMain.handle(ipcChannels.setPinnedGroupOpen, (event, value: unknown): void => {
     assertTrustedSender(event, window)
     database.preferences.setPinnedGroupOpen(assertBoolean(value))
+  })
+  ipcMain.handle(ipcChannels.setNotificationsEnabled, (event, value: unknown): void => {
+    assertTrustedSender(event, window)
+    database.preferences.setNotificationsEnabled(assertBoolean(value))
   })
   ipcMain.handle(ipcChannels.setProjectGroupOpen, (event, value: unknown): void => {
     assertTrustedSender(event, window)
@@ -124,11 +132,16 @@ export const registerIpcHandlers = ({ database, window }: RegisterIpcHandlersOpt
     return {
       activeWorkspaceId: database.navigation.getActiveWorkspace(),
       projects: database.projects.list(),
+      scratchWorkspaces: database.projects.listScratch(),
     }
   })
   ipcMain.handle(ipcChannels.selectWorkspace, (event, value: unknown): void => {
     assertTrustedSender(event, window)
     database.navigation.setActiveWorkspace(assertIdentifier(value))
+  })
+  ipcMain.handle(ipcChannels.setWorkspacePinned, (event, workspaceId: unknown, isPinned: unknown): Workspace => {
+    assertTrustedSender(event, window)
+    return database.projects.setPinned(assertIdentifier(workspaceId), assertBoolean(isPinned) ? new Date() : null)
   })
 }
 
@@ -138,13 +151,16 @@ export const removeIpcHandlers = (): void => {
   ipcMain.removeHandler(ipcChannels.getSidebarOpen)
   ipcMain.removeHandler(ipcChannels.getSidebarWidth)
   ipcMain.removeHandler(ipcChannels.getPinnedGroupOpen)
+  ipcMain.removeHandler(ipcChannels.getNotificationsEnabled)
   ipcMain.removeHandler(ipcChannels.getProjectGroupOpen)
   ipcMain.removeHandler(ipcChannels.setTheme)
   ipcMain.removeHandler(ipcChannels.setSidebarOpen)
   ipcMain.removeHandler(ipcChannels.setSidebarWidth)
   ipcMain.removeHandler(ipcChannels.setPinnedGroupOpen)
+  ipcMain.removeHandler(ipcChannels.setNotificationsEnabled)
   ipcMain.removeHandler(ipcChannels.setProjectGroupOpen)
   ipcMain.removeHandler(ipcChannels.addProjectDirectory)
   ipcMain.removeHandler(ipcChannels.getWorkspaceNavigation)
   ipcMain.removeHandler(ipcChannels.selectWorkspace)
+  ipcMain.removeHandler(ipcChannels.setWorkspacePinned)
 }

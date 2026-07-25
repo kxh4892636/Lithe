@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { ProjectWithWorkspaces, WorkspaceNavigation } from '../../../../shared/app-contract'
+import type { ProjectWithWorkspaces, Workspace, WorkspaceNavigation } from '../../../../shared/app-contract'
 
 interface ProjectState extends WorkspaceNavigation {
   error: string | null
@@ -8,6 +8,7 @@ interface ProjectState extends WorkspaceNavigation {
   addDirectory: () => Promise<void>
   hydrate: () => Promise<void>
   selectWorkspace: (workspaceId: string) => Promise<void>
+  setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
 }
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
@@ -20,6 +21,7 @@ export const useProjectStore = create<ProjectState>(
   (set): ProjectState => ({
     activeWorkspaceId: null,
     projects: [],
+    scratchWorkspaces: [],
     error: null,
     isLoading: false,
     addDirectory: async (): Promise<void> => {
@@ -61,6 +63,30 @@ export const useProjectStore = create<ProjectState>(
         set({ error: errorMessage(error) })
       }
     },
+    setWorkspacePinned: async (workspaceId: string, isPinned: boolean): Promise<void> => {
+      try {
+        const updated = await window.lithe.projects.setWorkspacePinned(workspaceId, isPinned)
+        set(
+          (state): Partial<ProjectState> => ({
+            error: null,
+            projects: state.projects.map(
+              (project): ProjectWithWorkspaces => ({
+                ...project,
+                workspaces: project.workspaces.map(
+                  (workspace): Workspace => (workspace.id === updated.id ? updated : workspace),
+                ),
+              }),
+            ),
+            scratchWorkspaces: state.scratchWorkspaces.map(
+              (workspace): Workspace => (workspace.id === updated.id ? updated : workspace),
+            ),
+          }),
+        )
+      } catch (error: unknown) {
+        recordBoundaryError('workspace pin update', error)
+        set({ error: errorMessage(error) })
+      }
+    },
   }),
 )
 
@@ -71,3 +97,13 @@ export const findActiveProject = (
   projects.find((project): boolean =>
     project.workspaces.some((workspace): boolean => workspace.id === activeWorkspaceId),
   )
+
+export const findActiveWorkspace = (
+  projects: ProjectWithWorkspaces[],
+  scratchWorkspaces: Workspace[],
+  activeWorkspaceId: string | null,
+): Workspace | undefined =>
+  projects
+    .flatMap((project): Workspace[] => project.workspaces)
+    .concat(scratchWorkspaces)
+    .find((workspace): boolean => workspace.id === activeWorkspaceId)

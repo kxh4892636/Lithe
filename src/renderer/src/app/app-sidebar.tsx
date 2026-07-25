@@ -33,14 +33,14 @@ const AppSidebarFooter = (): React.JSX.Element => {
           </button>
         </div>
       </details>
-      <button
+      <Link
         className="hover:bg-sidebar-accent grid size-8 place-items-center rounded-md"
         title={t('appMenu.archive')}
-        type="button"
+        to="/archive"
       >
         <ArchiveIcon className="size-4" />
         <span className="sr-only">{t('appMenu.archive')}</span>
-      </button>
+      </Link>
     </SidebarFooter>
   )
 }

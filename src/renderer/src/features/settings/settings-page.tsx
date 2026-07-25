@@ -1,4 +1,5 @@
 import { MoonIcon, SunIcon, SunMoonIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +24,13 @@ export const SettingsPage = (): React.JSX.Element => {
   const { t } = useTranslation()
   const theme = useThemeStore((state): Theme => state.theme)
   const setTheme = useThemeStore((state) => state.setTheme)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+  useEffect((): void => {
+    void window.lithe.preferences
+      .getNotificationsEnabled()
+      .then(setNotificationsEnabled)
+      .catch(globalThis.console.error)
+  }, [])
 
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-8 p-8 lg:p-12">
@@ -56,6 +64,27 @@ export const SettingsPage = (): React.JSX.Element => {
               </label>
             ))}
           </RadioGroup>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>任务通知</CardTitle>
+          <CardDescription>后台任务标记未读时，只显示项目、工作区与任务名称，不包含 Agent 内容。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <label className="flex items-center justify-between gap-4 text-sm">
+            <span>启用系统通知</span>
+            <input
+              checked={notificationsEnabled}
+              className="accent-primary size-4"
+              onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+                const enabled = event.target.checked
+                setNotificationsEnabled(enabled)
+                void window.lithe.preferences.setNotificationsEnabled(enabled).catch(globalThis.console.error)
+              }}
+              type="checkbox"
+            />
+          </label>
         </CardContent>
       </Card>
       <AdapterSettings />

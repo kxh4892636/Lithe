@@ -91,12 +91,31 @@ export const AgentPanel = ({ config, task }: AgentPanelProps): React.JSX.Element
   const definition: AdapterDefinition | undefined = adapter?.currentVersion.definition
   const [error, setError] = useState<string | null>(launch?.error ?? null)
   const [isRunning, setIsRunning] = useState(launch?.isRunning ?? false)
+  const restoreAttempted = useRef(false)
   useEffect((): void => {
     void window.lithe.adapters
       .get(task.adapterVersionId)
       .then((summary: AdapterSummary | null): void => setAdapter(summary ?? undefined))
       .catch((reason: unknown): void => setError(reason instanceof Error ? reason.message : String(reason)))
   }, [task.adapterVersionId])
+  useEffect((): void => {
+    if (restoreAttempted.current || launch || task.lifecycle !== 'active' || !task.shouldAutoRestore) return
+    restoreAttempted.current = true
+    void window.lithe.agents
+      .shouldRestore()
+      .then(async (shouldRestore: boolean): Promise<void> => {
+        if (!shouldRestore) return
+        const restored = task.agentSessionId
+          ? await window.lithe.agents.resume(task.id)
+          : await window.lithe.agents.start(task.id)
+        addLaunch(restored)
+        setIsRunning(restored.isRunning)
+        setError(restored.error)
+      })
+      .catch((reason: unknown): void => {
+        setError(reason instanceof Error ? reason.message : String(reason))
+      })
+  }, [addLaunch, launch, task.agentSessionId, task.id, task.lifecycle, task.shouldAutoRestore])
   const run = (operation: 'fork' | 'resume' | 'start' | 'stop'): void => {
     const request =
       operation === 'fork'

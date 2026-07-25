@@ -9,6 +9,7 @@ import {
 } from '../../shared/agent-contract'
 import { ipcChannels } from '../../shared/ipc-channels'
 import type { AppDatabase } from '../database/app-database'
+import type { TaskStateService } from '../tasks/task-state-service'
 import type { AdapterService } from './adapter-service'
 import type { AgentApplication } from './agent-application'
 
@@ -16,6 +17,11 @@ interface RegisterAgentIpcOptions {
   adapters: AdapterService
   application: AgentApplication
   database: AppDatabase
+  deleteTask: (task: Task) => Promise<boolean>
+  isTaskVisible: (taskId: string) => boolean
+  setVisibleTask: (taskId: string | null) => void
+  shouldRestoreAgents: () => boolean
+  states: TaskStateService
   window: BrowserWindow
 }
 
@@ -35,7 +41,17 @@ const assertName = (value: unknown): string => {
   throw new TypeError('Invalid name')
 }
 
-export const registerAgentIpc = ({ adapters, application, database, window }: RegisterAgentIpcOptions): void => {
+export const registerAgentIpc = ({
+  adapters,
+  application,
+  database,
+  deleteTask,
+  isTaskVisible,
+  setVisibleTask,
+  shouldRestoreAgents,
+  states,
+  window,
+}: RegisterAgentIpcOptions): void => {
   ipcMain.handle(ipcChannels.adapterList, (event: IpcMainInvokeEvent): Promise<AdapterSummary[]> => {
     assertTrustedSender(event, window)
     return adapters.list()
@@ -78,6 +94,10 @@ export const registerAgentIpc = ({ adapters, application, database, window }: Re
     assertTrustedSender(event, window)
     return database.tasks.list(assertIdentifier(workspaceId))
   })
+  ipcMain.handle(ipcChannels.taskListArchived, (event: IpcMainInvokeEvent): Task[] => {
+    assertTrustedSender(event, window)
+    return database.tasks.listArchived()
+  })
   ipcMain.handle(
     ipcChannels.taskCreate,
     async (event: IpcMainInvokeEvent, workspaceId: unknown, name: unknown): Promise<AgentLaunch> => {
@@ -88,6 +108,35 @@ export const registerAgentIpc = ({ adapters, application, database, window }: Re
   ipcMain.handle(ipcChannels.taskRename, (event: IpcMainInvokeEvent, taskId: unknown, name: unknown): Task => {
     assertTrustedSender(event, window)
     return application.renameTask(assertIdentifier(taskId), assertName(name))
+  })
+  ipcMain.handle(ipcChannels.taskArchive, (event: IpcMainInvokeEvent, taskId: unknown): Task => {
+    assertTrustedSender(event, window)
+    return states.archive(assertIdentifier(taskId))
+  })
+  ipcMain.handle(ipcChannels.taskRestore, (event: IpcMainInvokeEvent, taskId: unknown): Task => {
+    assertTrustedSender(event, window)
+    return states.restore(assertIdentifier(taskId))
+  })
+  ipcMain.handle(ipcChannels.taskDelete, async (event: IpcMainInvokeEvent, taskId: unknown): Promise<boolean> => {
+    assertTrustedSender(event, window)
+    return deleteTask(states.get(assertIdentifier(taskId)))
+  })
+  ipcMain.handle(ipcChannels.taskViewed, (event: IpcMainInvokeEvent, taskId: unknown): Task => {
+    assertTrustedSender(event, window)
+    const id = assertIdentifier(taskId)
+    return states.markViewed(id, isTaskVisible(id))
+  })
+  ipcMain.handle(ipcChannels.taskSetVisible, (event: IpcMainInvokeEvent, taskId: unknown): void => {
+    assertTrustedSender(event, window)
+    if (taskId === null) {
+      setVisibleTask(null)
+      return
+    }
+    setVisibleTask(assertIdentifier(taskId))
+  })
+  ipcMain.handle(ipcChannels.agentShouldRestore, (event: IpcMainInvokeEvent): boolean => {
+    assertTrustedSender(event, window)
+    return shouldRestoreAgents()
   })
   ipcMain.handle(ipcChannels.agentStart, (event: IpcMainInvokeEvent, taskId: unknown): AgentLaunch => {
     assertTrustedSender(event, window)
@@ -116,9 +165,16 @@ export const removeAgentIpc = (): void => {
   ipcMain.removeHandler(ipcChannels.adapterGet)
   ipcMain.removeHandler(ipcChannels.taskList)
   ipcMain.removeHandler(ipcChannels.taskCreate)
+  ipcMain.removeHandler(ipcChannels.taskArchive)
+  ipcMain.removeHandler(ipcChannels.taskDelete)
   ipcMain.removeHandler(ipcChannels.taskRename)
+  ipcMain.removeHandler(ipcChannels.taskListArchived)
+  ipcMain.removeHandler(ipcChannels.taskRestore)
+  ipcMain.removeHandler(ipcChannels.taskViewed)
+  ipcMain.removeHandler(ipcChannels.taskSetVisible)
   ipcMain.removeHandler(ipcChannels.agentStart)
   ipcMain.removeHandler(ipcChannels.agentResume)
   ipcMain.removeHandler(ipcChannels.agentStop)
   ipcMain.removeHandler(ipcChannels.agentFork)
+  ipcMain.removeHandler(ipcChannels.agentShouldRestore)
 }

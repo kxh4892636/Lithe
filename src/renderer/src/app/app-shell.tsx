@@ -1,16 +1,57 @@
-import { Outlet } from '@tanstack/react-router'
+import { Outlet, useNavigate } from '@tanstack/react-router'
 import { PanelLeftCloseIcon } from 'lucide-react'
-import { type CSSProperties } from 'react'
+import { type CSSProperties, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { useProjectStore } from '@/features/projects/project-store'
+import { useTaskStore } from '@/features/tasks/task-store'
 
 import { AppSidebar } from './app-sidebar'
 import { useNavigationAppearance } from './navigation-appearance'
 
 export const AppShell = (): React.JSX.Element => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const appearance = useNavigationAppearance()
+  useEffect(
+    (): (() => void) =>
+      window.lithe.tasks.onNavigate((taskId: string): void => {
+        const task = Object.values(useTaskStore.getState().tasksByWorkspace)
+          .flat()
+          .find((candidate): boolean => candidate.id === taskId)
+        if (!task) return
+        void useProjectStore
+          .getState()
+          .selectWorkspace(task.workspaceId)
+          .then((): void => {
+            useTaskStore.getState().openTask(task.id)
+            void navigate({ to: '/' })
+          })
+      }),
+    [navigate],
+  )
+  useEffect(
+    (): (() => void) =>
+      window.lithe.agents.onBackgroundLaunch((event): void => {
+        useTaskStore.getState().addBackgroundLaunch(event)
+      }),
+    [],
+  )
+  useEffect(
+    (): (() => void) =>
+      window.lithe.tasks.onChanged((event): void => {
+        useTaskStore.getState().applyChange(event)
+      }),
+    [],
+  )
+  useEffect(
+    (): (() => void) =>
+      window.lithe.projects.onNavigationChanged((): void => {
+        void useProjectStore.getState().hydrate()
+      }),
+    [],
+  )
 
   return (
     <SidebarProvider

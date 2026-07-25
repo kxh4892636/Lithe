@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { findActiveProject, useProjectStore } from '@/features/projects/project-store'
+import { findActiveProject, findActiveWorkspace, useProjectStore } from '@/features/projects/project-store'
 import { WorkspaceView } from '@/features/workspace/workspace-view'
 
 dayjs.extend(utc)
@@ -17,8 +17,9 @@ export const HomePage = (): React.JSX.Element => {
   const { t } = useTranslation()
   const activeWorkspaceId = useProjectStore((state) => state.activeWorkspaceId)
   const projects = useProjectStore((state) => state.projects)
+  const scratchWorkspaces = useProjectStore((state) => state.scratchWorkspaces)
   const activeProject = findActiveProject(projects, activeWorkspaceId)
-  const activeWorkspace = activeProject?.workspaces.find((workspace): boolean => workspace.id === activeWorkspaceId)
+  const activeWorkspace = findActiveWorkspace(projects, scratchWorkspaces, activeWorkspaceId)
   const runtimeQuery = useQuery({
     queryFn: window.lithe.runtime.getInfo,
     queryKey: ['runtime-info'],

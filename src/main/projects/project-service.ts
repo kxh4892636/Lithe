@@ -52,6 +52,7 @@ export const createProjectService = ({
           rootPath,
           gitBranch: await detectGitBranch(rootPath),
           kind: 'default',
+          pinnedAt: null,
           createdAt,
         },
       ],

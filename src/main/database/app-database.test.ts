@@ -178,7 +178,14 @@ describe('app database', (): void => {
       name: 'Review',
       adapterVersionId: codex.id,
       agentSessionId: null,
+      archivedAt: null,
       createdAt: project.createdAt,
+      isRunning: false,
+      isUnread: false,
+      lastAttentionAt: null,
+      lastViewedAt: null,
+      lifecycle: 'active' as const,
+      shouldAutoRestore: true,
     }
 
     database.tasks.add(task)

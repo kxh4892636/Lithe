@@ -1,17 +1,20 @@
 import type { AdapterVersion, AgentLaunch, Task } from '../../shared/agent-contract'
+import type { Workspace } from '../../shared/app-contract'
 import type { AppDatabase } from '../database/app-database'
 import type { TaskService } from '../tasks/task-service'
 import type { AgentManager } from './agent-manager'
 
 interface AgentApplicationOptions {
   database: AppDatabase
+  createScratchWorkspace?: () => Workspace
   inspectAvailability: (adapter: AdapterVersion) => Promise<{ forkAvailable: boolean; resumeAvailable: boolean }>
   manager: AgentManager
+  removeScratchWorkspace?: (workspace: Workspace) => void
   tasks: TaskService
 }
 
 export interface AgentApplication {
-  createTask: (workspaceId: string, name: string) => Promise<AgentLaunch>
+  createTask: (workspaceId: string | null, name: string) => Promise<AgentLaunch>
   fork: (taskId: string) => Promise<AgentLaunch>
   renameTask: (taskId: string, name: string) => Task
   resume: (taskId: string) => Promise<AgentLaunch>
@@ -21,13 +24,23 @@ export interface AgentApplication {
 
 export const createAgentApplication = ({
   database,
+  createScratchWorkspace = (): Workspace => {
+    throw new TypeError('Temporary workspace creation is unavailable')
+  },
   inspectAvailability,
   manager,
+  removeScratchWorkspace = (): void => undefined,
   tasks,
 }: AgentApplicationOptions): AgentApplication => ({
-  createTask: async (workspaceId: string, name: string): Promise<AgentLaunch> => {
-    const task = await tasks.create({ workspaceId, name })
-    return manager.launch(task.id, 'start')
+  createTask: async (workspaceId: string | null, name: string): Promise<AgentLaunch> => {
+    const scratch = workspaceId ? undefined : createScratchWorkspace()
+    try {
+      const task = await tasks.create({ workspaceId: workspaceId ?? scratch?.id ?? '', name })
+      return manager.launch(task.id, 'start')
+    } catch (error: unknown) {
+      if (scratch) removeScratchWorkspace(scratch)
+      throw error
+    }
   },
   fork: async (taskId: string): Promise<AgentLaunch> => {
     const source = database.tasks.get(taskId)

@@ -10,6 +10,7 @@ interface ContextCommandOptions {
   externalToken: string
   getActiveWorkspaceId: () => string | null
   listProjects: () => ProjectWithWorkspaces[]
+  listScratchWorkspaces?: () => Workspace[]
   listTasks: (workspaceId: string) => Task[]
 }
 
@@ -20,6 +21,7 @@ export interface ContextCommand {
 
 const mapContext = (
   projects: ProjectWithWorkspaces[],
+  scratchWorkspaces: Workspace[],
   activeWorkspaceId: string | null,
   listTasks: (workspaceId: string) => Task[],
 ): ToolContext => ({
@@ -37,26 +39,57 @@ const mapContext = (
           rootPath: workspace.rootPath,
           gitBranch: workspace.gitBranch,
           kind: workspace.kind,
-          tasks: listTasks(workspace.id).map((task: Task) => ({ id: task.id, name: task.name })),
+          tasks: listTasks(workspace.id).map((task: Task) => ({
+            id: task.id,
+            isRunning: task.isRunning ?? false,
+            isUnread: task.isUnread ?? false,
+            lifecycle: task.lifecycle ?? 'active',
+            name: task.name,
+          })),
         }),
       ),
+    }),
+  ),
+  scratchWorkspaces: scratchWorkspaces.map(
+    (workspace: Workspace): ToolContextWorkspace => ({
+      id: workspace.id,
+      name: workspace.name,
+      rootPath: workspace.rootPath,
+      gitBranch: workspace.gitBranch,
+      kind: workspace.kind,
+      tasks: listTasks(workspace.id).map((task: Task) => ({
+        id: task.id,
+        isRunning: task.isRunning ?? false,
+        isUnread: task.isUnread ?? false,
+        lifecycle: task.lifecycle ?? 'active',
+        name: task.name,
+      })),
     }),
   ),
 })
 
 const scopeContext = (context: ToolContext, binding: AgentBinding): ToolContext => ({
   activeWorkspaceId: binding.workspaceId,
-  projects: context.projects
-    .filter((project: ToolContextProject): boolean => project.id === binding.projectId)
-    .map(
-      (project: ToolContextProject): ToolContextProject => ({
-        ...project,
-        workspaces: project.workspaces.filter(
+  projects:
+    binding.projectId === null
+      ? []
+      : context.projects
+          .filter((project: ToolContextProject): boolean => project.id === binding.projectId)
+          .map(
+            (project: ToolContextProject): ToolContextProject => ({
+              ...project,
+              workspaces: project.workspaces.filter(
+                (workspace: ToolContextWorkspace): boolean => workspace.id === binding.workspaceId,
+              ),
+            }),
+          )
+          .filter((project: ToolContextProject): boolean => project.workspaces.length === 1),
+  scratchWorkspaces:
+    binding.projectId === null
+      ? context.scratchWorkspaces.filter(
           (workspace: ToolContextWorkspace): boolean => workspace.id === binding.workspaceId,
-        ),
-      }),
-    )
-    .filter((project: ToolContextProject): boolean => project.workspaces.length === 1),
+        )
+      : [],
 })
 
 const matchesToken = (actual: string, expected: string): boolean => {
@@ -70,14 +103,20 @@ export const createContextCommand = ({
   externalToken,
   getActiveWorkspaceId,
   listProjects,
+  listScratchWorkspaces = (): Workspace[] => [],
   listTasks,
 }: ContextCommandOptions): ContextCommand => ({
   executeExternal: (token: string): ToolContext | undefined =>
-    matchesToken(token, externalToken) ? mapContext(listProjects(), getActiveWorkspaceId(), listTasks) : undefined,
+    matchesToken(token, externalToken)
+      ? mapContext(listProjects(), listScratchWorkspaces(), getActiveWorkspaceId(), listTasks)
+      : undefined,
   executeAgent: (capability: string): ToolContext | undefined => {
     const binding = capabilities.resolve(capability)
     if (!binding) return undefined
-    const scoped = scopeContext(mapContext(listProjects(), getActiveWorkspaceId(), listTasks), binding)
-    return scoped.projects.length === 1 ? scoped : undefined
+    const scoped = scopeContext(
+      mapContext(listProjects(), listScratchWorkspaces(), getActiveWorkspaceId(), listTasks),
+      binding,
+    )
+    return scoped.projects.length === 1 || scoped.scratchWorkspaces.length === 1 ? scoped : undefined
   },
 })

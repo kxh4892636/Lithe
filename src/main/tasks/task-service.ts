@@ -44,7 +44,14 @@ export const createTaskService = (options: TaskServiceOptions): TaskService => {
       name: assertUnique(input.workspaceId, input.name),
       adapterVersionId,
       agentSessionId: null,
+      archivedAt: null,
       createdAt: options.now(),
+      isRunning: false,
+      isUnread: false,
+      lifecycle: 'active',
+      lastAttentionAt: null,
+      lastViewedAt: null,
+      shouldAutoRestore: true,
     }
     options.saveTask(task)
     return task

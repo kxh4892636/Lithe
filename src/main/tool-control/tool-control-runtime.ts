@@ -43,6 +43,7 @@ export const createToolControlRuntime = (
       externalToken,
       getActiveWorkspaceId: database.navigation.getActiveWorkspace,
       listProjects: database.projects.list,
+      listScratchWorkspaces: database.projects.listScratch,
       listTasks: database.tasks.list,
     }),
   )

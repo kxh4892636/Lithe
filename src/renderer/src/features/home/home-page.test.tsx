@@ -41,7 +41,7 @@ describe('home page', (): void => {
         addDirectory: vi.fn<LitheBridge['projects']['addDirectory']>().mockResolvedValue(null),
         getNavigation: vi
           .fn<LitheBridge['projects']['getNavigation']>()
-          .mockResolvedValue({ activeWorkspaceId: null, projects: [] }),
+          .mockResolvedValue({ activeWorkspaceId: null, projects: [], scratchWorkspaces: [] }),
         selectWorkspace: vi.fn<LitheBridge['projects']['selectWorkspace']>().mockResolvedValue(undefined),
       },
       runtime: { getInfo: getRuntimeInfo },

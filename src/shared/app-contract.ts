@@ -34,15 +34,16 @@ export interface Project {
   createdAt: Date
 }
 
-export type WorkspaceKind = 'default' | 'derived'
+export type WorkspaceKind = 'default' | 'derived' | 'scratch'
 
 export interface Workspace {
   id: string
-  projectId: string
+  projectId: string | null
   name: string
   rootPath: string
   gitBranch: string | null
   kind: WorkspaceKind
+  pinnedAt?: Date | null
   createdAt: Date
 }
 
@@ -53,6 +54,7 @@ export interface ProjectWithWorkspaces extends Project {
 export interface WorkspaceNavigation {
   activeWorkspaceId: string | null
   projects: ProjectWithWorkspaces[]
+  scratchWorkspaces: Workspace[]
 }
 
 export interface TerminalSession {
@@ -82,17 +84,21 @@ export interface LitheBridge {
   }
   agents: {
     fork: (taskId: string) => Promise<AgentLaunch>
+    onBackgroundLaunch: (listener: (event: BackgroundAgentLaunch) => void) => () => void
     resume: (taskId: string) => Promise<AgentLaunch>
     start: (taskId: string) => Promise<AgentLaunch>
     stop: (taskId: string) => Promise<void>
+    shouldRestore: () => Promise<boolean>
   }
   preferences: {
     getPinnedGroupOpen: () => Promise<boolean>
+    getNotificationsEnabled: () => Promise<boolean>
     getProjectGroupOpen: () => Promise<boolean>
     getSidebarOpen: () => Promise<boolean>
     getSidebarWidth: () => Promise<number>
     getTheme: () => Promise<Theme>
     setPinnedGroupOpen: (isOpen: boolean) => Promise<void>
+    setNotificationsEnabled: (isEnabled: boolean) => Promise<void>
     setProjectGroupOpen: (isOpen: boolean) => Promise<void>
     setSidebarOpen: (isOpen: boolean) => Promise<void>
     setSidebarWidth: (width: number) => Promise<void>
@@ -104,7 +110,9 @@ export interface LitheBridge {
   projects: {
     addDirectory: () => Promise<ProjectWithWorkspaces | null>
     getNavigation: () => Promise<WorkspaceNavigation>
+    onNavigationChanged: (listener: () => void) => () => void
     selectWorkspace: (workspaceId: string) => Promise<void>
+    setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<Workspace>
   }
   shells: {
     getDefault: () => Promise<string>
@@ -120,12 +128,26 @@ export interface LitheBridge {
     write: (panelId: string, data: string) => Promise<void>
   }
   tasks: {
+    archive: (taskId: string) => Promise<Task>
     create: (workspaceId: string, name: string) => Promise<AgentLaunch>
+    delete: (taskId: string) => Promise<boolean>
     list: (workspaceId: string) => Promise<Task[]>
+    listArchived: () => Promise<Task[]>
+    markViewed: (taskId: string) => Promise<Task>
+    onChanged: (listener: (event: TaskChangeEvent) => void) => () => void
+    onNavigate: (listener: (taskId: string) => void) => () => void
     rename: (taskId: string, name: string) => Promise<Task>
+    restore: (taskId: string) => Promise<Task>
+    setVisible: (taskId: string | null) => Promise<void>
   }
   workspaceLayouts: {
     get: (workspaceId: string) => Promise<WorkspaceLayoutSnapshot | null>
     save: (workspaceId: string, snapshot: WorkspaceLayoutSnapshot) => Promise<void>
   }
+}
+
+export type TaskChangeEvent = Task | { deletedTaskId: string; workspaceId: string }
+export interface BackgroundAgentLaunch {
+  afterTaskId?: string
+  launch: AgentLaunch
 }
