@@ -22,6 +22,7 @@ export const toolRequestSchema = z
     id: z.string().min(1).max(128),
     command: z.string().min(1).max(64),
     authorization: z.discriminatedUnion('kind', [externalAuthorizationSchema, agentAuthorizationSchema]),
+    payload: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
 
@@ -54,6 +55,8 @@ export interface ToolContext {
   projects: ToolContextProject[]
 }
 
+export type ToolJson = boolean | null | number | string | ToolJson[] | { [key: string]: ToolJson }
+
 export type ToolErrorCode =
   | 'APPROVAL_TIMEOUT'
   | 'INTERNAL_ERROR'
@@ -64,10 +67,30 @@ export type ToolErrorCode =
   | 'UNKNOWN_COMMAND'
   | 'USER_REJECTED'
 
-export type ToolResponse =
-  | { id: string; ok: true; data: ToolContext }
+export type ToolResponse<T = ToolJson> =
+  | { id: string; ok: true; data: T }
   | { id: string | null; ok: false; error: { code: ToolErrorCode; message: string } }
 
+const toolErrorCodeSchema = z.enum([
+  'APPROVAL_TIMEOUT',
+  'INTERNAL_ERROR',
+  'INVALID_REQUEST',
+  'LITHE_NOT_RUNNING',
+  'REQUEST_TIMEOUT',
+  'UNAUTHORIZED',
+  'UNKNOWN_COMMAND',
+  'USER_REJECTED',
+])
+const toolJsonSchema: z.ZodType<ToolJson> = z.lazy(() =>
+  z.union([
+    z.boolean(),
+    z.null(),
+    z.number().finite(),
+    z.string(),
+    z.array(toolJsonSchema),
+    z.record(z.string(), toolJsonSchema),
+  ]),
+)
 const toolContextTaskSchema = z.object({ id: z.string(), name: z.string() }).strict()
 const toolContextWorkspaceSchema = z
   .object({
@@ -79,33 +102,24 @@ const toolContextWorkspaceSchema = z
     tasks: z.array(toolContextTaskSchema),
   })
   .strict()
-const toolContextProjectSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    rootPath: z.string(),
-    isValid: z.boolean(),
-    workspaces: z.array(toolContextWorkspaceSchema),
-  })
-  .strict()
 const toolContextSchema = z
   .object({
     activeWorkspaceId: z.string().nullable(),
-    projects: z.array(toolContextProjectSchema),
+    projects: z.array(
+      z
+        .object({
+          id: z.string(),
+          name: z.string(),
+          rootPath: z.string(),
+          isValid: z.boolean(),
+          workspaces: z.array(toolContextWorkspaceSchema),
+        })
+        .strict(),
+    ),
   })
   .strict()
-const toolErrorCodeSchema = z.enum([
-  'APPROVAL_TIMEOUT',
-  'INTERNAL_ERROR',
-  'INVALID_REQUEST',
-  'LITHE_NOT_RUNNING',
-  'REQUEST_TIMEOUT',
-  'UNAUTHORIZED',
-  'UNKNOWN_COMMAND',
-  'USER_REJECTED',
-])
 const toolResponseSchema = z.discriminatedUnion('ok', [
-  z.object({ id: z.string(), ok: z.literal(true), data: toolContextSchema }).strict(),
+  z.object({ id: z.string(), ok: z.literal(true), data: toolJsonSchema }).strict(),
   z
     .object({
       id: z.string().nullable(),
@@ -116,6 +130,8 @@ const toolResponseSchema = z.discriminatedUnion('ok', [
 ])
 
 export const parseToolRequest = (value: unknown): ToolRequest => toolRequestSchema.parse(value)
+export const parseToolContext = (value: unknown): ToolContext => toolContextSchema.parse(value)
+export const parseToolJson = (value: unknown): ToolJson => toolJsonSchema.parse(value)
 export const parseToolResponse = (value: unknown): ToolResponse => toolResponseSchema.parse(value)
 
-export const serializeToolResponse = (response: ToolResponse): string => `${JSON.stringify(response)}\n`
+export const serializeToolResponse = <T>(response: ToolResponse<T>): string => `${JSON.stringify(response)}\n`

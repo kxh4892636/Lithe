@@ -1,8 +1,10 @@
+import type { AdapterDefinition, AdapterSummary, AgentLaunch, Task } from './agent-contract'
 import type { TerminalCreateRequest } from './terminal-schema'
 import type { WorkspaceLayoutSnapshot } from './workspace-layout-schema'
 
 export type { TerminalCreateRequest } from './terminal-schema'
 export type { WorkspaceLayoutSnapshot } from './workspace-layout-schema'
+export type { AdapterDefinition, AdapterSummary, AdapterVersion, AgentLaunch, Task } from './agent-contract'
 
 export const themeValues = ['light', 'dark', 'system'] as const
 
@@ -70,6 +72,20 @@ export interface TerminalExitEvent {
 }
 
 export interface LitheBridge {
+  adapters: {
+    create: (name: string, definition: AdapterDefinition) => Promise<AdapterSummary>
+    delete: (adapterId: string) => Promise<void>
+    get: (versionId: string) => Promise<AdapterSummary | null>
+    list: () => Promise<AdapterSummary[]>
+    setDefault: (versionId: string) => Promise<void>
+    update: (adapterId: string, name: string, definition: AdapterDefinition) => Promise<AdapterSummary>
+  }
+  agents: {
+    fork: (taskId: string) => Promise<AgentLaunch>
+    resume: (taskId: string) => Promise<AgentLaunch>
+    start: (taskId: string) => Promise<AgentLaunch>
+    stop: (taskId: string) => Promise<void>
+  }
   preferences: {
     getPinnedGroupOpen: () => Promise<boolean>
     getProjectGroupOpen: () => Promise<boolean>
@@ -102,6 +118,11 @@ export interface LitheBridge {
     onExit: (listener: (event: TerminalExitEvent) => void) => () => void
     resize: (panelId: string, columns: number, rows: number) => Promise<void>
     write: (panelId: string, data: string) => Promise<void>
+  }
+  tasks: {
+    create: (workspaceId: string, name: string) => Promise<AgentLaunch>
+    list: (workspaceId: string) => Promise<Task[]>
+    rename: (taskId: string, name: string) => Promise<Task>
   }
   workspaceLayouts: {
     get: (workspaceId: string) => Promise<WorkspaceLayoutSnapshot | null>

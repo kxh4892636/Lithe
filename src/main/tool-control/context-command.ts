@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 
+import type { Task } from '../../shared/agent-contract'
 import type { ProjectWithWorkspaces, Workspace } from '../../shared/app-contract'
 import type { ToolContext, ToolContextProject, ToolContextWorkspace } from '../../shared/tool-protocol'
 import type { AgentBinding, CapabilityRegistry } from './capability-registry'
@@ -9,6 +10,7 @@ interface ContextCommandOptions {
   externalToken: string
   getActiveWorkspaceId: () => string | null
   listProjects: () => ProjectWithWorkspaces[]
+  listTasks: (workspaceId: string) => Task[]
 }
 
 export interface ContextCommand {
@@ -16,7 +18,11 @@ export interface ContextCommand {
   executeExternal: (token: string) => ToolContext | undefined
 }
 
-const mapContext = (projects: ProjectWithWorkspaces[], activeWorkspaceId: string | null): ToolContext => ({
+const mapContext = (
+  projects: ProjectWithWorkspaces[],
+  activeWorkspaceId: string | null,
+  listTasks: (workspaceId: string) => Task[],
+): ToolContext => ({
   activeWorkspaceId,
   projects: projects.map(
     (project: ProjectWithWorkspaces): ToolContextProject => ({
@@ -31,7 +37,7 @@ const mapContext = (projects: ProjectWithWorkspaces[], activeWorkspaceId: string
           rootPath: workspace.rootPath,
           gitBranch: workspace.gitBranch,
           kind: workspace.kind,
-          tasks: [],
+          tasks: listTasks(workspace.id).map((task: Task) => ({ id: task.id, name: task.name })),
         }),
       ),
     }),
@@ -64,13 +70,14 @@ export const createContextCommand = ({
   externalToken,
   getActiveWorkspaceId,
   listProjects,
+  listTasks,
 }: ContextCommandOptions): ContextCommand => ({
   executeExternal: (token: string): ToolContext | undefined =>
-    matchesToken(token, externalToken) ? mapContext(listProjects(), getActiveWorkspaceId()) : undefined,
+    matchesToken(token, externalToken) ? mapContext(listProjects(), getActiveWorkspaceId(), listTasks) : undefined,
   executeAgent: (capability: string): ToolContext | undefined => {
     const binding = capabilities.resolve(capability)
     if (!binding) return undefined
-    const scoped = scopeContext(mapContext(listProjects(), getActiveWorkspaceId()), binding)
+    const scoped = scopeContext(mapContext(listProjects(), getActiveWorkspaceId(), listTasks), binding)
     return scoped.projects.length === 1 ? scoped : undefined
   },
 })

@@ -93,6 +93,7 @@ describe('local tool control', (): void => {
       externalToken: 'e'.repeat(32),
       getActiveWorkspaceId: (): string => 'workspace-1',
       listProjects: (): ProjectWithWorkspaces[] => [project],
+      listTasks: () => [],
     })
     const capability = capabilities.issue({
       instanceId: 'instance-1',
@@ -113,6 +114,7 @@ describe('local tool control', (): void => {
       externalToken: 'e'.repeat(32),
       getActiveWorkspaceId: (): string => 'workspace-1',
       listProjects: (): ProjectWithWorkspaces[] => [project],
+      listTasks: () => [],
     })
     const capability = capabilities.issue({
       instanceId: 'instance-1',
@@ -132,6 +134,7 @@ describe('local tool control', (): void => {
       externalToken: 'e'.repeat(32),
       getActiveWorkspaceId: (): string => 'workspace-1',
       listProjects: (): ProjectWithWorkspaces[] => [project],
+      listTasks: () => [],
     })
     const server = createLocalControlServer({ dispatcher: createToolCommandDispatcher(context), endpoint })
     servers.push(server)
@@ -161,6 +164,7 @@ describe('local tool control', (): void => {
           externalToken: 'e'.repeat(32),
           getActiveWorkspaceId: (): null => null,
           listProjects: (): ProjectWithWorkspaces[] => [],
+          listTasks: () => [],
         }),
       ),
       endpoint,
@@ -184,6 +188,7 @@ describe('local tool control', (): void => {
           externalToken: 'e'.repeat(32),
           getActiveWorkspaceId: (): null => null,
           listProjects: (): ProjectWithWorkspaces[] => [],
+          listTasks: () => [],
         }),
       ),
       endpoint,
@@ -228,6 +233,7 @@ describe('local tool control', (): void => {
             ],
           },
         }),
+        register: (): void => undefined,
       },
       endpoint,
     })
@@ -255,6 +261,7 @@ describe('local tool control', (): void => {
           dispatchedConnectionId = connectionId
           return { id: request.id, ok: true, data: { activeWorkspaceId: null, projects: [] } }
         },
+        register: (): void => undefined,
       },
       endpoint,
       onDisconnect: (connectionId: string): void => {

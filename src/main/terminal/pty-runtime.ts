@@ -11,8 +11,10 @@ export interface PtyAdapter {
 }
 
 export interface PtyCreateRequest {
+  args?: string[]
   columns: number
   cwd: string
+  environment?: Record<string, string>
   rows: number
   sessionId: string
   shell: string
@@ -28,11 +30,12 @@ export interface PtyRuntime {
 
 interface CreatePtyRuntimeOptions {
   adapter: PtyAdapter
+  onClose?: (sessionId: string) => void
   onData: (sessionId: string, data: string) => void
   onExit: (sessionId: string, exitCode: number) => void
 }
 
-export const createPtyRuntime = ({ adapter, onData, onExit }: CreatePtyRuntimeOptions): PtyRuntime => {
+export const createPtyRuntime = ({ adapter, onClose, onData, onExit }: CreatePtyRuntimeOptions): PtyRuntime => {
   const sessions = new Map<string, PtyProcess>()
   const requireSession = (sessionId: string): PtyProcess => {
     const session = sessions.get(sessionId)
@@ -46,10 +49,15 @@ export const createPtyRuntime = ({ adapter, onData, onExit }: CreatePtyRuntimeOp
       if (!session) return
       sessions.delete(sessionId)
       session.kill()
+      onClose?.(sessionId)
     },
     closeAll: (): void => {
-      for (const session of sessions.values()) session.kill()
+      const closing = [...sessions]
       sessions.clear()
+      for (const [sessionId, session] of closing) {
+        session.kill()
+        onClose?.(sessionId)
+      }
     },
     create: (request: PtyCreateRequest): void => {
       if (sessions.has(request.sessionId)) throw new TypeError('终端会话已存在')

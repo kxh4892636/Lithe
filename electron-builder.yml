@@ -12,6 +12,8 @@ asarUnpack:
 extraResources:
   - from: drizzle
     to: drizzle
+  - from: resources/lithe-tool
+    to: lithe-tool
 npmRebuild: false
 win:
   executableName: lithe

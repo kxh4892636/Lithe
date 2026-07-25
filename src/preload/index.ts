@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import type {
+  AdapterDefinition,
+  AdapterSummary,
+  AgentLaunch,
   LitheBridge,
   ProjectWithWorkspaces,
   RuntimeInfo,
@@ -8,6 +11,7 @@ import type {
   TerminalDataEvent,
   TerminalExitEvent,
   TerminalSession,
+  Task,
   Theme,
   WorkspaceLayoutSnapshot,
   WorkspaceNavigation,
@@ -15,6 +19,29 @@ import type {
 import { ipcChannels } from '../shared/ipc-channels'
 
 const bridge: LitheBridge = {
+  adapters: {
+    create: async (name: string, definition: AdapterDefinition): Promise<AdapterSummary> =>
+      ipcRenderer.invoke(ipcChannels.adapterCreate, name, definition) as Promise<AdapterSummary>,
+    delete: async (adapterId: string): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.adapterDelete, adapterId) as Promise<void>,
+    get: async (versionId: string): Promise<AdapterSummary | null> =>
+      ipcRenderer.invoke(ipcChannels.adapterGet, versionId) as Promise<AdapterSummary | null>,
+    list: async (): Promise<AdapterSummary[]> =>
+      ipcRenderer.invoke(ipcChannels.adapterList) as Promise<AdapterSummary[]>,
+    setDefault: async (versionId: string): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.adapterSetDefault, versionId) as Promise<void>,
+    update: async (adapterId: string, name: string, definition: AdapterDefinition): Promise<AdapterSummary> =>
+      ipcRenderer.invoke(ipcChannels.adapterUpdate, adapterId, name, definition) as Promise<AdapterSummary>,
+  },
+  agents: {
+    fork: async (taskId: string): Promise<AgentLaunch> =>
+      ipcRenderer.invoke(ipcChannels.agentFork, taskId) as Promise<AgentLaunch>,
+    resume: async (taskId: string): Promise<AgentLaunch> =>
+      ipcRenderer.invoke(ipcChannels.agentResume, taskId) as Promise<AgentLaunch>,
+    start: async (taskId: string): Promise<AgentLaunch> =>
+      ipcRenderer.invoke(ipcChannels.agentStart, taskId) as Promise<AgentLaunch>,
+    stop: async (taskId: string): Promise<void> => ipcRenderer.invoke(ipcChannels.agentStop, taskId) as Promise<void>,
+  },
   preferences: {
     getPinnedGroupOpen: async (): Promise<boolean> =>
       ipcRenderer.invoke(ipcChannels.getPinnedGroupOpen) as Promise<boolean>,
@@ -73,6 +100,14 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.resizeTerminal, panelId, columns, rows) as Promise<void>,
     write: async (panelId: string, data: string): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.writeTerminal, panelId, data) as Promise<void>,
+  },
+  tasks: {
+    create: async (workspaceId: string, name: string): Promise<AgentLaunch> =>
+      ipcRenderer.invoke(ipcChannels.taskCreate, workspaceId, name) as Promise<AgentLaunch>,
+    list: async (workspaceId: string): Promise<Task[]> =>
+      ipcRenderer.invoke(ipcChannels.taskList, workspaceId) as Promise<Task[]>,
+    rename: async (taskId: string, name: string): Promise<Task> =>
+      ipcRenderer.invoke(ipcChannels.taskRename, taskId, name) as Promise<Task>,
   },
   workspaceLayouts: {
     get: async (workspaceId: string): Promise<WorkspaceLayoutSnapshot | null> =>

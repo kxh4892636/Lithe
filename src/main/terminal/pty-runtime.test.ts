@@ -110,4 +110,36 @@ describe('PTY runtime', (): void => {
     expect(() => runtime.create(request)).toThrow('spawn failed')
     expect(() => runtime.write('terminal-1', 'data')).toThrow('终端会话不存在')
   })
+
+  it('reports intentional close so Agent capabilities can be revoked', (): void => {
+    const process = createFakeProcess()
+    const onClose = vi.fn<(sessionId: string) => void>()
+    const runtime = createPtyRuntime({
+      adapter: { spawn: (): PtyProcess => process },
+      onClose,
+      onData: (): void => undefined,
+      onExit: (): void => undefined,
+    })
+    runtime.create({ columns: 80, cwd: '.', rows: 24, sessionId: 'agent:task-1', shell: 'agent' })
+
+    runtime.close('agent:task-1')
+
+    expect(onClose).toHaveBeenCalledWith('agent:task-1')
+  })
+
+  it('removes all sessions before close callbacks can reenter the runtime', (): void => {
+    const process = createFakeProcess()
+    let runtime: ReturnType<typeof createPtyRuntime>
+    runtime = createPtyRuntime({
+      adapter: { spawn: (): PtyProcess => process },
+      onClose: (sessionId: string): void => runtime.close(sessionId),
+      onData: (): void => undefined,
+      onExit: (): void => undefined,
+    })
+    runtime.create({ columns: 80, cwd: '.', rows: 24, sessionId: 'agent:task-1', shell: 'agent' })
+
+    runtime.closeAll()
+
+    expect(process.kill).toHaveBeenCalledOnce()
+  })
 })

@@ -11,6 +11,14 @@ describe('settings page', (): void => {
     const setTheme = vi.fn<(theme: Theme) => Promise<void>>().mockResolvedValue(undefined)
     const setDefaultShell = vi.fn<LitheBridge['shells']['setDefault']>().mockResolvedValue(undefined)
     window.lithe = {
+      adapters: {
+        create: vi.fn<LitheBridge['adapters']['create']>(),
+        delete: vi.fn<LitheBridge['adapters']['delete']>().mockResolvedValue(undefined),
+        get: vi.fn<LitheBridge['adapters']['get']>().mockResolvedValue(null),
+        list: vi.fn<LitheBridge['adapters']['list']>().mockResolvedValue([]),
+        setDefault: vi.fn<LitheBridge['adapters']['setDefault']>().mockResolvedValue(undefined),
+        update: vi.fn<LitheBridge['adapters']['update']>(),
+      },
       preferences: {
         getPinnedGroupOpen: vi.fn<LitheBridge['preferences']['getPinnedGroupOpen']>().mockResolvedValue(true),
         getProjectGroupOpen: vi.fn<LitheBridge['preferences']['getProjectGroupOpen']>().mockResolvedValue(true),

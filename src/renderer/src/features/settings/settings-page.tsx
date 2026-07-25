@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 import type { Theme } from '../../../../shared/app-contract'
+import { AdapterSettings } from './adapter-settings'
 import { ShellSettings } from './shell-settings'
 import { useThemeStore } from './theme-store'
 
@@ -57,6 +58,7 @@ export const SettingsPage = (): React.JSX.Element => {
           </RadioGroup>
         </CardContent>
       </Card>
+      <AdapterSettings />
       <ShellSettings />
     </section>
   )

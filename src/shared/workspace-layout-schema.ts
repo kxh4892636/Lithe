@@ -9,7 +9,7 @@ const terminalConfigSchema = z
   })
   .strict()
 
-const tabSchema = z
+const terminalTabSchema = z
   .object({
     component: z.literal('terminal'),
     config: terminalConfigSchema,
@@ -19,6 +19,26 @@ const tabSchema = z
     type: z.literal('tab'),
   })
   .strict()
+
+const agentConfigSchema = z
+  .object({
+    panelId: identifier,
+    taskId: identifier,
+  })
+  .strict()
+
+const agentTabSchema = z
+  .object({
+    component: z.literal('agent'),
+    config: agentConfigSchema,
+    enableRenderOnDemand: z.boolean().optional(),
+    id: identifier,
+    name: z.string().min(1).max(128),
+    type: z.literal('tab'),
+  })
+  .strict()
+
+const tabSchema = z.discriminatedUnion('component', [terminalTabSchema, agentTabSchema])
 
 const tabSetSchema = z
   .object({

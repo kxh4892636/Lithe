@@ -1,4 +1,5 @@
-import { ChevronRightIcon, FolderIcon, FolderPlusIcon, GitBranchIcon, PinIcon } from 'lucide-react'
+import { BotIcon, ChevronRightIcon, FolderIcon, FolderPlusIcon, GitBranchIcon, PinIcon } from 'lucide-react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/sidebar'
 
 import type { ProjectWithWorkspaces } from '../../../../shared/app-contract'
+import { useTaskStore, type TaskState } from '../tasks/task-store'
 import { useProjectStore } from './project-store'
 
 interface NavigationGroupProps {
@@ -28,41 +30,66 @@ interface ProjectTreeProps {
   selectWorkspace: (workspaceId: string) => Promise<void>
 }
 
-const ProjectTree = ({ activeWorkspaceId, projects, selectWorkspace }: ProjectTreeProps): React.JSX.Element => (
-  <SidebarMenu>
-    {projects.map((project) => (
-      <SidebarMenuItem key={project.id}>
-        <SidebarMenuButton tooltip={project.name}>
-          <FolderIcon />
-          <span>{project.name}</span>
-        </SidebarMenuButton>
-        <SidebarMenuSub>
-          {project.workspaces.map((workspace) => (
-            <SidebarMenuSubItem key={workspace.id}>
-              <SidebarMenuSubButton
-                isActive={workspace.id === activeWorkspaceId}
-                onClick={(): void => {
-                  void selectWorkspace(workspace.id)
-                }}
-                render={<button aria-label={workspace.name} type="button" />}
-              >
-                <span className="flex min-w-0 flex-col items-start py-1">
-                  <span className="truncate">{workspace.name}</span>
-                  {workspace.gitBranch ? (
-                    <span className="text-muted-foreground flex max-w-full items-center gap-1 truncate text-[10px]">
-                      <GitBranchIcon className="size-2.5" />
-                      {workspace.gitBranch}
-                    </span>
-                  ) : null}
-                </span>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
-          ))}
-        </SidebarMenuSub>
-      </SidebarMenuItem>
-    ))}
-  </SidebarMenu>
-)
+const ProjectTree = ({ activeWorkspaceId, projects, selectWorkspace }: ProjectTreeProps): React.JSX.Element => {
+  const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
+  const openTask = useTaskStore((state: TaskState) => state.openTask)
+  const tasksByWorkspace = useTaskStore((state: TaskState) => state.tasksByWorkspace)
+
+  useEffect((): void => {
+    for (const project of projects) {
+      for (const workspace of project.workspaces) void hydrateWorkspace(workspace.id)
+    }
+  }, [hydrateWorkspace, projects])
+
+  return (
+    <SidebarMenu>
+      {projects.map((project) => (
+        <SidebarMenuItem key={project.id}>
+          <SidebarMenuButton tooltip={project.name}>
+            <FolderIcon />
+            <span>{project.name}</span>
+          </SidebarMenuButton>
+          <SidebarMenuSub>
+            {project.workspaces.map((workspace) => (
+              <SidebarMenuSubItem key={workspace.id}>
+                <SidebarMenuSubButton
+                  isActive={workspace.id === activeWorkspaceId}
+                  onClick={(): void => {
+                    void selectWorkspace(workspace.id)
+                  }}
+                  render={<button aria-label={workspace.name} type="button" />}
+                >
+                  <span className="flex min-w-0 flex-col items-start py-1">
+                    <span className="truncate">{workspace.name}</span>
+                    {workspace.gitBranch ? (
+                      <span className="text-muted-foreground flex max-w-full items-center gap-1 truncate text-[10px]">
+                        <GitBranchIcon className="size-2.5" />
+                        {workspace.gitBranch}
+                      </span>
+                    ) : null}
+                  </span>
+                </SidebarMenuSubButton>
+                {(tasksByWorkspace[workspace.id] ?? []).map((task) => (
+                  <button
+                    className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 py-1 pl-7 text-left text-xs"
+                    key={task.id}
+                    onClick={(): void => {
+                      void selectWorkspace(workspace.id).then((): void => openTask(task.id))
+                    }}
+                    type="button"
+                  >
+                    <BotIcon className="size-3" />
+                    <span className="truncate">{task.name}</span>
+                  </button>
+                ))}
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  )
+}
 
 export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps): React.JSX.Element => {
   const { t } = useTranslation()

@@ -149,4 +149,69 @@ describe('app database', (): void => {
     expect(database.workspaceLayouts.get(workspace.id)).toEqual(snapshot)
     expect(JSON.stringify(database.workspaceLayouts.get(workspace.id))).not.toContain('secret output')
   })
+
+  it('seeds immutable built-in Adapters and binds tasks idempotently', (): void => {
+    const database = createTestDatabase()
+    const project = {
+      id: 'project-agent',
+      name: 'agent',
+      rootPath: 'D:\\projects\\agent',
+      isValid: true,
+      createdAt: new Date('2026-07-25T00:00:00.000Z'),
+    }
+    const workspace = {
+      id: 'workspace-agent',
+      projectId: project.id,
+      name: '默认',
+      rootPath: project.rootPath,
+      gitBranch: 'main',
+      kind: 'default' as const,
+      createdAt: project.createdAt,
+    }
+    database.projects.add(project, workspace)
+    const codex = database.adapters.listCurrent().find((adapter): boolean => adapter.name === 'Codex')
+    if (!codex) throw new Error('Codex Adapter was not seeded')
+    database.adapters.setDefault(codex.id)
+    const task = {
+      id: 'task-agent',
+      workspaceId: workspace.id,
+      name: 'Review',
+      adapterVersionId: codex.id,
+      agentSessionId: null,
+      createdAt: project.createdAt,
+    }
+
+    database.tasks.add(task)
+
+    expect(database.adapters.getDefault()?.id).toBe(codex.id)
+    expect(database.tasks.list(workspace.id)).toEqual([task])
+    expect(database.tasks.bindSession(task.id, 'provider-1').agentSessionId).toBe('provider-1')
+    expect(database.tasks.bindSession(task.id, 'provider-1').agentSessionId).toBe('provider-1')
+    expect(() => database.tasks.bindSession(task.id, 'provider-2')).toThrow('already bound')
+    database.tasks.add({ ...task, id: 'task-agent-2', name: 'Review 2' })
+    expect(() => database.tasks.bindSession('task-agent-2', 'provider-1')).toThrow('another task')
+  })
+
+  it('keeps an old custom Adapter version readable after edits and deletion', (): void => {
+    const database = createTestDatabase()
+    const first = database.adapters.createCustom('custom-1', 'custom-1-v1', 'Wrapper', {
+      executable: 'wrapper',
+      start: [],
+      resume: null,
+      fork: null,
+    })
+    const second = database.adapters.updateCustom('custom-1', 'custom-1-v2', 'Wrapper 2', {
+      executable: 'wrapper',
+      start: ['--new'],
+      resume: null,
+      fork: null,
+    })
+
+    database.adapters.deleteCustom('custom-1')
+
+    expect(first.version).toBe(1)
+    expect(second.version).toBe(2)
+    expect(database.adapters.listCurrent().some((adapter): boolean => adapter.adapterId === 'custom-1')).toBe(false)
+    expect(database.adapters.getVersion(first.id)?.definition.start).toEqual([])
+  })
 })

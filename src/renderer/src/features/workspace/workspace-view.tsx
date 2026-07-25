@@ -4,9 +4,17 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
-import type { Workspace } from '../../../../shared/app-contract'
-import { createLayoutAdapter, type TerminalPanelConfig, type WorkspaceLayoutAdapter } from './layout-adapter'
+import type { AdapterSummary, Task, Workspace } from '../../../../shared/app-contract'
+import { useTaskStore, type TaskState } from '../tasks/task-store'
+import { AgentPanel } from './agent-panel'
+import {
+  createLayoutAdapter,
+  type AgentPanelConfig,
+  type TerminalPanelConfig,
+  type WorkspaceLayoutAdapter,
+} from './layout-adapter'
 import { TerminalPanel } from './terminal-panel'
 
 interface WorkspaceViewProps {
@@ -14,13 +22,60 @@ interface WorkspaceViewProps {
 }
 
 type TerminalPlacement = 'center' | 'right' | 'bottom'
+const noTasks: never[] = []
 
 interface WorkspaceToolbarProps {
   addTerminal: (placement: TerminalPlacement) => Promise<void>
+  createTask: (name: string) => Promise<void>
 }
 
-const WorkspaceToolbar = ({ addTerminal }: WorkspaceToolbarProps): React.JSX.Element => {
+const DefaultAdapterPicker = (): React.JSX.Element | null => {
+  const [adapters, setAdapters] = useState<AdapterSummary[]>([])
+  useEffect((): void => {
+    void window.lithe.adapters.list().then(setAdapters).catch(globalThis.console.error)
+  }, [])
+  if (adapters.some((adapter: AdapterSummary): boolean => adapter.isDefault)) return null
+  const available = adapters.filter((adapter: AdapterSummary): boolean => adapter.isAvailable)
+  return (
+    <select
+      aria-label="默认 Coding Agent"
+      className="bg-background h-7 max-w-44 rounded-md border px-2 text-xs"
+      defaultValue=""
+      onChange={(event: React.ChangeEvent<HTMLSelectElement>): void => {
+        const adapter = available.find(
+          (candidate: AdapterSummary): boolean => candidate.currentVersion.id === event.target.value,
+        )
+        if (!adapter) return
+        void window.lithe.adapters
+          .setDefault(adapter.currentVersion.id)
+          .then((): void => {
+            setAdapters((current: AdapterSummary[]): AdapterSummary[] =>
+              current.map(
+                (candidate: AdapterSummary): AdapterSummary => ({
+                  ...candidate,
+                  isDefault: candidate.currentVersion.id === adapter.currentVersion.id,
+                }),
+              ),
+            )
+          })
+          .catch(globalThis.console.error)
+      }}
+    >
+      <option disabled value="">
+        选择默认 Agent
+      </option>
+      {available.map((adapter: AdapterSummary) => (
+        <option key={adapter.id} value={adapter.currentVersion.id}>
+          {adapter.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+const WorkspaceToolbar = ({ addTerminal, createTask }: WorkspaceToolbarProps): React.JSX.Element => {
   const { t } = useTranslation()
+  const [taskName, setTaskName] = useState('')
   const button = (
     placement: TerminalPlacement,
     label: string,
@@ -45,13 +100,54 @@ const WorkspaceToolbar = ({ addTerminal }: WorkspaceToolbarProps): React.JSX.Ele
       {button('center', t('terminal.new'), SquareTerminalIcon)}
       {button('right', t('terminal.horizontalSplit'), Columns2Icon)}
       {button('bottom', t('terminal.verticalSplit'), Rows2Icon)}
+      <div className="ml-auto flex items-center gap-1">
+        <DefaultAdapterPicker />
+        <Input
+          aria-label="任务名称"
+          className="h-7 w-40"
+          onChange={(event: React.ChangeEvent<HTMLInputElement>): void => setTaskName(event.target.value)}
+          placeholder="新任务"
+          value={taskName}
+        />
+        <Button
+          disabled={!taskName.trim()}
+          onClick={(): void => {
+            void createTask(taskName)
+              .then((): void => setTaskName(''))
+              .catch((): void => undefined)
+          }}
+          size="sm"
+        >
+          创建任务
+        </Button>
+      </div>
     </div>
   )
 }
 
+type PanelFactory = (node: TabNode) => React.ReactNode
+
+const createPanelFactory =
+  (layout: WorkspaceLayoutAdapter, tasks: Task[], workspaceId: string): PanelFactory =>
+  (node: TabNode): React.ReactNode => {
+    if (node.getComponent() === 'agent') {
+      const config = node.getConfig() as AgentPanelConfig
+      const task = tasks.find((candidate: Task): boolean => candidate.id === config.taskId)
+      return task ? <AgentPanel config={config} task={task} /> : null
+    }
+    const config = node.getConfig() as TerminalPanelConfig
+    return <TerminalPanel config={config} updateTerminal={layout.updateTerminal} workspaceId={workspaceId} />
+  }
+
 export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Element => {
   const { t } = useTranslation()
   const [layout, setLayout] = useState<WorkspaceLayoutAdapter>()
+  const createTask = useTaskStore((state: TaskState) => state.createTask)
+  const taskError = useTaskStore((state: TaskState) => state.error)
+  const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
+  const openTaskId = useTaskStore((state: TaskState) => state.openTaskId)
+  const openTaskAfterId = useTaskStore((state: TaskState) => state.openTaskAfterId)
+  const tasks = useTaskStore((state: TaskState) => state.tasksByWorkspace[workspace.id] ?? noTasks)
 
   useEffect((): (() => void) => {
     let active = true
@@ -70,6 +166,21 @@ export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Elem
     }
   }, [workspace.id])
 
+  useEffect((): void => {
+    void hydrateWorkspace(workspace.id)
+  }, [hydrateWorkspace, workspace.id])
+
+  useEffect((): void => {
+    if (!layout || !openTaskId) return
+    const task = tasks.find((candidate): boolean => candidate.id === openTaskId)
+    if (!task) return
+    layout.openAgent(
+      { panelId: `agent:${task.id}`, taskId: task.id },
+      task.name,
+      openTaskAfterId ? `agent:${openTaskAfterId}` : undefined,
+    )
+  }, [layout, openTaskAfterId, openTaskId, tasks])
+
   const addTerminal = async (placement: TerminalPlacement): Promise<void> => {
     if (!layout) return
     const source = placement === 'center' ? undefined : layout.getActiveTerminalConfig()
@@ -84,6 +195,9 @@ export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Elem
       targetGroupId: layout.getActiveGroupId(),
     })
   }
+  const createNamedTask = async (name: string): Promise<void> => {
+    await createTask(workspace.id, name)
+  }
 
   if (!layout) {
     return (
@@ -91,20 +205,16 @@ export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Elem
     )
   }
 
-  const factory = (node: TabNode): React.ReactNode => {
-    const config = node.getConfig() as TerminalPanelConfig
-    return <TerminalPanel config={config} updateTerminal={layout.updateTerminal} workspaceId={workspace.id} />
-  }
-
   return (
     <section
       className="flex size-full min-h-0 flex-col"
       aria-label={t('terminal.workspaceLabel', { name: workspace.name })}
     >
-      <WorkspaceToolbar addTerminal={addTerminal} />
+      <WorkspaceToolbar addTerminal={addTerminal} createTask={createNamedTask} />
+      {taskError ? <p className="text-destructive border-b px-3 py-1 text-xs">{taskError}</p> : null}
       <div className="relative min-h-0 flex-1">
         <Layout
-          factory={factory}
+          factory={createPanelFactory(layout, tasks, workspace.id)}
           model={layout.getModel()}
           onModelChange={(): void => {
             void window.lithe.workspaceLayouts.save(workspace.id, layout.serialize()).catch((error: unknown): void => {

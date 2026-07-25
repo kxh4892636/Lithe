@@ -6,7 +6,7 @@ import { dirname } from 'node:path'
 import type { AppDatabase } from '../database/app-database'
 import { createApprovalQueue, type ApprovalQueue } from './approval-queue'
 import { createCapabilityRegistry, type CapabilityRegistry } from './capability-registry'
-import { createToolCommandDispatcher } from './command-dispatcher'
+import { createToolCommandDispatcher, type ToolCommandDispatcher } from './command-dispatcher'
 import { createContextCommand } from './context-command'
 import { removeControlDiscovery, resolveControlDiscoveryPath, writeControlDiscovery } from './control-discovery'
 import { createLocalControlServer, type LocalControlServer } from './local-control-server'
@@ -16,6 +16,7 @@ export interface ToolControlRuntime {
   approvals: ApprovalQueue
   capabilities: CapabilityRegistry
   close: () => Promise<void>
+  commands: ToolCommandDispatcher
   listen: () => Promise<void>
 }
 
@@ -36,15 +37,17 @@ export const createToolControlRuntime = (
     platform: process.platform,
     userIdentity: userInfo().username,
   })
+  const commands = createToolCommandDispatcher(
+    createContextCommand({
+      capabilities,
+      externalToken,
+      getActiveWorkspaceId: database.navigation.getActiveWorkspace,
+      listProjects: database.projects.list,
+      listTasks: database.tasks.list,
+    }),
+  )
   const server: LocalControlServer = createLocalControlServer({
-    dispatcher: createToolCommandDispatcher(
-      createContextCommand({
-        capabilities,
-        externalToken,
-        getActiveWorkspaceId: database.navigation.getActiveWorkspace,
-        listProjects: database.projects.list,
-      }),
-    ),
+    dispatcher: commands,
     endpoint,
     onDisconnect: approvals.cancelConnection,
     onSocketError: (error: Error): void => {
@@ -57,6 +60,7 @@ export const createToolControlRuntime = (
   return {
     approvals,
     capabilities,
+    commands,
     listen: async (): Promise<void> => {
       await server.listen()
       mkdirSync(dirname(discoveryPath), { recursive: true, mode: 0o700 })

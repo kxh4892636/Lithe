@@ -9,6 +9,11 @@ export interface TerminalPanelConfig {
   shell: string
 }
 
+export interface AgentPanelConfig {
+  panelId: string
+  taskId: string
+}
+
 type Placement = 'center' | 'right' | 'bottom'
 
 interface AddPanelOptions {
@@ -17,6 +22,7 @@ interface AddPanelOptions {
 }
 
 export interface WorkspaceLayoutAdapter {
+  openAgent: (panel: AgentPanelConfig, taskName: string, afterPanelId?: string) => void
   addTerminal: (panel: TerminalPanelConfig, options?: AddPanelOptions) => void
   getActiveGroupId: () => string
   getActiveTerminalConfig: () => TerminalPanelConfig | undefined
@@ -91,7 +97,9 @@ export const createLayoutAdapter = (snapshot?: WorkspaceLayoutSnapshot): Workspa
     getActiveGroupId: (): string => activeGroup().getId(),
     getActiveTerminalConfig: (): TerminalPanelConfig | undefined => {
       const selected = activeGroup().getSelectedNode()
-      return selected instanceof TabNode ? (selected.getConfig() as TerminalPanelConfig) : undefined
+      return selected instanceof TabNode && selected.getComponent() === 'terminal'
+        ? (selected.getConfig() as TerminalPanelConfig)
+        : undefined
     },
     getModel: (): Model => model,
     listPanelIds: (): string[] => {
@@ -103,6 +111,25 @@ export const createLayoutAdapter = (snapshot?: WorkspaceLayoutSnapshot): Workspa
     },
     movePanel: (panelId: string, targetGroupId: string): void => {
       model.doAction(Actions.moveNode(panelId, targetGroupId, DockLocation.CENTER, -1, true))
+    },
+    openAgent: (panel: AgentPanelConfig, taskName: string, afterPanelId?: string): void => {
+      if (model.getNodeById(panel.panelId)) {
+        model.doAction(Actions.selectTab(panel.panelId))
+        return
+      }
+      const tab: IJsonTabNode = {
+        type: 'tab',
+        component: 'agent',
+        config: panel,
+        enableRenderOnDemand: false,
+        id: panel.panelId,
+        name: taskName,
+      }
+      const source = afterPanelId ? model.getNodeById(afterPanelId) : undefined
+      const sourceGroup = source?.getParent()
+      const targetGroup = sourceGroup instanceof TabSetNode ? sourceGroup : activeGroup()
+      const targetIndex = source ? targetGroup.getChildren().indexOf(source) + 1 : -1
+      model.doAction(Actions.addTab(tab, targetGroup.getId(), DockLocation.CENTER, targetIndex, true))
     },
     serialize: (): WorkspaceLayoutSnapshot =>
       parseWorkspaceLayoutSnapshot({ version: 1, layout: sanitizeLayout(model) }),

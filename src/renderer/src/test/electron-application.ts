@@ -65,6 +65,7 @@ const launchApplication = async (
         ...process.env,
         LITHE_CONTROL_DISCOVERY_PATH: controlDiscoveryPath,
         LITHE_E2E: '1',
+        LITHE_SKILL_HOME: userDataDirectory,
         LITHE_USER_DATA_DIR: userDataDirectory,
       },
     })

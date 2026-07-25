@@ -3,16 +3,20 @@ import { connect } from 'node:net'
 
 import {
   parseToolResponse,
+  parseToolContext,
   serializeToolResponse,
   toolMessageMaxBytes,
   toolProtocolVersion,
   type ToolRequest,
   type ToolResponse,
+  type ToolContext,
 } from '../shared/tool-protocol'
 
 export interface ToolClientOptions {
   authorization: ToolRequest['authorization']
+  command: string
   endpoint: string
+  payload?: Record<string, unknown>
   timeoutMilliseconds?: number
 }
 
@@ -22,9 +26,11 @@ const unavailable = (): ToolResponse => ({
   error: { code: 'LITHE_NOT_RUNNING', message: 'Lithe is not running' },
 })
 
-export const requestContext = ({
+export const requestTool = ({
   authorization,
+  command,
   endpoint,
+  payload,
   timeoutMilliseconds = 5_000,
 }: ToolClientOptions): Promise<ToolResponse> =>
   new Promise((resolve: (value: ToolResponse) => void): void => {
@@ -32,8 +38,9 @@ export const requestContext = ({
     const request: ToolRequest = {
       version: toolProtocolVersion,
       id: randomUUID(),
-      command: 'context',
+      command,
       authorization,
+      ...(payload ? { payload } : {}),
     }
     let buffer = Buffer.alloc(0)
     let settled = false
@@ -95,4 +102,12 @@ export const requestContext = ({
     })
   })
 
-export const responseToStdout = (response: ToolResponse): string => serializeToolResponse(response)
+export const requestContext = (
+  options: Omit<ToolClientOptions, 'command' | 'payload'>,
+): Promise<ToolResponse<ToolContext>> =>
+  requestTool({ ...options, command: 'context' }).then((response): ToolResponse<ToolContext> => {
+    if (!response.ok) return response
+    return { ...response, data: parseToolContext(response.data) }
+  })
+
+export const responseToStdout = <T>(response: ToolResponse<T>): string => serializeToolResponse(response)
