@@ -28,6 +28,7 @@ const createInput = (payload: Record<string, unknown>): WorkspaceCreateInput => 
   name: stringValue(payload, 'name', true),
   newBranch: stringValue(payload, 'newBranch', true),
   projectId: stringValue(payload, 'projectId') ?? '',
+  sourceWorkspaceId: stringValue(payload, 'sourceWorkspaceId', true),
 })
 
 const requireApproval = async (

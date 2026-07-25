@@ -18,7 +18,9 @@ export interface AdapterRepository {
   deleteCustom: (adapterId: string) => void
   ensureVersions: (versions: AdapterVersion[]) => void
   getDefault: () => AdapterVersion | undefined
+  getUsageCount: (adapterId: string) => number
   getVersion: (versionId: string) => AdapterVersion | undefined
+  incrementUsage: (adapterId: string) => void
   listCurrent: () => AdapterVersion[]
   setDefault: (versionId: string) => void
   updateCustom: (adapterId: string, versionId: string, name: string, definition: AdapterDefinition) => AdapterVersion
@@ -216,7 +218,34 @@ export const createAdapterRepository = (database: Database, sqlite: DatabaseSync
       : undefined
     return adapter && !adapter.isDeleted && adapter.currentVersion === version?.version ? version : undefined
   },
+  getUsageCount: (adapterId: string): number => {
+    const row = database
+      .select({ value: appPreferences.value })
+      .from(appPreferences)
+      .where(eq(appPreferences.key, `adapter-usage:${adapterId}`))
+      .get()
+    const count = Number.parseInt(row?.value ?? '0', 10)
+    return Number.isSafeInteger(count) && count >= 0 ? count : 0
+  },
   getVersion: (versionId: string): AdapterVersion | undefined => getAdapterVersion(database, versionId),
+  incrementUsage: (adapterId: string): void => {
+    const key = `adapter-usage:${adapterId}`
+    const current = database
+      .select({ value: appPreferences.value })
+      .from(appPreferences)
+      .where(eq(appPreferences.key, key))
+      .get()
+    const parsed = Number.parseInt(current?.value ?? '0', 10)
+    const next = Number.isSafeInteger(parsed) && parsed >= 0 ? parsed + 1 : 1
+    database
+      .insert(appPreferences)
+      .values({ key, value: String(next), updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: appPreferences.key,
+        set: { value: String(next), updatedAt: new Date() },
+      })
+      .run()
+  },
   listCurrent: (): AdapterVersion[] => {
     const adapterRows = database
       .select()

@@ -14,7 +14,7 @@ interface AgentApplicationOptions {
 }
 
 export interface AgentApplication {
-  createTask: (workspaceId: string | null, name: string) => Promise<AgentLaunch>
+  createTask: (workspaceId: string | null, name: string, adapterId?: string) => Promise<AgentLaunch>
   fork: (taskId: string) => Promise<AgentLaunch>
   renameTask: (taskId: string, name: string) => Task
   resume: (taskId: string) => Promise<AgentLaunch>
@@ -32,10 +32,10 @@ export const createAgentApplication = ({
   removeScratchWorkspace = (): void => undefined,
   tasks,
 }: AgentApplicationOptions): AgentApplication => ({
-  createTask: async (workspaceId: string | null, name: string): Promise<AgentLaunch> => {
+  createTask: async (workspaceId: string | null, name: string, adapterId?: string): Promise<AgentLaunch> => {
     const scratch = workspaceId ? undefined : createScratchWorkspace()
     try {
-      const task = await tasks.create({ workspaceId: workspaceId ?? scratch?.id ?? '', name })
+      const task = await tasks.create({ adapterId, workspaceId: workspaceId ?? scratch?.id ?? '', name })
       return manager.launch(task.id, 'start')
     } catch (error: unknown) {
       if (scratch) removeScratchWorkspace(scratch)

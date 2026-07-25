@@ -48,6 +48,7 @@ export const createTaskStateService = (options: TaskStateServiceOptions): TaskSt
     },
     delete: (taskId: string): void => {
       const task = required(taskId)
+      if (task.lifecycle !== 'archived') throw new TypeError('Task must be archived before deletion')
       options.stopAgent(taskId)
       options.clearRunMarks(taskId)
       options.removeTaskPanel(task.workspaceId, task.id)

@@ -152,6 +152,8 @@ export const createLayoutAdapter = (snapshot?: WorkspaceLayoutSnapshot): Workspa
       if (model.getNodeById(panelId)) model.doAction(Actions.deleteTab(panelId))
     },
     openAgent: (panel: AgentPanelConfig, taskName: string, afterPanelId?: string, select = true): void => {
+      const maximized = model.getMaximizedTabset()
+      if (maximized) model.doAction(Actions.maximizeToggle(maximized.getId()))
       if (model.getNodeById(panel.panelId)) {
         if (select) model.doAction(Actions.selectTab(panel.panelId))
         return

@@ -208,8 +208,8 @@ const bridge: LitheBridge = {
   tasks: {
     archive: async (taskId: string): Promise<Task> =>
       ipcRenderer.invoke(ipcChannels.taskArchive, taskId) as Promise<Task>,
-    create: async (workspaceId: string, name: string): Promise<AgentLaunch> =>
-      ipcRenderer.invoke(ipcChannels.taskCreate, workspaceId, name) as Promise<AgentLaunch>,
+    create: async (workspaceId: string, name: string, adapterId?: string): Promise<AgentLaunch> =>
+      ipcRenderer.invoke(ipcChannels.taskCreate, workspaceId, name, adapterId) as Promise<AgentLaunch>,
     delete: async (taskId: string): Promise<boolean> =>
       ipcRenderer.invoke(ipcChannels.taskDelete, taskId) as Promise<boolean>,
     list: async (workspaceId: string): Promise<Task[]> =>
@@ -237,6 +237,18 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.taskRestore, taskId) as Promise<Task>,
     setVisible: async (taskId: string | null): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.taskSetVisible, taskId) as Promise<void>,
+  },
+  window: {
+    getMaximized: async (): Promise<boolean> => ipcRenderer.invoke(ipcChannels.getWindowMaximized) as Promise<boolean>,
+    onMaximizedChanged: (listener: (isMaximized: boolean) => void): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, value: boolean): void => listener(value)
+      ipcRenderer.on(ipcChannels.windowMaximizedChanged, wrapped)
+      return (): void => {
+        ipcRenderer.removeListener(ipcChannels.windowMaximizedChanged, wrapped)
+      }
+    },
+    toggleMaximized: async (): Promise<boolean> =>
+      ipcRenderer.invoke(ipcChannels.toggleWindowMaximized) as Promise<boolean>,
   },
   workspaceLayouts: {
     get: async (workspaceId: string): Promise<WorkspaceLayoutSnapshot | null> =>

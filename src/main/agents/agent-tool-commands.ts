@@ -73,7 +73,8 @@ export const registerAgentToolCommands = ({
         throw new TypeError('Capability is invalid or expired')
       }
       if (workspaceId) assertAgentTarget(context, capabilities, workspaceId, 'workspace')
-      const launch = await application.createTask(workspaceId ?? null, name(payload))
+      const adapterId = payload.adapterId === undefined ? undefined : identifier(payload, 'adapterId')
+      const launch = await application.createTask(workspaceId ?? null, name(payload), adapterId)
       onBackgroundLaunch(launch)
       return launch
     },

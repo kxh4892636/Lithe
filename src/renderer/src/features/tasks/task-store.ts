@@ -14,16 +14,22 @@ export interface TaskState {
   addLaunch: (launch: AgentLaunch, afterTaskId?: string) => void
   addBackgroundLaunch: (event: BackgroundAgentLaunch) => void
   applyChange: (event: TaskChangeEvent) => void
-  createTask: (workspaceId: string, name: string) => Promise<AgentLaunch>
+  createTask: (workspaceId: string, name: string, adapterId?: string) => Promise<AgentLaunch>
+  forkTask: (taskId: string) => Promise<AgentLaunch>
   archiveTask: (taskId: string) => Promise<void>
   deleteTask: (taskId: string) => Promise<boolean>
   hydrateArchived: () => Promise<void>
   hydrateWorkspace: (workspaceId: string) => Promise<void>
   openTask: (taskId: string) => void
+  renameTask: (taskId: string, name: string) => Promise<Task>
   restoreTask: (taskId: string) => Promise<void>
 }
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+const upsertTask = (tasks: Task[], next: Task): Task[] =>
+  tasks.some((task: Task): boolean => task.id === next.id)
+    ? tasks.map((task: Task): Task => (task.id === next.id ? next : task))
+    : [...tasks, next]
 
 export const useTaskStore = create<TaskState>(
   (set): TaskState => ({
@@ -38,14 +44,14 @@ export const useTaskStore = create<TaskState>(
     addLaunch: (launch: AgentLaunch, afterTaskId?: string): void => {
       set((state): Partial<TaskState> => {
         const existing = state.tasksByWorkspace[launch.task.workspaceId] ?? []
-        const tasks = existing.some((task: Task): boolean => task.id === launch.task.id)
-          ? existing
-          : [...existing, launch.task]
         return {
           launchesByTask: { ...state.launchesByTask, [launch.task.id]: launch },
           openTaskAfterId: afterTaskId ?? null,
           openTaskId: launch.task.id,
-          tasksByWorkspace: { ...state.tasksByWorkspace, [launch.task.workspaceId]: tasks },
+          tasksByWorkspace: {
+            ...state.tasksByWorkspace,
+            [launch.task.workspaceId]: upsertTask(existing, launch.task),
+          },
         }
       })
     },
@@ -60,9 +66,7 @@ export const useTaskStore = create<TaskState>(
           launchesByTask: { ...state.launchesByTask, [event.launch.task.id]: event.launch },
           tasksByWorkspace: {
             ...state.tasksByWorkspace,
-            [event.launch.task.workspaceId]: existing.some((task: Task): boolean => task.id === event.launch.task.id)
-              ? existing.map((task: Task): Task => (task.id === event.launch.task.id ? event.launch.task : task))
-              : [...existing, event.launch.task],
+            [event.launch.task.workspaceId]: upsertTask(existing, event.launch.task),
           },
         }
       })
@@ -94,16 +98,14 @@ export const useTaskStore = create<TaskState>(
               archivedTasks: state.archivedTasks.filter((task: Task): boolean => task.id !== event.id),
               tasksByWorkspace: {
                 ...state.tasksByWorkspace,
-                [event.workspaceId]: workspaceTasks.some((task: Task): boolean => task.id === event.id)
-                  ? workspaceTasks.map((task: Task): Task => (task.id === event.id ? event : task))
-                  : [...workspaceTasks, event],
+                [event.workspaceId]: upsertTask(workspaceTasks, event),
               },
             }
       })
     },
-    createTask: async (workspaceId: string, name: string): Promise<AgentLaunch> => {
+    createTask: async (workspaceId: string, name: string, adapterId?: string): Promise<AgentLaunch> => {
       try {
-        const launch = await window.lithe.tasks.create(workspaceId, name)
+        const launch = await window.lithe.tasks.create(workspaceId, name, adapterId)
         set(
           (state): Partial<TaskState> => ({
             error: null,
@@ -112,7 +114,28 @@ export const useTaskStore = create<TaskState>(
             openTaskId: launch.task.id,
             tasksByWorkspace: {
               ...state.tasksByWorkspace,
-              [workspaceId]: [...(state.tasksByWorkspace[workspaceId] ?? []), launch.task],
+              [workspaceId]: upsertTask(state.tasksByWorkspace[workspaceId] ?? [], launch.task),
+            },
+          }),
+        )
+        return launch
+      } catch (error: unknown) {
+        set({ error: errorMessage(error) })
+        throw error
+      }
+    },
+    forkTask: async (taskId: string): Promise<AgentLaunch> => {
+      try {
+        const launch = await window.lithe.agents.fork(taskId)
+        set(
+          (state): Partial<TaskState> => ({
+            error: null,
+            launchesByTask: { ...state.launchesByTask, [launch.task.id]: launch },
+            openTaskAfterId: taskId,
+            openTaskId: launch.task.id,
+            tasksByWorkspace: {
+              ...state.tasksByWorkspace,
+              [launch.task.workspaceId]: upsertTask(state.tasksByWorkspace[launch.task.workspaceId] ?? [], launch.task),
             },
           }),
         )
@@ -188,6 +211,27 @@ export const useTaskStore = create<TaskState>(
       }
     },
     openTask: (taskId: string): void => set({ openTaskAfterId: null, openTaskId: taskId }),
+    renameTask: async (taskId: string, name: string): Promise<Task> => {
+      try {
+        const renamed = await window.lithe.tasks.rename(taskId, name)
+        set(
+          (state): Partial<TaskState> => ({
+            archivedTasks: state.archivedTasks.map((task): Task => (task.id === taskId ? renamed : task)),
+            error: null,
+            tasksByWorkspace: {
+              ...state.tasksByWorkspace,
+              [renamed.workspaceId]: (state.tasksByWorkspace[renamed.workspaceId] ?? []).map(
+                (task): Task => (task.id === taskId ? renamed : task),
+              ),
+            },
+          }),
+        )
+        return renamed
+      } catch (error: unknown) {
+        set({ error: errorMessage(error) })
+        throw error
+      }
+    },
     restoreTask: async (taskId: string): Promise<void> => {
       try {
         const restored = await window.lithe.tasks.restore(taskId)
@@ -197,7 +241,7 @@ export const useTaskStore = create<TaskState>(
             error: null,
             tasksByWorkspace: {
               ...state.tasksByWorkspace,
-              [restored.workspaceId]: [...(state.tasksByWorkspace[restored.workspaceId] ?? []), restored],
+              [restored.workspaceId]: upsertTask(state.tasksByWorkspace[restored.workspaceId] ?? [], restored),
             },
           }),
         )

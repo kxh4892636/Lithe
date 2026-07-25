@@ -11,8 +11,20 @@ const intersectsDisplay = (bounds: Rectangle, workArea: Rectangle): boolean => {
   return horizontal >= minimumVisibleSize && vertical >= minimumVisibleSize
 }
 
-export const resolveWindowOptions = (state: WindowState | undefined): BrowserWindowConstructorOptions => {
-  const defaults = { height: 720, minHeight: 560, minWidth: 800, width: 1100 }
+export const resolveWindowOptions = (
+  state: WindowState | undefined,
+  primaryWorkArea: Rectangle = screen.getPrimaryDisplay().workArea,
+): BrowserWindowConstructorOptions => {
+  const width = Math.max(800, Math.round(primaryWorkArea.width * 0.61))
+  const height = Math.max(560, Math.round(primaryWorkArea.height * 0.61))
+  const defaults = {
+    height,
+    minHeight: 560,
+    minWidth: 800,
+    width,
+    x: Math.round(primaryWorkArea.x + (primaryWorkArea.width - width) / 2),
+    y: Math.round(primaryWorkArea.y + (primaryWorkArea.height - height) / 2),
+  }
   if (!state) return defaults
   const bounds = { height: state.height, width: state.width, x: state.x, y: state.y }
   const isVisible = screen.getAllDisplays().some((display): boolean => intersectsDisplay(bounds, display.workArea))

@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 
 import type { Page } from '@playwright/test'
 
@@ -54,8 +54,14 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
       { executable: process.execPath, toolPath: cliPath },
     )
 
-    await page.getByLabel('任务名称').fill('Review')
-    await page.getByRole('button', { name: '创建任务' }).click()
+    await expect(page.getByRole('button', { name: basename(projectDirectory), exact: true })).toBeVisible()
+    const workspaceRow = page.locator('[data-sidebar="menu-sub-item"]').first()
+    await expect(workspaceRow).toBeVisible()
+    await workspaceRow.hover()
+    await workspaceRow.getByRole('button', { name: /创建任务/ }).click()
+    const taskDialog = page.getByRole('dialog')
+    await taskDialog.getByLabel('任务名称').fill('Review')
+    await taskDialog.getByRole('button', { name: '创建任务' }).click()
     await expect(page.locator('[data-agent-id]')).toHaveCount(1)
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_READY')
 
@@ -113,7 +119,19 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
       .toBe(true)
 
     expect(runTool('task', 'unread', '--task-id', sourceTaskId).status).toBe(0)
-    await expect(page.getByLabel('未读').first()).toBeVisible()
+    await expect
+      .poll(
+        async (): Promise<boolean> =>
+          page?.evaluate(async (taskId: string): Promise<boolean> => {
+            const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
+            const navigation = await bridge.projects.getNavigation()
+            if (!navigation.activeWorkspaceId) return false
+            return (await bridge.tasks.list(navigation.activeWorkspaceId)).some(
+              (task): boolean => task.id === taskId && Boolean(task.isUnread),
+            )
+          }, sourceTaskId) ?? false,
+      )
+      .toBe(true)
 
     expect(runTool('task', 'running', '--task-id', sourceTaskId, '--instance-id', 'e2e-external-agent').status).toBe(0)
     expect(runTool('task', 'archive', '--task-id', sourceTaskId).status).toBe(1)

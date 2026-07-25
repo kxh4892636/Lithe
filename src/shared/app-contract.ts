@@ -63,6 +63,7 @@ export interface WorkspaceCreateInput {
   name?: string
   newBranch?: string
   projectId: string
+  sourceWorkspaceId?: string
 }
 
 export interface WorkspaceCreatePreview {
@@ -200,6 +201,11 @@ export interface LitheBridge {
   runtime: {
     getInfo: () => Promise<RuntimeInfo>
   }
+  window: {
+    getMaximized: () => Promise<boolean>
+    onMaximizedChanged: (listener: (isMaximized: boolean) => void) => () => void
+    toggleMaximized: () => Promise<boolean>
+  }
   projects: {
     addDirectory: () => Promise<ProjectWithWorkspaces | null>
     getNavigation: () => Promise<WorkspaceNavigation>
@@ -232,7 +238,7 @@ export interface LitheBridge {
   }
   tasks: {
     archive: (taskId: string) => Promise<Task>
-    create: (workspaceId: string, name: string) => Promise<AgentLaunch>
+    create: (workspaceId: string, name: string, adapterId?: string) => Promise<AgentLaunch>
     delete: (taskId: string) => Promise<boolean>
     list: (workspaceId: string) => Promise<Task[]>
     listArchived: () => Promise<Task[]>

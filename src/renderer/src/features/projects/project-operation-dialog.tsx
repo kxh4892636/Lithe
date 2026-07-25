@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 import type {
   ProjectRemovalPreview,
@@ -14,13 +21,13 @@ import { CreateOperationFields, DestructiveOperationFields, NameOperationField }
 import { useProjectStore } from './project-store'
 
 export type ProjectOperation =
-  | { kind: 'create'; project: ProjectWithWorkspaces }
+  | { kind: 'create'; project: ProjectWithWorkspaces; sourceWorkspace?: Workspace }
   | { kind: 'delete'; workspace: Workspace }
   | { kind: 'forget'; project: ProjectWithWorkspaces }
   | { kind: 'remove'; project: ProjectWithWorkspaces }
   | { kind: 'rename'; workspace: Workspace }
 
-interface ProjectOperationSheetProps {
+interface ProjectOperationDialogProps {
   onClose: () => void
   operation: ProjectOperation | null
 }
@@ -99,6 +106,7 @@ const executeOperation = async (options: ExecuteOperationOptions): Promise<boole
       name: options.name || undefined,
       newBranch: options.branchMode === 'new' ? options.branch : undefined,
       projectId: operation.project.id,
+      sourceWorkspaceId: operation.sourceWorkspace?.id,
     }
     const preview = await window.lithe.workspaces.previewCreate(input)
     if (preview.dirtyPaths.length > 0 && options.createPreview?.dirtyFingerprint !== preview.dirtyFingerprint) {
@@ -195,37 +203,37 @@ const ProjectOperationForm = ({ onClose, operation }: ProjectOperationFormProps)
         />
         {error ? <p className="text-destructive text-xs">{error}</p> : null}
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button disabled={isDisabled} type="submit" variant={operation.kind === 'create' ? 'default' : 'destructive'}>
           {operation.kind === 'create' ? '创建工作区' : operation.kind === 'rename' ? '保存名称' : '确认操作'}
         </Button>
         <Button onClick={onClose} type="button" variant="outline">
           取消
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   )
 }
 
-export const ProjectOperationSheet = ({ onClose, operation }: ProjectOperationSheetProps): React.JSX.Element => (
-  <Sheet
+export const ProjectOperationDialog = ({ onClose, operation }: ProjectOperationDialogProps): React.JSX.Element => (
+  <Dialog
     onOpenChange={(isOpen): void => {
       if (!isOpen) onClose()
     }}
     open={operation !== null}
   >
     {operation ? (
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{title(operation)}</SheetTitle>
-          <SheetDescription>{description(operation)}</SheetDescription>
-        </SheetHeader>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title(operation)}</DialogTitle>
+          <DialogDescription>{description(operation)}</DialogDescription>
+        </DialogHeader>
         <ProjectOperationForm
           key={`${operation.kind}-${'project' in operation ? operation.project.id : operation.workspace.id}`}
           onClose={onClose}
           operation={operation}
         />
-      </SheetContent>
+      </DialogContent>
     ) : null}
-  </Sheet>
+  </Dialog>
 )

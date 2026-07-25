@@ -47,7 +47,7 @@ const adapter: AdapterVersion = {
   createdAt: new Date(0),
 }
 
-const setup = () => {
+const setup = (resolveExecutable = (executable: string): string => executable) => {
   let savedTask = { ...task }
   const runtime = {
     close: vi.fn<(sessionId: string) => void>(),
@@ -75,6 +75,7 @@ const setup = () => {
     capabilities,
     createId: (): string => 'instance-1',
     database,
+    resolveExecutable,
     runtime,
   })
   return { capabilities, manager, runtime }
@@ -101,6 +102,18 @@ describe('Agent manager', (): void => {
     expect(manager.bind(capability, 'provider-1').agentSessionId).toBe('provider-1')
     expect(manager.bind(capability, 'provider-1').agentSessionId).toBe('provider-1')
     expect(() => manager.bind(capability, 'provider-2')).toThrow('already bound')
+  })
+
+  it('launches the resolved executable path instead of the Adapter command name', (): void => {
+    const { manager, runtime } = setup((): string => 'C:\\Tools\\fake-agent.exe')
+
+    manager.launch(task.id, 'start')
+
+    expect(runtime.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        shell: 'C:\\Tools\\fake-agent.exe',
+      }),
+    )
   })
 
   it('revokes capability when the Agent instance exits', (): void => {

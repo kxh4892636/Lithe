@@ -77,6 +77,16 @@ export const registerIpcHandlers = ({
       refreshedAt: new Date().toISOString(),
     }
   })
+  ipcMain.handle(ipcChannels.getWindowMaximized, (event): boolean => {
+    assertTrustedSender(event, window)
+    return window.isMaximized()
+  })
+  ipcMain.handle(ipcChannels.toggleWindowMaximized, (event): boolean => {
+    assertTrustedSender(event, window)
+    if (window.isMaximized()) window.unmaximize()
+    else window.maximize()
+    return window.isMaximized()
+  })
   ipcMain.handle(ipcChannels.getTheme, (event): Theme => {
     assertTrustedSender(event, window)
     return database.preferences.getTheme()

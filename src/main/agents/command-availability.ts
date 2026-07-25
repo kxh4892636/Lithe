@@ -16,6 +16,8 @@ interface ProbeResult {
   succeeded: boolean
 }
 
+export const resolveExecutablePath = (executable: string): string | null => which.sync(executable, { nothrow: true })
+
 const probe = (executable: string, arguments_: string[]): Promise<ProbeResult> =>
   new Promise((resolve: (value: ProbeResult) => void): void => {
     execFile(

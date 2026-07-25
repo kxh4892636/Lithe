@@ -100,9 +100,18 @@ export const registerAgentIpc = ({
   })
   ipcMain.handle(
     ipcChannels.taskCreate,
-    async (event: IpcMainInvokeEvent, workspaceId: unknown, name: unknown): Promise<AgentLaunch> => {
+    async (
+      event: IpcMainInvokeEvent,
+      workspaceId: unknown,
+      name: unknown,
+      adapterId: unknown,
+    ): Promise<AgentLaunch> => {
       assertTrustedSender(event, window)
-      return application.createTask(assertIdentifier(workspaceId), assertName(name))
+      return application.createTask(
+        assertIdentifier(workspaceId),
+        assertName(name),
+        adapterId === undefined ? undefined : assertIdentifier(adapterId),
+      )
     },
   )
   ipcMain.handle(ipcChannels.taskRename, (event: IpcMainInvokeEvent, taskId: unknown, name: unknown): Task => {
@@ -152,7 +161,10 @@ export const registerAgentIpc = ({
   })
   ipcMain.handle(ipcChannels.agentFork, async (event: IpcMainInvokeEvent, taskId: unknown): Promise<AgentLaunch> => {
     assertTrustedSender(event, window)
-    return application.fork(assertIdentifier(taskId))
+    const sourceTaskId = assertIdentifier(taskId)
+    const launch = await application.fork(sourceTaskId)
+    database.workspaceLayouts.addAgentPanel?.(launch.task.workspaceId, launch.task.id, launch.task.name, sourceTaskId)
+    return launch
   })
 }
 

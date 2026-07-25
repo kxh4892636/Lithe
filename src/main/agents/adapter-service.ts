@@ -51,6 +51,7 @@ export const createAdapterService = ({
       isAvailable: availability.isAvailable,
       resumeAvailable: availability.resumeAvailable,
       unavailableReason: availability.reason,
+      usageCount: repository.getUsageCount(version.adapterId),
     }
   }
 

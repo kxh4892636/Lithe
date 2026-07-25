@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input'
 
 import type { WorkspaceCreatePreview, WorkspaceDeletePreview } from '../../../../shared/app-contract'
-import type { ProjectOperation } from './project-operation-sheet'
+import type { ProjectOperation } from './project-operation-dialog'
 
 interface CreateOperationFieldsProps {
   branch: string

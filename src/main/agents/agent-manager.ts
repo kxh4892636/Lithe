@@ -5,6 +5,7 @@ import type { AppDatabase } from '../database/app-database'
 import type { PtyRuntime } from '../terminal/pty-runtime'
 import type { CapabilityRegistry } from '../tool-control/capability-registry'
 import { renderAdapterCommand, type AdapterOperation } from './adapter-executor'
+import { resolveExecutablePath } from './command-availability'
 
 interface RunningAgent {
   capability: string
@@ -18,6 +19,7 @@ interface AgentManagerOptions {
   createId?: () => string
   database: AppDatabase
   onInstanceExit?: (instanceId: string) => void
+  resolveExecutable?: (executable: string) => string | null
   runtime: PtyRuntime
 }
 
@@ -34,6 +36,7 @@ export const createAgentManager = ({
   createId = randomUUID,
   database,
   onInstanceExit = (): void => undefined,
+  resolveExecutable = resolveExecutablePath,
   runtime,
 }: AgentManagerOptions): AgentManager => {
   const runningByTask = new Map<string, RunningAgent>()
@@ -98,7 +101,7 @@ export const createAgentManager = ({
           environment: { LITHE_CAPABILITY: capability },
           rows: 24,
           sessionId,
-          shell: command.executable,
+          shell: resolveExecutable(command.executable) ?? command.executable,
         })
       } catch (error: unknown) {
         capabilities.revokeInstance(instanceId)

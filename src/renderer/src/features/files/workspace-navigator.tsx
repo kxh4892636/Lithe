@@ -78,10 +78,10 @@ export const WorkspaceNavigator = ({
           <PanelRightCloseIcon />
         </Button>
       </header>
-      <div className={tab === 'files' ? 'flex min-h-0 flex-1' : 'hidden'}>
+      <div className={tab === 'files' ? 'flex min-h-0 flex-1 p-2' : 'hidden'}>
         <FileTree onOpenFile={onOpenFile} showIgnored={showIgnored} workspaceId={workspaceId} />
       </div>
-      <div className={tab === 'changes' ? 'relative min-h-0 flex-1 overflow-hidden' : 'hidden'}>
+      <div className={tab === 'changes' ? 'relative min-h-0 flex-1 overflow-hidden p-2' : 'hidden'}>
         <GitChangeTree
           active={tab === 'changes'}
           onOpenDiff={onOpenDiff}

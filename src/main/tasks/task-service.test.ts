@@ -24,13 +24,25 @@ const adapter: AdapterVersion = {
   createdAt: new Date(0),
 }
 
-const setup = (overrides: { available?: boolean; defaultAdapter?: AdapterVersion } = {}) => {
+const setup = (
+  overrides: {
+    adapters?: AdapterVersion[]
+    available?: boolean
+    defaultAdapter?: AdapterVersion
+  } = {},
+) => {
   const tasks: Task[] = []
+  const usage: string[] = []
   const service = createTaskService({
     createId: (): string => `task-${tasks.length + 1}`,
     getDefaultAdapter: (): AdapterVersion | undefined => overrides.defaultAdapter,
+    getAdapter: (adapterId: string): AdapterVersion | undefined =>
+      overrides.adapters?.find((candidate): boolean => candidate.adapterId === adapterId),
     getWorkspace: (workspaceId: string): Workspace | undefined =>
       workspaceId === workspace.id ? workspace : undefined,
+    incrementAdapterUsage: (adapterId: string): void => {
+      usage.push(adapterId)
+    },
     isAdapterAvailable: async (): Promise<boolean> => overrides.available ?? true,
     listTasks: (): Task[] => tasks,
     now: (): Date => new Date('2026-07-25T00:00:00.000Z'),
@@ -46,7 +58,7 @@ const setup = (overrides: { available?: boolean; defaultAdapter?: AdapterVersion
       return updated
     },
   })
-  return { service, tasks }
+  return { service, tasks, usage }
 }
 
 describe('task service', (): void => {
@@ -65,13 +77,29 @@ describe('task service', (): void => {
   })
 
   it('creates a normalized-unique task pinned to an immutable Adapter version', async (): Promise<void> => {
-    const { service } = setup({ defaultAdapter: adapter })
+    const { service, usage } = setup({ defaultAdapter: adapter })
     const task = await service.create({ workspaceId: workspace.id, name: '  Review  ' })
 
     expect(task).toMatchObject({ name: 'Review', adapterVersionId: 'adapter-v1', agentSessionId: null })
+    expect(usage).toEqual(['adapter'])
     await expect(service.create({ workspaceId: workspace.id, name: 'review' })).rejects.toThrow(
       'Task name already exists',
     )
+    expect(usage).toEqual(['adapter'])
+  })
+
+  it('uses an explicitly selected available Adapter instead of the global default', async (): Promise<void> => {
+    const selected = { ...adapter, id: 'selected-v2', adapterId: 'selected', version: 2 }
+    const { service, usage } = setup({ adapters: [selected], defaultAdapter: adapter })
+
+    const task = await service.create({
+      workspaceId: workspace.id,
+      name: 'Review',
+      adapterId: selected.adapterId,
+    })
+
+    expect(task.adapterVersionId).toBe(selected.id)
+    expect(usage).toEqual([selected.adapterId])
   })
 
   it('allocates fork names from the complete current source name', async (): Promise<void> => {

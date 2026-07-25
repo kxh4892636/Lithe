@@ -1,11 +1,14 @@
 import { ArchiveRestoreIcon, Trash2Icon } from 'lucide-react'
 import { useEffect } from 'react'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { findActiveWorkspace, useProjectStore } from '@/features/projects/project-store'
 
 import type { Task } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from './task-store'
+import { useAdaptersByVersion } from './use-adapters-by-version'
 
 export const ArchivePage = (): React.JSX.Element => {
   const archivedTasks = useTaskStore((state: TaskState) => state.archivedTasks)
@@ -14,6 +17,10 @@ export const ArchivePage = (): React.JSX.Element => {
   const restoreTask = useTaskStore((state: TaskState) => state.restoreTask)
   const projects = useProjectStore((state) => state.projects)
   const scratchWorkspaces = useProjectStore((state) => state.scratchWorkspaces)
+  const adaptersByVersion = useAdaptersByVersion(archivedTasks.map((task): string => task.adapterVersionId))
+  const reportTaskAction = (action: Promise<unknown>): void => {
+    void action.catch(globalThis.console.error)
+  }
 
   useEffect((): void => {
     void hydrateArchived()
@@ -32,36 +39,47 @@ export const ArchivePage = (): React.JSX.Element => {
         ) : (
           archivedTasks.map((task: Task) => {
             const workspace = findActiveWorkspace(projects, scratchWorkspaces, task.workspaceId)
+            const adapter = adaptersByVersion.get(task.adapterVersionId)
             return (
-              <article className="flex items-center gap-4 p-4" key={task.id}>
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-sm font-medium">{task.name}</h2>
-                  <p className="text-muted-foreground mt-1 truncate text-xs">
-                    {workspace?.name ?? '无效工作区'}
-                    {task.archivedAt ? ` · ${task.archivedAt.toLocaleString()}` : ''}
-                  </p>
-                </div>
-                <Button
-                  onClick={(): void => {
-                    void restoreTask(task.id)
-                  }}
-                  size="sm"
-                  variant="outline"
-                >
-                  <ArchiveRestoreIcon />
-                  恢复
-                </Button>
-                <Button
-                  onClick={(): void => {
-                    void deleteTask(task.id)
-                  }}
-                  size="icon-sm"
-                  title="删除"
-                  variant="ghost"
-                >
-                  <Trash2Icon />
-                </Button>
-              </article>
+              <ContextMenu key={task.id}>
+                <ContextMenuTrigger render={<article className="flex items-center gap-4 p-4" />}>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="flex items-center gap-1 truncate text-sm font-medium">
+                      <Badge className="h-4 px-1 text-[9px]" variant="secondary">
+                        {adapter?.name ?? 'agent'}
+                      </Badge>
+                      <span className="truncate">-{task.name}</span>
+                    </h2>
+                    <p className="text-muted-foreground mt-1 truncate text-xs">
+                      {workspace?.name ?? '无效工作区'}
+                      {task.archivedAt ? ` · ${task.archivedAt.toLocaleString()}` : ''}
+                    </p>
+                  </div>
+                  <Button onClick={(): void => reportTaskAction(restoreTask(task.id))} size="sm" variant="outline">
+                    <ArchiveRestoreIcon />
+                    恢复
+                  </Button>
+                  <Button
+                    aria-label={`删除 ${task.name}`}
+                    onClick={(): void => reportTaskAction(deleteTask(task.id))}
+                    size="icon-sm"
+                    title="删除"
+                    variant="ghost"
+                  >
+                    <Trash2Icon />
+                  </Button>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onClick={(): void => reportTaskAction(restoreTask(task.id))}>
+                    <ArchiveRestoreIcon />
+                    恢复
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={(): void => reportTaskAction(deleteTask(task.id))} variant="destructive">
+                    <Trash2Icon />
+                    删除
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             )
           })
         )}

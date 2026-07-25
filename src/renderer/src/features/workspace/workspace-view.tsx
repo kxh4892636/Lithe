@@ -1,16 +1,15 @@
-import { Actions, Layout, TabNode, type Action } from 'flexlayout-react'
-import { Columns2Icon, PanelRightOpenIcon, Rows2Icon, SquareTerminalIcon } from 'lucide-react'
+import { Actions, Layout, TabNode, TabSetNode, type Action } from 'flexlayout-react'
+import { PanelRightOpenIcon, PlusIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { fileDocumentKey, useFileDocumentStore } from '@/features/files/file-document-store'
 import { FileEditorPanel } from '@/features/files/file-editor-panel'
 import { WorkspaceNavigator } from '@/features/files/workspace-navigator'
 import { GitDiffPanel } from '@/features/git-diff/git-diff-panel'
 
-import type { AdapterSummary, GitChangeEntry, Task, Workspace } from '../../../../shared/app-contract'
+import type { GitChangeEntry, Task, Workspace } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from '../tasks/task-store'
 import { AgentPanel } from './agent-panel'
 import {
@@ -27,122 +26,7 @@ interface WorkspaceViewProps {
   workspace: Workspace
 }
 
-type TerminalPlacement = 'center' | 'right' | 'bottom'
 const noTasks: never[] = []
-
-interface WorkspaceToolbarProps {
-  addTerminal: (placement: TerminalPlacement) => Promise<void>
-  createTask: (name: string) => Promise<void>
-  navigatorOpen: boolean
-  openNavigator: () => void
-}
-
-const DefaultAdapterPicker = (): React.JSX.Element | null => {
-  const [adapters, setAdapters] = useState<AdapterSummary[]>([])
-  useEffect((): void => {
-    void window.lithe.adapters.list().then(setAdapters).catch(globalThis.console.error)
-  }, [])
-  if (adapters.some((adapter: AdapterSummary): boolean => adapter.isDefault)) return null
-  const available = adapters.filter((adapter: AdapterSummary): boolean => adapter.isAvailable)
-  return (
-    <select
-      aria-label="默认 Coding Agent"
-      className="bg-background h-7 max-w-44 rounded-md border px-2 text-xs"
-      defaultValue=""
-      onChange={(event: React.ChangeEvent<HTMLSelectElement>): void => {
-        const adapter = available.find(
-          (candidate: AdapterSummary): boolean => candidate.currentVersion.id === event.target.value,
-        )
-        if (!adapter) return
-        void window.lithe.adapters
-          .setDefault(adapter.currentVersion.id)
-          .then((): void => {
-            setAdapters((current: AdapterSummary[]): AdapterSummary[] =>
-              current.map(
-                (candidate: AdapterSummary): AdapterSummary => ({
-                  ...candidate,
-                  isDefault: candidate.currentVersion.id === adapter.currentVersion.id,
-                }),
-              ),
-            )
-          })
-          .catch(globalThis.console.error)
-      }}
-    >
-      <option disabled value="">
-        选择默认 Agent
-      </option>
-      {available.map((adapter: AdapterSummary) => (
-        <option key={adapter.id} value={adapter.currentVersion.id}>
-          {adapter.name}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-const WorkspaceToolbar = ({
-  addTerminal,
-  createTask,
-  navigatorOpen,
-  openNavigator,
-}: WorkspaceToolbarProps): React.JSX.Element => {
-  const { t } = useTranslation()
-  const [taskName, setTaskName] = useState('')
-  const button = (
-    placement: TerminalPlacement,
-    label: string,
-    Icon: React.ComponentType<{ className?: string }>,
-  ): React.JSX.Element => (
-    <Button
-      onClick={(): void => {
-        void addTerminal(placement).catch((error: unknown): void => {
-          globalThis.console.error('Lithe terminal panel creation failed', error)
-        })
-      }}
-      size="sm"
-      variant="ghost"
-    >
-      <Icon />
-      {label}
-    </Button>
-  )
-
-  return (
-    <div className="flex h-10 shrink-0 items-center gap-1 border-b px-2">
-      {button('center', t('terminal.new'), SquareTerminalIcon)}
-      {button('right', t('terminal.horizontalSplit'), Columns2Icon)}
-      {button('bottom', t('terminal.verticalSplit'), Rows2Icon)}
-      {!navigatorOpen ? (
-        <Button aria-label="打开右侧文件导航" onClick={openNavigator} size="sm" variant="ghost">
-          <PanelRightOpenIcon />
-          文件
-        </Button>
-      ) : null}
-      <div className="ml-auto flex items-center gap-1">
-        <DefaultAdapterPicker />
-        <Input
-          aria-label="任务名称"
-          className="h-7 w-40"
-          onChange={(event: React.ChangeEvent<HTMLInputElement>): void => setTaskName(event.target.value)}
-          placeholder="新任务"
-          value={taskName}
-        />
-        <Button
-          disabled={!taskName.trim()}
-          onClick={(): void => {
-            void createTask(taskName)
-              .then((): void => setTaskName(''))
-              .catch((): void => undefined)
-          }}
-          size="sm"
-        >
-          创建任务
-        </Button>
-      </div>
-    </div>
-  )
-}
 
 type PanelFactory = (node: TabNode) => React.ReactNode
 
@@ -261,7 +145,6 @@ const useFileNavigation = (workspaceId: string) => {
 }
 
 const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdapter | undefined) => {
-  const createTask = useTaskStore((state: TaskState) => state.createTask)
   const backgroundPanels = useTaskStore((state: TaskState) => state.backgroundPanels)
   const deletedTaskIds = useTaskStore((state: TaskState) => state.deletedTaskIds)
   const error = useTaskStore((state: TaskState) => state.error)
@@ -314,7 +197,7 @@ const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdap
       void window.lithe.workspaceLayouts.save(workspaceId, layout.serialize()).catch(globalThis.console.error)
     }
   }, [deletedTaskIds, layout, workspaceId])
-  return { createTask, error, tasks }
+  return { error, tasks }
 }
 
 const selectedTaskId = (layout: WorkspaceLayoutAdapter): string | null => {
@@ -345,39 +228,45 @@ const useVisibleTaskReporting = (layout: WorkspaceLayoutAdapter | undefined): vo
   }, [layout])
 }
 
+const topRightTabsetId = (layout: WorkspaceLayoutAdapter): string => {
+  const tabsets: TabSetNode[] = []
+  layout.getModel().visitNodes((node): void => {
+    if (node instanceof TabSetNode) tabsets.push(node)
+  })
+  return (
+    tabsets
+      .sort((left, right): number => {
+        const leftRect = left.getRect()
+        const rightRect = right.getRect()
+        return leftRect.y - rightRect.y || rightRect.x + rightRect.width - (leftRect.x + leftRect.width)
+      })
+      .at(0)
+      ?.getId() ?? layout.getActiveGroupId()
+  )
+}
+
 interface WorkspaceLayoutBodyProps {
-  createTask: (workspaceId: string, name: string) => Promise<unknown>
   layout: WorkspaceLayoutAdapter
   taskError: string | null
   tasks: Task[]
   workspace: Workspace
 }
 
-const WorkspaceLayoutBody = ({
-  createTask,
-  layout,
-  taskError,
-  tasks,
-  workspace,
-}: WorkspaceLayoutBodyProps): React.JSX.Element => {
+const WorkspaceLayoutBody = ({ layout, taskError, tasks, workspace }: WorkspaceLayoutBodyProps): React.JSX.Element => {
   const { t } = useTranslation()
   const navigation = useFileNavigation(workspace.id)
   const approvedCloseIds = useRef(new Set<string>())
-  const addTerminal = async (placement: TerminalPlacement): Promise<void> => {
-    const source = placement === 'center' ? undefined : layout.getActiveTerminalConfig()
-    const shell = source?.shell ?? (await window.lithe.shells.getDefault())
+  const addTerminal = async (targetGroupId: string): Promise<void> => {
+    const shell = await window.lithe.shells.getDefault()
     const panel: TerminalPanelConfig = {
-      cwd: source?.cwd ?? workspace.rootPath,
+      cwd: workspace.rootPath,
       panelId: crypto.randomUUID(),
       shell,
     }
     layout.addTerminal(panel, {
-      placement,
-      targetGroupId: layout.getActiveGroupId(),
+      placement: 'center',
+      targetGroupId,
     })
-  }
-  const createNamedTask = async (name: string): Promise<void> => {
-    await createTask(workspace.id, name)
   }
   const openFile = (relativePath: string): void => {
     layout.openFile(
@@ -396,12 +285,6 @@ const WorkspaceLayoutBody = ({
       className="flex size-full min-h-0 flex-col overflow-hidden"
       aria-label={t('terminal.workspaceLabel', { name: workspace.name })}
     >
-      <WorkspaceToolbar
-        addTerminal={addTerminal}
-        createTask={createNamedTask}
-        navigatorOpen={navigation.open}
-        openNavigator={(): void => navigation.setOpen(true)}
-      />
       {taskError ? <p className="text-destructive border-b px-3 py-1 text-xs">{taskError}</p> : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="relative min-w-0 flex-1">
@@ -418,6 +301,35 @@ const WorkspaceLayoutBody = ({
                 .catch((error: unknown): void => {
                   globalThis.console.error('Lithe workspace layout persistence failed', error)
                 })
+            }}
+            onRenderTabSet={(node, renderValues): void => {
+              if (!(node instanceof TabSetNode)) return
+              renderValues.buttons.push(
+                <Button
+                  aria-label="在此标签组新建终端"
+                  key={`terminal:${node.getId()}`}
+                  onClick={(): void => {
+                    void addTerminal(node.getId()).catch(globalThis.console.error)
+                  }}
+                  size="icon-xs"
+                  variant="ghost"
+                >
+                  <PlusIcon />
+                </Button>,
+              )
+              if (!navigation.open && node.getId() === topRightTabsetId(layout)) {
+                renderValues.buttons.push(
+                  <Button
+                    aria-label="打开右侧文件导航"
+                    key={`navigator:${node.getId()}`}
+                    onClick={(): void => navigation.setOpen(true)}
+                    size="icon-xs"
+                    variant="ghost"
+                  >
+                    <PanelRightOpenIcon />
+                  </Button>,
+                )
+              }
             }}
             realtimeResize
           />
@@ -451,12 +363,6 @@ export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Elem
     )
   }
   return (
-    <WorkspaceLayoutBody
-      createTask={taskPanels.createTask}
-      layout={layout}
-      taskError={taskPanels.error}
-      tasks={taskPanels.tasks}
-      workspace={workspace}
-    />
+    <WorkspaceLayoutBody layout={layout} taskError={taskPanels.error} tasks={taskPanels.tasks} workspace={workspace} />
   )
 }

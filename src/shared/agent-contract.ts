@@ -37,6 +37,7 @@ export interface AdapterSummary {
   isAvailable: boolean
   resumeAvailable: boolean
   unavailableReason: string | null
+  usageCount: number
 }
 
 export interface Task {

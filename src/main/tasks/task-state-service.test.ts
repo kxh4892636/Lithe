@@ -159,7 +159,7 @@ describe('task state service', () => {
       archive: vi.fn(),
       clearRunMarks: vi.fn(),
       deleteTask,
-      get: vi.fn(() => task()),
+      get: vi.fn(() => task({ lifecycle: 'archived', archivedAt: new Date() })),
       markIdle: vi.fn(),
       markRunning: vi.fn(),
       markViewed: vi.fn(),
@@ -175,5 +175,27 @@ describe('task state service', () => {
 
     expect(removeTaskPanel).toHaveBeenCalledWith('workspace-1', 'task-1')
     expect(deleteTask).toHaveBeenCalledWith('task-1')
+  })
+
+  it('requires a task to be archived before deletion', () => {
+    const deleteTask = vi.fn()
+    const service = createTaskStateService({
+      archive: vi.fn(),
+      clearRunMarks: vi.fn(),
+      deleteTask,
+      get: vi.fn(() => task()),
+      markIdle: vi.fn(),
+      markRunning: vi.fn(),
+      markViewed: vi.fn(),
+      notify: vi.fn(),
+      now: () => new Date(),
+      recordAttention: vi.fn(),
+      removeTaskPanel: vi.fn(),
+      restore: vi.fn(),
+      stopAgent: vi.fn(),
+    })
+
+    expect(() => service.delete('task-1')).toThrow('Task must be archived before deletion')
+    expect(deleteTask).not.toHaveBeenCalled()
   })
 })

@@ -65,10 +65,15 @@ const task = program.command('task').description('Manage Lithe tasks')
 task
   .command('create')
   .option('--workspace-id <id>')
+  .option('--adapter-id <id>')
   .requiredOption('--name <name>')
   .action(
-    (options: { workspaceId?: string; name: string }): Promise<void> =>
-      execute('task.create', { workspaceId: options.workspaceId, name: options.name }),
+    (options: { adapterId?: string; workspaceId?: string; name: string }): Promise<void> =>
+      execute('task.create', {
+        adapterId: options.adapterId,
+        workspaceId: options.workspaceId,
+        name: options.name,
+      }),
   )
 task
   .command('rename')
@@ -103,13 +108,6 @@ agent
   .requiredOption('--session-id <id>')
   .action((options: { sessionId: string }): Promise<void> => execute('agent.bind', { sessionId: options.sessionId }))
 
-for (const operation of ['start', 'resume', 'stop', 'fork'] as const) {
-  agent
-    .command(operation)
-    .requiredOption('--task-id <id>')
-    .action((options: { taskId: string }): Promise<void> => execute(`agent.${operation}`, { taskId: options.taskId }))
-}
-
 const workspace = program.command('workspace').description('Manage Lithe Git workspaces')
 workspace
   .command('create')
@@ -118,6 +116,7 @@ workspace
   .option('--from <commit>')
   .option('--existing-branch <branch>')
   .option('--name <name>')
+  .option('--source-workspace-id <id>')
   .action(
     (options: {
       existingBranch?: string
@@ -125,6 +124,7 @@ workspace
       name?: string
       newBranch?: string
       projectId: string
+      sourceWorkspaceId?: string
     }): Promise<void> => execute('workspace.create', options),
   )
 workspace

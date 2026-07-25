@@ -81,6 +81,19 @@ const project = (options: WorktreeServiceOptions, projectId: string): ProjectWit
   return value
 }
 
+const createSource = (
+  options: WorktreeServiceOptions,
+  input: WorkspaceCreateInput,
+): { project: ProjectWithWorkspaces; rootPath: string } => {
+  const sourceProject = project(options, input.projectId)
+  if (!input.sourceWorkspaceId) return { project: sourceProject, rootPath: sourceProject.rootPath }
+  const sourceWorkspace = options.getWorkspace(input.sourceWorkspaceId)
+  if (!sourceWorkspace || sourceWorkspace.projectId !== sourceProject.id) {
+    throw new TypeError('Source workspace does not belong to the project')
+  }
+  return { project: sourceProject, rootPath: sourceWorkspace.rootPath }
+}
+
 const workspace = (options: WorktreeServiceOptions, workspaceId: string): Workspace => {
   const value = options.getWorkspace(workspaceId)
   if (!value) throw new TypeError('Workspace does not exist')
@@ -96,7 +109,7 @@ const previewCreate = async (
   input: WorkspaceCreateInput,
 ): Promise<WorkspaceCreatePreview> => {
   validateInput(input)
-  const state = await options.driver.inspectSource(project(options, input.projectId).rootPath)
+  const state = await options.driver.inspectSource(createSource(options, input).rootPath)
   return {
     dirtyFingerprint: state.dirtyFingerprint,
     dirtyPaths: state.dirtyPaths,
@@ -182,7 +195,7 @@ const createWorkspace = async (
   confirmedDirtyFingerprint?: string,
 ): Promise<Workspace> => {
   const validated = validateInput(input)
-  const source = project(options, input.projectId)
+  const { project: source, rootPath: sourceRoot } = createSource(options, input)
   const rootPath = join(
     options.worktreeRoot,
     `${directoryName(source.name)}-${source.id.slice(0, 8)}`,
@@ -193,21 +206,21 @@ const createWorkspace = async (
     kind: validated.kind,
     projectId: source.id,
     rootPath,
-    sourceRoot: source.rootPath,
+    sourceRoot,
   })
   if (recovered) return recovered
-  const state = await options.driver.inspectSource(source.rootPath)
+  const state = await options.driver.inspectSource(sourceRoot)
   if (state.dirtyPaths.length > 0 && confirmedDirtyFingerprint !== state.dirtyFingerprint) {
     throw new TypeError('Dirty source preview confirmation is required')
   }
   const commit = await options.driver.resolveCommit(
-    source.rootPath,
+    sourceRoot,
     validated.kind === 'new' ? (input.from ?? '') : validated.branch,
   )
-  const branchExists = await options.driver.branchExists(source.rootPath, validated.branch)
+  const branchExists = await options.driver.branchExists(sourceRoot, validated.branch)
   if (validated.kind === 'new' && branchExists) throw new TypeError('New branch already exists')
   if (validated.kind === 'existing' && !branchExists) throw new TypeError('Existing branch does not exist')
-  if (await options.driver.isBranchCheckedOut(source.rootPath, validated.branch)) {
+  if (await options.driver.isBranchCheckedOut(sourceRoot, validated.branch)) {
     throw new TypeError('Branch is already checked out in another worktree')
   }
   const created: Workspace = {
@@ -225,14 +238,14 @@ const createWorkspace = async (
     kind: validated.kind,
     projectId: source.id,
     rootPath,
-    sourceRoot: source.rootPath,
+    sourceRoot,
   }
   options.recovery.save(recovery)
   try {
     if (validated.kind === 'new') {
-      await options.driver.createNewBranch(source.rootPath, rootPath, validated.branch, commit)
+      await options.driver.createNewBranch(sourceRoot, rootPath, validated.branch, commit)
     } else {
-      await options.driver.createExistingBranch(source.rootPath, rootPath, validated.branch)
+      await options.driver.createExistingBranch(sourceRoot, rootPath, validated.branch)
     }
     options.addWorkspace(created)
   } catch (error: unknown) {

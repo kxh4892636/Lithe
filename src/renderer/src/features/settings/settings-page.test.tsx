@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { LitheBridge, RuntimeInfo, Theme } from '../../../../shared/app-contract'
+import { useSettingsNavigationStore } from './settings-navigation-store'
 import { SettingsPage } from './settings-page'
 import { useThemeStore } from './theme-store'
 
@@ -50,6 +51,7 @@ describe('settings page', (): void => {
       },
     } as unknown as LitheBridge
     useThemeStore.setState({ theme: 'system', isHydrated: true })
+    useSettingsNavigationStore.setState({ category: 'general' })
 
     render(<SettingsPage />)
     await userEvent.click(screen.getByRole('radio', { name: '深色' }))
@@ -58,6 +60,7 @@ describe('settings page', (): void => {
     expect(useThemeStore.getState().theme).toBe('dark')
     expect(document.documentElement).toHaveClass('dark')
 
+    act((): void => useSettingsNavigationStore.getState().select('terminal'))
     await userEvent.selectOptions(await screen.findByRole('combobox', { name: '默认 Shell' }), 'cmd.exe')
     expect(setDefaultShell).toHaveBeenCalledWith('cmd.exe')
   })

@@ -2,14 +2,17 @@ import type { AdapterVersion, Task } from '../../shared/agent-contract'
 import type { Workspace } from '../../shared/app-contract'
 
 interface CreateTaskInput {
+  adapterId?: string
   name: string
   workspaceId: string
 }
 
 interface TaskServiceOptions {
   createId: () => string
+  getAdapter: (adapterId: string) => AdapterVersion | undefined
   getDefaultAdapter: () => AdapterVersion | undefined
   getWorkspace: (workspaceId: string) => Workspace | undefined
+  incrementAdapterUsage: (adapterId: string) => void
   isAdapterAvailable: (adapter: AdapterVersion) => Promise<boolean>
   listTasks: (workspaceId: string) => Task[]
   now: () => Date
@@ -58,13 +61,19 @@ export const createTaskService = (options: TaskServiceOptions): TaskService => {
   }
 
   return {
-    create: async ({ name, workspaceId }: CreateTaskInput): Promise<Task> => {
-      const adapter = options.getDefaultAdapter()
-      if (!adapter) throw new TypeError('Default Adapter is not configured')
-      if (!(await options.isAdapterAvailable(adapter))) {
-        throw new TypeError('Default Adapter executable is unavailable')
+    create: async ({ adapterId, name, workspaceId }: CreateTaskInput): Promise<Task> => {
+      const adapter = adapterId ? options.getAdapter(adapterId) : options.getDefaultAdapter()
+      if (!adapter) {
+        throw new TypeError(adapterId ? 'Adapter does not exist' : 'Default Adapter is not configured')
       }
-      return createPinned({ workspaceId, name }, adapter.id)
+      if (!(await options.isAdapterAvailable(adapter))) {
+        throw new TypeError(
+          adapterId ? 'Adapter executable is unavailable' : 'Default Adapter executable is unavailable',
+        )
+      }
+      const task = createPinned({ workspaceId, name }, adapter.id)
+      options.incrementAdapterUsage(adapter.adapterId)
+      return task
     },
     createPinned,
     nextForkName: (source: Task): string => {

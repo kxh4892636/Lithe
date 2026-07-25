@@ -84,13 +84,17 @@ test('E2E-LITHE-005 restores a collapsed sidebar and expands it as an overlay on
   await expect(projectGroup).toHaveAttribute('aria-expanded', 'false')
 
   await window.getByRole('button', { name: '切换侧栏' }).click()
-  await expect(sidebar).toHaveAttribute('data-state', 'collapsed')
+  await expect(sidebar).toHaveAttribute('data-state', 'expanded')
+  await expect(sidebar).toHaveAttribute('data-overlay-expanded', 'true')
   await expect
     .poll(async (): Promise<number> => (await window.locator('[data-slot="sidebar-gap"]').boundingBox())?.width ?? 0)
     .toBeLessThan(50)
+  await window.mouse.move(600, 300)
+  await expect(sidebar).toHaveAttribute('data-state', 'collapsed')
+  await expect(sidebar).toHaveAttribute('data-overlay-expanded', 'false')
   const collapsedGap = await window.locator('[data-slot="sidebar-gap"]').boundingBox()
 
-  await window.locator('[data-slot="sidebar-container"]').hover()
+  await window.getByRole('button', { name: '切换侧栏' }).hover()
   await expect(sidebar).toHaveAttribute('data-state', 'expanded')
   await expect(sidebar).toHaveAttribute('data-overlay-expanded', 'true')
   const hoveredGap = await window.locator('[data-slot="sidebar-gap"]').boundingBox()
@@ -141,7 +145,8 @@ test('E2E-LITHE-009 creates and deletes a managed Git workspace from project nav
       if (!derived) throw new Error('Derived workspace is missing')
       return derived.rootPath
     })
-    await window.getByRole('button', { name: '删除 Review' }).click()
+    await window.getByRole('button', { name: 'Review', exact: true }).click({ button: 'right' })
+    await window.getByRole('menuitem', { name: '删除', exact: true }).click()
     await window.getByRole('button', { name: '确认操作' }).click()
     await expect(window.getByRole('button', { name: 'Review', exact: true })).toHaveCount(0)
     await expect.poll((): boolean => existsSync(managedPath)).toBe(false)

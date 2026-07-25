@@ -84,6 +84,51 @@ describe('worktree service', () => {
     expect(addWorkspace).toHaveBeenCalledWith(workspace)
   })
 
+  it('derives from the explicitly selected workspace working directory', async () => {
+    const sourceWorkspace: Workspace = {
+      createdAt: new Date(0),
+      gitBranch: 'feature/source',
+      id: 'workspace-source',
+      kind: 'derived',
+      name: 'Source',
+      pinnedAt: null,
+      projectId: project.id,
+      rootPath: 'C:\\Users\\me\\.lithe\\worktree\\lithe-project\\Source',
+    }
+    const git = driver()
+    const service = createWorktreeService({
+      addWorkspace: vi.fn(),
+      createId: () => 'workspace-derived',
+      driver: git,
+      getProject: () => ({ ...project, workspaces: [sourceWorkspace] }),
+      getWorkspace: (workspaceId): Workspace | undefined =>
+        workspaceId === sourceWorkspace.id ? sourceWorkspace : undefined,
+      hasRunningTasks: () => false,
+      now: () => new Date(0),
+      recovery: recoveryStore(),
+      removeProject: vi.fn(),
+      removeWorkspace: vi.fn(),
+      renameWorkspace: vi.fn(),
+      worktreeRoot: 'C:\\Users\\me\\.lithe\\worktree',
+    })
+
+    await service.create({
+      from: 'HEAD',
+      name: 'Derived',
+      newBranch: 'feature/derived',
+      projectId: project.id,
+      sourceWorkspaceId: sourceWorkspace.id,
+    })
+
+    expect(git.inspectSource).toHaveBeenCalledWith(sourceWorkspace.rootPath)
+    expect(git.createNewBranch).toHaveBeenCalledWith(
+      sourceWorkspace.rootPath,
+      expect.stringContaining('lithe-project-\\Derived'),
+      'feature/derived',
+      'abc123',
+    )
+  })
+
   it('rolls back the worktree and new branch when SQLite persistence fails', async () => {
     const git = driver()
     const service = createWorktreeService({

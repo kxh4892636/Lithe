@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { app, BrowserWindow, dialog, type MessageBoxOptions, Notification, shell } from 'electron'
 
-import type { Task } from '../shared/agent-contract'
+import type { AdapterVersion, Task } from '../shared/agent-contract'
 import { ipcChannels } from '../shared/ipc-channels'
 import { createAdapterService } from './agents/adapter-service'
 import { createAgentApplication } from './agents/agent-application'
@@ -213,10 +213,16 @@ const createWindow = (): BrowserWindow => {
 
   if (savedState?.isMaximized) window.maximize()
   window.once('ready-to-show', (): void => window.show())
-  window.on('maximize', scheduleWindowStatePersistence)
+  window.on('maximize', (): void => {
+    scheduleWindowStatePersistence()
+    window.webContents.send(ipcChannels.windowMaximizedChanged, true)
+  })
   window.on('move', scheduleWindowStatePersistence)
   window.on('resize', scheduleWindowStatePersistence)
-  window.on('unmaximize', scheduleWindowStatePersistence)
+  window.on('unmaximize', (): void => {
+    scheduleWindowStatePersistence()
+    window.webContents.send(ipcChannels.windowMaximizedChanged, false)
+  })
   window.on('close', (event): void => {
     persistWindowState()
     if (!shutdownStarted && !shutdownComplete) {
@@ -299,8 +305,11 @@ const openMainWindow = async (): Promise<void> => {
   })
   const taskService = createTaskService({
     createId: randomUUID,
+    getAdapter: (adapterId): AdapterVersion | undefined =>
+      appDatabase?.adapters.listCurrent().find((adapter): boolean => adapter.adapterId === adapterId),
     getDefaultAdapter: appDatabase.adapters.getDefault,
     getWorkspace: appDatabase.projects.getWorkspace,
+    incrementAdapterUsage: appDatabase.adapters.incrementUsage,
     isAdapterAvailable,
     listTasks: appDatabase.tasks.list,
     now: (): Date => new Date(),

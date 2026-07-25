@@ -42,6 +42,7 @@ const createInput = (value: unknown): WorkspaceCreateInput => {
     name: optionalString(input.name, 'name'),
     newBranch: optionalString(input.newBranch, 'newBranch'),
     projectId: identifier(input.projectId),
+    sourceWorkspaceId: optionalString(input.sourceWorkspaceId, 'sourceWorkspaceId'),
   }
 }
 
