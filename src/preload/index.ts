@@ -6,6 +6,7 @@ import type {
   AgentLaunch,
   BackgroundAgentLaunch,
   LitheBridge,
+  ProjectRemovalPreview,
   ProjectWithWorkspaces,
   RuntimeInfo,
   TerminalCreateRequest,
@@ -16,6 +17,9 @@ import type {
   TaskChangeEvent,
   Theme,
   Workspace,
+  WorkspaceCreateInput,
+  WorkspaceCreatePreview,
+  WorkspaceDeletePreview,
   WorkspaceLayoutSnapshot,
   WorkspaceNavigation,
 } from '../shared/app-contract'
@@ -90,10 +94,28 @@ const bridge: LitheBridge = {
         ipcRenderer.removeListener(ipcChannels.workspaceNavigationChanged, wrapped)
       }
     },
+    previewRemove: async (projectId: string): Promise<ProjectRemovalPreview> =>
+      ipcRenderer.invoke(ipcChannels.previewProjectRemoval, projectId) as Promise<ProjectRemovalPreview>,
+    remove: async (projectId: string, branchConfirmations?: Record<string, string>): Promise<boolean> =>
+      ipcRenderer.invoke(ipcChannels.removeProject, projectId, branchConfirmations) as Promise<boolean>,
+    forgetInvalid: async (projectId: string, confirmation: string): Promise<boolean> =>
+      ipcRenderer.invoke(ipcChannels.forgetInvalidProject, projectId, confirmation) as Promise<boolean>,
     selectWorkspace: async (workspaceId: string): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.selectWorkspace, workspaceId) as Promise<void>,
     setWorkspacePinned: async (workspaceId: string, isPinned: boolean): Promise<Workspace> =>
       ipcRenderer.invoke(ipcChannels.setWorkspacePinned, workspaceId, isPinned) as Promise<Workspace>,
+  },
+  workspaces: {
+    create: async (input: WorkspaceCreateInput, confirmedDirtyFingerprint?: string): Promise<Workspace | null> =>
+      ipcRenderer.invoke(ipcChannels.createWorkspace, input, confirmedDirtyFingerprint) as Promise<Workspace | null>,
+    delete: async (workspaceId: string, branchConfirmation?: string): Promise<boolean> =>
+      ipcRenderer.invoke(ipcChannels.deleteWorkspace, workspaceId, branchConfirmation) as Promise<boolean>,
+    previewCreate: async (input: WorkspaceCreateInput): Promise<WorkspaceCreatePreview> =>
+      ipcRenderer.invoke(ipcChannels.previewWorkspaceCreate, input) as Promise<WorkspaceCreatePreview>,
+    previewDelete: async (workspaceId: string): Promise<WorkspaceDeletePreview> =>
+      ipcRenderer.invoke(ipcChannels.previewWorkspaceDelete, workspaceId) as Promise<WorkspaceDeletePreview>,
+    rename: async (workspaceId: string, name: string): Promise<Workspace> =>
+      ipcRenderer.invoke(ipcChannels.renameWorkspace, workspaceId, name) as Promise<Workspace>,
   },
   shells: {
     getDefault: async (): Promise<string> => ipcRenderer.invoke(ipcChannels.getDefaultShell) as Promise<string>,

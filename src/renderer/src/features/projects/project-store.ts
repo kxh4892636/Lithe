@@ -1,12 +1,22 @@
 import { create } from 'zustand'
 
-import type { ProjectWithWorkspaces, Workspace, WorkspaceNavigation } from '../../../../shared/app-contract'
+import type {
+  ProjectWithWorkspaces,
+  Workspace,
+  WorkspaceCreateInput,
+  WorkspaceNavigation,
+} from '../../../../shared/app-contract'
 
 interface ProjectState extends WorkspaceNavigation {
   error: string | null
   isLoading: boolean
   addDirectory: () => Promise<void>
+  createWorkspace: (input: WorkspaceCreateInput, confirmedDirtyFingerprint?: string) => Promise<void>
+  deleteWorkspace: (workspaceId: string, branchConfirmation?: string) => Promise<void>
+  forgetInvalidProject: (projectId: string, confirmation: string) => Promise<void>
   hydrate: () => Promise<void>
+  removeProject: (projectId: string, branchConfirmations: Record<string, string>) => Promise<void>
+  renameWorkspace: (workspaceId: string, name: string) => Promise<void>
   selectWorkspace: (workspaceId: string) => Promise<void>
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
 }
@@ -45,6 +55,37 @@ export const useProjectStore = create<ProjectState>(
         set({ error: errorMessage(error), isLoading: false })
       }
     },
+    createWorkspace: async (input: WorkspaceCreateInput, confirmedDirtyFingerprint?: string): Promise<void> => {
+      try {
+        const created = await window.lithe.workspaces.create(input, confirmedDirtyFingerprint)
+        if (created) await useProjectStore.getState().hydrate()
+      } catch (error: unknown) {
+        recordBoundaryError('workspace creation', error)
+        set({ error: errorMessage(error) })
+        throw error
+      }
+    },
+    deleteWorkspace: async (workspaceId: string, branchConfirmation?: string): Promise<void> => {
+      try {
+        if (await window.lithe.workspaces.delete(workspaceId, branchConfirmation)) {
+          await useProjectStore.getState().hydrate()
+        }
+      } catch (error: unknown) {
+        recordBoundaryError('workspace deletion', error)
+        set({ error: errorMessage(error) })
+        throw error
+      }
+    },
+    forgetInvalidProject: async (projectId: string, confirmation: string): Promise<void> => {
+      try {
+        if (await window.lithe.projects.forgetInvalid(projectId, confirmation))
+          await useProjectStore.getState().hydrate()
+      } catch (error: unknown) {
+        recordBoundaryError('invalid project removal', error)
+        set({ error: errorMessage(error) })
+        throw error
+      }
+    },
     hydrate: async (): Promise<void> => {
       set({ error: null, isLoading: true })
       try {
@@ -52,6 +93,26 @@ export const useProjectStore = create<ProjectState>(
       } catch (error: unknown) {
         recordBoundaryError('project navigation hydration', error)
         set({ error: errorMessage(error), isLoading: false })
+      }
+    },
+    removeProject: async (projectId: string, branchConfirmations: Record<string, string>): Promise<void> => {
+      try {
+        if (await window.lithe.projects.remove(projectId, branchConfirmations))
+          await useProjectStore.getState().hydrate()
+      } catch (error: unknown) {
+        recordBoundaryError('project removal', error)
+        set({ error: errorMessage(error) })
+        throw error
+      }
+    },
+    renameWorkspace: async (workspaceId: string, name: string): Promise<void> => {
+      try {
+        await window.lithe.workspaces.rename(workspaceId, name)
+        await useProjectStore.getState().hydrate()
+      } catch (error: unknown) {
+        recordBoundaryError('workspace rename', error)
+        set({ error: errorMessage(error) })
+        throw error
       }
     },
     selectWorkspace: async (workspaceId: string): Promise<void> => {

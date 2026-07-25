@@ -28,6 +28,7 @@ import type { AppDatabase } from './database/app-database'
 import { createAppDatabase } from './database/app-database'
 import { registerIpcHandlers, removeIpcHandlers } from './ipc-handlers'
 import { createScratchWorkspaceService } from './tasks/scratch-workspace-service'
+import { createTaskDeleteApproval } from './tasks/task-delete-approval'
 import { createTaskService } from './tasks/task-service'
 import { createTaskStateService, type TaskStateService } from './tasks/task-state-service'
 import { createNodePtyAdapter } from './terminal/node-pty-adapter'
@@ -37,8 +38,11 @@ import {
   createWorkspaceLayoutPersistence,
   type WorkspaceLayoutPersistence,
 } from './terminal/workspace-layout-persistence'
+import { createWorkspaceApproval } from './tool-control/native-approval'
 import { createToolControlRuntime, type ToolControlRuntime } from './tool-control/tool-control-runtime'
 import { resolveWindowOptions } from './window-state'
+import { createWorkspaceLifecycle } from './workspaces/workspace-lifecycle'
+import { registerWorkspaceToolCommands } from './workspaces/workspace-tool-commands'
 
 const userDataOverride = process.env.LITHE_USER_DATA_DIR
 if (userDataOverride) app.setPath('userData', userDataOverride)
@@ -59,7 +63,6 @@ let restoreAgentsThisLaunch = true
 const taskNotifications = new Map<string, Notification>()
 const scratchRoot = resolve(homedir(), '.lithe', 'scratch')
 const scratchTrashStagingRoot = resolve(homedir(), '.lithe', 'trash-staging')
-
 const assertScratchPath = (path: string): string => {
   const resolved = resolve(path)
   const child = relative(scratchRoot, resolved)
@@ -264,12 +267,12 @@ const createWindow = (): BrowserWindow => {
   return window
 }
 
-const openMainWindow = (): void => {
+const openMainWindow = async (): Promise<void> => {
   if (!appDatabase) return
   removeIpcHandlers()
   removeAgentIpc()
   removeTerminalIpc()
-  ptyRuntime?.closeAll()
+  await ptyRuntime?.closeAll()
   visibleTaskId = null
   mainWindow = createWindow()
   if (skillConflicts.length > 0) {
@@ -281,7 +284,21 @@ const openMainWindow = (): void => {
     })
     skillConflicts = []
   }
-  registerIpcHandlers({ database: appDatabase, window: mainWindow })
+  const workspaceLifecycle = createWorkspaceLifecycle({
+    database: appDatabase,
+    getAgentManager: (): AgentManager | undefined => agentManager,
+    notifyNavigation: (): void => mainWindow?.webContents.send(ipcChannels.workspaceNavigationChanged),
+    trash: async (path: string): Promise<void> => await shell.trashItem(path),
+  })
+  const { worktrees } = workspaceLifecycle
+  workspaceLifecycle.refreshProjectValidity()
+  mainWindow.on('focus', workspaceLifecycle.refreshProjectValidity)
+  registerIpcHandlers({
+    database: appDatabase,
+    forgetInvalidProject: workspaceLifecycle.forgetInvalidProject,
+    window: mainWindow,
+    worktrees,
+  })
   ptyRuntime = createPtyRuntime({
     adapter: createNodePtyAdapter(),
     onClose: (panelId: string): void => agentManager?.handleExit(panelId),
@@ -384,34 +401,16 @@ const openMainWindow = (): void => {
     restore: appDatabase.tasks.restore,
     stopAgent: agentManager.stop,
   })
-  const requestDeleteApproval = async (
-    context: import('./tool-control/command-dispatcher').ToolCommandContext,
-    task: import('../shared/agent-contract').Task,
-  ): Promise<'approved' | 'rejected' | 'timed-out'> => {
-    if (!mainWindow || !toolControlRuntime || !appDatabase) return 'rejected'
-    const database = appDatabase
-    const pending = toolControlRuntime.approvals.request(context.requestId, context.connectionId)
-    const workspace = database.projects.getWorkspace(task.workspaceId)
-    const isLastScratch = workspace?.kind === 'scratch' && database.tasks.listAll(workspace.id).length === 1
-    const fileCount = isLastScratch && workspace ? countDirectoryEntries(workspace.rootPath) : 0
-    void dialog
-      .showMessageBox(mainWindow, {
-        buttons: ['取消', '删除'],
-        cancelId: 0,
-        defaultId: 0,
-        detail: isLastScratch
-          ? `这也是该临时工作区的最后一个任务。目录及其中 ${fileCount} 个条目将移入系统回收站。`
-          : '任务记录和对应 Agent 面板将被移除，此操作不可撤销。',
-        message: `删除任务“${task.name}”？`,
-        title: '确认删除任务',
-        type: 'warning',
-      })
-      .then((result): void => {
-        toolControlRuntime?.approvals.decide(context.requestId, result.response === 1 ? 'approved' : 'rejected')
-      })
-    const decision = await pending
-    return decision === 'approved' || decision === 'timed-out' ? decision : 'rejected'
-  }
+  const requestDeleteApproval = createTaskDeleteApproval({
+    approvals: toolControlRuntime.approvals,
+    countEntries: countDirectoryEntries,
+    database: appDatabase,
+    getWindow: (): BrowserWindow | undefined => mainWindow,
+  })
+  const requestWorkspaceApproval = createWorkspaceApproval(
+    toolControlRuntime.approvals,
+    (): BrowserWindow | undefined => mainWindow,
+  )
   registerAgentToolCommands({
     application: agentApplication,
     capabilities: toolControlRuntime.capabilities,
@@ -432,6 +431,12 @@ const openMainWindow = (): void => {
     },
     requestDeleteApproval,
     states: taskStateService,
+  })
+  registerWorkspaceToolCommands({
+    changed: (): void => mainWindow?.webContents.send(ipcChannels.workspaceNavigationChanged),
+    commands: toolControlRuntime.commands,
+    requestApproval: requestWorkspaceApproval,
+    worktrees,
   })
   registerAgentIpc({
     adapters: adapterService,
@@ -515,9 +520,9 @@ if (!app.requestSingleInstanceLock()) {
         process.env.LITHE_E2E === '1' ? { discoveryPath: join(app.getPath('userData'), 'control.json') } : {},
       )
       await toolControlRuntime.listen()
-      openMainWindow()
+      await openMainWindow()
       app.on('activate', (): void => {
-        if (BrowserWindow.getAllWindows().length === 0) openMainWindow()
+        if (BrowserWindow.getAllWindows().length === 0) void openMainWindow()
       })
     })
     .catch((error: unknown): void => {
@@ -556,17 +561,16 @@ if (!app.requestSingleInstanceLock()) {
             shutdownStarted = false
             return
           }
-          for (const task of runningTasks) {
-            agentManager?.stop(task.id)
-            appDatabase?.tasks.clearRunMarks(task.id)
-          }
+        }
+        await ptyRuntime?.closeAll()
+        for (const task of runningTasks) {
+          appDatabase?.tasks.clearRunMarks(task.id)
         }
         if (persistTimer) clearTimeout(persistTimer)
         persistWindowState()
         removeIpcHandlers()
         removeAgentIpc()
         removeTerminalIpc()
-        ptyRuntime?.closeAll()
         ptyRuntime = undefined
         agentManager = undefined
         taskStateService = undefined

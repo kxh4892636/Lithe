@@ -50,7 +50,12 @@ export interface ProjectRepository {
   getWorkspace: (workspaceId: string) => Workspace | undefined
   addScratchAndSelect: (workspace: Workspace) => void
   addScratch: (workspace: Workspace) => void
+  addWorkspace: (workspace: Workspace) => void
   deleteWorkspace: (workspaceId: string) => void
+  get: (projectId: string) => ProjectWithWorkspaces | undefined
+  remove: (projectId: string) => void
+  renameWorkspace: (workspaceId: string, name: string) => Workspace
+  setValidity: (projectId: string, isValid: boolean) => void
   setPinned: (workspaceId: string, pinnedAt: Date | null) => Workspace
 }
 
@@ -207,12 +212,30 @@ export const createProjectRepository = (database: Database, sqlite: DatabaseSync
       }
       database.insert(workspaces).values(workspace).run()
     },
+    addWorkspace: (workspace: Workspace): void => {
+      if (workspace.kind === 'scratch' || !workspace.projectId) {
+        throw new TypeError('Project workspace must belong to a project')
+      }
+      database.insert(workspaces).values(workspace).run()
+    },
     deleteWorkspace: (workspaceId: string): void => {
       database.delete(workspaces).where(eq(workspaces.id, workspaceId)).run()
     },
     getWorkspace: (workspaceId: string): Workspace | undefined => {
       const workspace = database.select().from(workspaces).where(eq(workspaces.id, workspaceId)).get()
       return workspace ? mapWorkspace(workspace) : undefined
+    },
+    get: (projectId: string): ProjectWithWorkspaces | undefined => {
+      const project = database.select().from(projects).where(eq(projects.id, projectId)).get()
+      if (!project) return undefined
+      const projectWorkspaces = database
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.projectId, projectId))
+        .orderBy(asc(workspaces.createdAt))
+        .all()
+        .map(mapWorkspace)
+      return { ...project, workspaces: projectWorkspaces }
     },
     list: (): ProjectWithWorkspaces[] => {
       const projectRows = database.select().from(projects).orderBy(asc(projects.createdAt)).all()
@@ -239,6 +262,18 @@ export const createProjectRepository = (database: Database, sqlite: DatabaseSync
       const workspace = database.select().from(workspaces).where(eq(workspaces.id, workspaceId)).get()
       if (!workspace) throw new TypeError('工作区不存在')
       return mapWorkspace(workspace)
+    },
+    remove: (projectId: string): void => {
+      database.delete(projects).where(eq(projects.id, projectId)).run()
+    },
+    renameWorkspace: (workspaceId: string, name: string): Workspace => {
+      database.update(workspaces).set({ name }).where(eq(workspaces.id, workspaceId)).run()
+      const workspace = database.select().from(workspaces).where(eq(workspaces.id, workspaceId)).get()
+      if (!workspace) throw new TypeError('Workspace does not exist')
+      return mapWorkspace(workspace)
+    },
+    setValidity: (projectId: string, isValid: boolean): void => {
+      database.update(projects).set({ isValid }).where(eq(projects.id, projectId)).run()
     },
   }
 }

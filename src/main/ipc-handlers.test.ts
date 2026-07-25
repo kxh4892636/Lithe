@@ -77,7 +77,7 @@ describe('terminal IPC', (): void => {
     )
     const runtime: PtyRuntime = {
       close: vi.fn<(sessionId: string) => void>(),
-      closeAll: vi.fn<() => void>(),
+      closeAll: vi.fn<() => Promise<void>>(async (): Promise<void> => undefined),
       create: vi.fn<PtyRuntime['create']>(),
       resize: vi.fn<PtyRuntime['resize']>(),
       write: vi.fn<PtyRuntime['write']>(),

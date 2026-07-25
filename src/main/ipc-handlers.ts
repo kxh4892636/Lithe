@@ -8,10 +8,14 @@ import { ipcChannels } from '../shared/ipc-channels'
 import type { AppDatabase } from './database/app-database'
 import { detectGitBranch } from './projects/git-branch'
 import { createProjectService } from './projects/project-service'
+import { registerWorkspaceIpc, removeWorkspaceIpc } from './workspaces/workspace-ipc'
+import type { WorktreeService } from './workspaces/worktree-service'
 
 interface RegisterIpcHandlersOptions {
   database: AppDatabase
+  forgetInvalidProject?: (projectId: string, confirmation: string) => Promise<boolean>
   window: BrowserWindow
+  worktrees?: WorktreeService
 }
 
 const assertTrustedSender = (event: IpcMainInvokeEvent, window: BrowserWindow): void => {
@@ -45,7 +49,12 @@ const logBoundaryError = (message: string, error: unknown): void => {
   process.stderr.write(`Lithe ${message}: ${detail}\n`)
 }
 
-export const registerIpcHandlers = ({ database, window }: RegisterIpcHandlersOptions): void => {
+export const registerIpcHandlers = ({
+  database,
+  forgetInvalidProject = async (): Promise<boolean> => false,
+  window,
+  worktrees,
+}: RegisterIpcHandlersOptions): void => {
   const projectService = createProjectService({
     addProject: (project): void => {
       const [workspace] = project.workspaces
@@ -143,9 +152,11 @@ export const registerIpcHandlers = ({ database, window }: RegisterIpcHandlersOpt
     assertTrustedSender(event, window)
     return database.projects.setPinned(assertIdentifier(workspaceId), assertBoolean(isPinned) ? new Date() : null)
   })
+  if (worktrees) registerWorkspaceIpc({ forgetInvalidProject, window, worktrees })
 }
 
 export const removeIpcHandlers = (): void => {
+  removeWorkspaceIpc()
   ipcMain.removeHandler(ipcChannels.getRuntimeInfo)
   ipcMain.removeHandler(ipcChannels.getTheme)
   ipcMain.removeHandler(ipcChannels.getSidebarOpen)

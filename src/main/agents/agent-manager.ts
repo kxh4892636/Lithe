@@ -71,6 +71,9 @@ export const createAgentManager = ({
       if (operation === 'fork' && !sourceAgentSessionId) throw new TypeError('Source Agent session is not bound')
       const workspace = database.projects.getWorkspace(task.workspaceId)
       if (!workspace) throw new TypeError('Workspace does not exist')
+      if (workspace.projectId && database.projects.get?.(workspace.projectId)?.isValid === false) {
+        throw new TypeError('Project is invalid')
+      }
       const adapter = database.adapters.getVersion(task.adapterVersionId)
       if (!adapter) throw new TypeError('Task Adapter version does not exist')
       const command = renderAdapterCommand(adapter.definition, operation, {

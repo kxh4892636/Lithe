@@ -110,6 +110,61 @@ for (const operation of ['start', 'resume', 'stop', 'fork'] as const) {
     .action((options: { taskId: string }): Promise<void> => execute(`agent.${operation}`, { taskId: options.taskId }))
 }
 
+const workspace = program.command('workspace').description('Manage Lithe Git workspaces')
+workspace
+  .command('create')
+  .requiredOption('--project-id <id>')
+  .option('--new-branch <branch>')
+  .option('--from <commit>')
+  .option('--existing-branch <branch>')
+  .option('--name <name>')
+  .action(
+    (options: {
+      existingBranch?: string
+      from?: string
+      name?: string
+      newBranch?: string
+      projectId: string
+    }): Promise<void> => execute('workspace.create', options),
+  )
+workspace
+  .command('rename')
+  .requiredOption('--workspace-id <id>')
+  .requiredOption('--name <name>')
+  .action((options: { name: string; workspaceId: string }): Promise<void> => execute('workspace.rename', options))
+workspace
+  .command('delete')
+  .requiredOption('--workspace-id <id>')
+  .option('--confirm-branch <branch>')
+  .action(
+    (options: { confirmBranch?: string; workspaceId: string }): Promise<void> =>
+      execute('workspace.delete', {
+        branchConfirmation: options.confirmBranch,
+        workspaceId: options.workspaceId,
+      }),
+  )
+
+const projectCommand = program.command('project').description('Manage Lithe projects')
+projectCommand
+  .command('remove')
+  .requiredOption('--project-id <id>')
+  .option(
+    '--confirm-branch <workspace-id=branch...>',
+    'Confirm unmerged branches',
+    (value: string, previous: string[]) => [...previous, value],
+    [],
+  )
+  .action((options: { confirmBranch: string[]; projectId: string }): Promise<void> => {
+    const branchConfirmations = Object.fromEntries(
+      options.confirmBranch.map((entry): [string, string] => {
+        const separator = entry.indexOf('=')
+        if (separator < 1) return ['', '']
+        return [entry.slice(0, separator), entry.slice(separator + 1)]
+      }),
+    )
+    return execute('project.remove', { branchConfirmations, projectId: options.projectId })
+  })
+
 program.configureOutput({
   writeErr: (): void => undefined,
   writeOut: (text: string): void => {

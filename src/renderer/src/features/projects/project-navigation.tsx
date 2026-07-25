@@ -7,6 +7,8 @@ import {
   FolderPlusIcon,
   GitBranchIcon,
   PinIcon,
+  PlusIcon,
+  PencilIcon,
   SearchIcon,
   Trash2Icon,
 } from 'lucide-react'
@@ -28,6 +30,7 @@ import {
 
 import type { ProjectWithWorkspaces, Task, Workspace } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from '../tasks/task-store'
+import { ProjectOperationSheet, type ProjectOperation } from './project-operation-sheet'
 import { useProjectStore } from './project-store'
 
 interface NavigationGroupProps {
@@ -39,6 +42,7 @@ interface ProjectTreeProps {
   activeWorkspaceId: string | null
   projects: ProjectWithWorkspaces[]
   selectWorkspace: (workspaceId: string) => Promise<void>
+  setOperation: (operation: ProjectOperation) => void
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
 }
 
@@ -96,6 +100,7 @@ const ProjectTree = ({
   activeWorkspaceId,
   projects,
   selectWorkspace,
+  setOperation,
   setWorkspacePinned,
 }: ProjectTreeProps): React.JSX.Element => {
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
@@ -112,10 +117,34 @@ const ProjectTree = ({
     <SidebarMenu>
       {projects.map((project) => (
         <SidebarMenuItem key={project.id}>
-          <SidebarMenuButton tooltip={project.name}>
+          <SidebarMenuButton className={project.isValid ? '' : 'text-destructive'} tooltip={project.name}>
             <FolderIcon />
             <span>{project.name}</span>
           </SidebarMenuButton>
+          <div className="flex items-center justify-end gap-1 px-2">
+            {project.isValid ? (
+              <button
+                aria-label={`为 ${project.name} 创建工作区`}
+                onClick={(): void => setOperation({ kind: 'create', project })}
+                title="创建工作区"
+                type="button"
+              >
+                <PlusIcon className="size-3" />
+              </button>
+            ) : (
+              <span className="text-destructive mr-auto text-[10px]">项目目录无效</span>
+            )}
+            <button
+              aria-label={project.isValid ? `移除 ${project.name}` : `忘记 ${project.name}`}
+              onClick={(): void =>
+                setOperation(project.isValid ? { kind: 'remove', project } : { kind: 'forget', project })
+              }
+              title={project.isValid ? '移除项目' : '忘记无效项目'}
+              type="button"
+            >
+              <Trash2Icon className="size-3" />
+            </button>
+          </div>
           <SidebarMenuSub>
             {project.workspaces.map((workspace) => (
               <SidebarMenuSubItem key={workspace.id}>
@@ -146,6 +175,32 @@ const ProjectTree = ({
                   >
                     <PinIcon className={workspace.pinnedAt ? 'size-3 fill-current' : 'size-3'} />
                   </button>
+                  {workspace.kind === 'derived' ? (
+                    <>
+                      <button
+                        aria-label={`重命名 ${workspace.name}`}
+                        onClick={(event: React.MouseEvent): void => {
+                          event.stopPropagation()
+                          setOperation({ kind: 'rename', workspace })
+                        }}
+                        title="重命名工作区"
+                        type="button"
+                      >
+                        <PencilIcon className="size-3" />
+                      </button>
+                      <button
+                        aria-label={`删除 ${workspace.name}`}
+                        onClick={(event: React.MouseEvent): void => {
+                          event.stopPropagation()
+                          setOperation({ kind: 'delete', workspace })
+                        }}
+                        title="删除工作区"
+                        type="button"
+                      >
+                        <Trash2Icon className="size-3" />
+                      </button>
+                    </>
+                  ) : null}
                 </SidebarMenuSubButton>
                 {(tasksByWorkspace[workspace.id] ?? []).map((task: Task) => (
                   <TaskRow
@@ -271,6 +326,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
   const openTask = useTaskStore((state: TaskState) => state.openTask)
   const tasksByWorkspace = useTaskStore((state: TaskState) => state.tasksByWorkspace)
   const [query, setQuery] = useState('')
+  const [operation, setOperation] = useState<ProjectOperation | null>(null)
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const filteredProjects = useMemo(
     (): ProjectWithWorkspaces[] =>
@@ -354,6 +410,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
               activeWorkspaceId={activeWorkspaceId}
               projects={filteredProjects}
               selectWorkspace={selectWorkspace}
+              setOperation={setOperation}
               setWorkspacePinned={setWorkspacePinned}
             />
           )}
@@ -373,6 +430,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
               )),
           )}
           {error ? <p className="text-destructive px-2 py-2 text-xs">{error}</p> : null}
+          <ProjectOperationSheet onClose={(): void => setOperation(null)} operation={operation} />
         </SidebarGroupContent>
       ) : null}
     </SidebarGroup>

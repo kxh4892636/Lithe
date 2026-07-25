@@ -2,16 +2,21 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createPtyRuntime, type PtyAdapter, type PtyProcess } from './pty-runtime'
 
-const createFakeProcess = (): PtyProcess => ({
-  kill: vi.fn<() => void>(),
-  onData: vi.fn<(listener: (data: string) => void) => void>(),
-  onExit: vi.fn<(listener: (exitCode: number) => void) => void>(),
-  resize: vi.fn<(columns: number, rows: number) => void>(),
-  write: vi.fn<(data: string) => void>(),
-})
+const createFakeProcess = (): PtyProcess => {
+  let exit: ((exitCode: number) => void) | undefined
+  return {
+    kill: vi.fn<() => void>(() => exit?.(0)),
+    onData: vi.fn<(listener: (data: string) => void) => void>(),
+    onExit: vi.fn<(listener: (exitCode: number) => void) => void>((listener) => {
+      exit = listener
+    }),
+    resize: vi.fn<(columns: number, rows: number) => void>(),
+    write: vi.fn<(data: string) => void>(),
+  }
+}
 
 describe('PTY runtime', (): void => {
-  it('owns input, resize, output, exit, and cleanup behind one interface', (): void => {
+  it('owns input, resize, output, exit, and cleanup behind one interface', async (): Promise<void> => {
     const process = createFakeProcess()
     const adapter: PtyAdapter = { spawn: vi.fn<() => PtyProcess>().mockReturnValue(process) }
     const onData = vi.fn<(sessionId: string, data: string) => void>()
@@ -31,7 +36,7 @@ describe('PTY runtime', (): void => {
     expect(process.write).toHaveBeenCalledWith('echo ready\r')
     expect(process.resize).toHaveBeenCalledWith(120, 40)
 
-    runtime.closeAll()
+    await runtime.closeAll()
     expect(process.kill).toHaveBeenCalledOnce()
   })
 
@@ -127,7 +132,7 @@ describe('PTY runtime', (): void => {
     expect(onClose).toHaveBeenCalledWith('agent:task-1')
   })
 
-  it('removes all sessions before close callbacks can reenter the runtime', (): void => {
+  it('removes all sessions before close callbacks can reenter the runtime', async (): Promise<void> => {
     const process = createFakeProcess()
     let runtime: ReturnType<typeof createPtyRuntime>
     runtime = createPtyRuntime({
@@ -138,8 +143,58 @@ describe('PTY runtime', (): void => {
     })
     runtime.create({ columns: 80, cwd: '.', rows: 24, sessionId: 'agent:task-1', shell: 'agent' })
 
-    runtime.closeAll()
+    await runtime.closeAll()
 
     expect(process.kill).toHaveBeenCalledOnce()
+  })
+
+  it('keeps current and remaining sessions reachable when sequential shutdown fails', async (): Promise<void> => {
+    const first = createFakeProcess()
+    first.kill = vi.fn<() => void>(() => {
+      throw new Error('native close failed')
+    })
+    const second = createFakeProcess()
+    const runtime = createPtyRuntime({
+      adapter: { spawn: vi.fn<() => PtyProcess>().mockReturnValueOnce(first).mockReturnValueOnce(second) },
+      onData: (): void => undefined,
+      onExit: (): void => undefined,
+    })
+    runtime.create({ columns: 80, cwd: '.', rows: 24, sessionId: 'first', shell: 'pwsh' })
+    runtime.create({ columns: 80, cwd: '.', rows: 24, sessionId: 'second', shell: 'pwsh' })
+
+    await expect(runtime.closeAll()).rejects.toThrow(/native close failed/)
+    runtime.write('first', 'still reachable')
+    runtime.write('second', 'still reachable')
+    expect(second.kill).not.toHaveBeenCalled()
+  })
+
+  it('does not commit close side effects when shutdown times out', async (): Promise<void> => {
+    vi.useFakeTimers()
+    try {
+      const process = createFakeProcess()
+      process.kill = vi.fn<() => void>()
+      const onClose = vi.fn<(sessionId: string) => void>()
+      const runtime = createPtyRuntime({
+        adapter: { spawn: (): PtyProcess => process },
+        onClose,
+        onData: (): void => undefined,
+        onExit: (): void => undefined,
+      })
+      runtime.create({ columns: 80, cwd: '.', rows: 24, sessionId: 'agent:task-1', shell: 'agent' })
+
+      const closing = runtime.closeAll()
+      let rejection: unknown
+      const handled = closing.catch((error: unknown): void => {
+        rejection = error
+      })
+      await vi.advanceTimersByTimeAsync(10_000)
+      await handled
+
+      expect(rejection).toEqual(expect.objectContaining({ message: expect.stringMatching(/did not exit/) }))
+      expect(onClose).not.toHaveBeenCalled()
+      expect(() => runtime.write('agent:task-1', 'still reachable')).not.toThrow()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

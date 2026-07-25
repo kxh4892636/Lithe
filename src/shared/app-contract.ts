@@ -57,6 +57,33 @@ export interface WorkspaceNavigation {
   scratchWorkspaces: Workspace[]
 }
 
+export interface WorkspaceCreateInput {
+  existingBranch?: string
+  from?: string
+  name?: string
+  newBranch?: string
+  projectId: string
+}
+
+export interface WorkspaceCreatePreview {
+  dirtyFingerprint: string
+  dirtyPaths: string[]
+  headCommit: string
+  input: WorkspaceCreateInput
+}
+
+export interface WorkspaceDeletePreview {
+  branch: string
+  dirtyPaths: string[]
+  unmergedCommits: Array<{ hash: string; subject: string }>
+  workspace: Workspace
+}
+
+export interface ProjectRemovalPreview {
+  project: ProjectWithWorkspaces
+  workspaces: WorkspaceDeletePreview[]
+}
+
 export interface TerminalSession {
   cwd: string
   panelId: string
@@ -113,6 +140,16 @@ export interface LitheBridge {
     onNavigationChanged: (listener: () => void) => () => void
     selectWorkspace: (workspaceId: string) => Promise<void>
     setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<Workspace>
+    previewRemove: (projectId: string) => Promise<ProjectRemovalPreview>
+    remove: (projectId: string, branchConfirmations?: Record<string, string>) => Promise<boolean>
+    forgetInvalid: (projectId: string, confirmation: string) => Promise<boolean>
+  }
+  workspaces: {
+    create: (input: WorkspaceCreateInput, confirmedDirtyFingerprint?: string) => Promise<Workspace | null>
+    delete: (workspaceId: string, branchConfirmation?: string) => Promise<boolean>
+    previewCreate: (input: WorkspaceCreateInput) => Promise<WorkspaceCreatePreview>
+    previewDelete: (workspaceId: string) => Promise<WorkspaceDeletePreview>
+    rename: (workspaceId: string, name: string) => Promise<Workspace>
   }
   shells: {
     getDefault: () => Promise<string>

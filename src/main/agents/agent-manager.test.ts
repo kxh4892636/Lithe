@@ -51,7 +51,7 @@ const setup = () => {
   let savedTask = { ...task }
   const runtime = {
     close: vi.fn<(sessionId: string) => void>(),
-    closeAll: vi.fn<() => void>(),
+    closeAll: vi.fn<() => Promise<void>>(async (): Promise<void> => undefined),
     create: vi.fn<(request: Parameters<PtyRuntime['create']>[0]) => void>(),
     resize: vi.fn<(sessionId: string, columns: number, rows: number) => void>(),
     write: vi.fn<(sessionId: string, data: string) => void>(),
