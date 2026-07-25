@@ -10,6 +10,9 @@ import type {
   FileDocumentSnapshot,
   FileDraft,
   FileTreeEntry,
+  GitChangeKind,
+  GitChangeList,
+  GitDiffSnapshot,
   LitheBridge,
   ProjectRemovalPreview,
   ProjectWithWorkspaces,
@@ -103,6 +106,14 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.fileSetDraft, draft) as Promise<void>,
     watch: async (workspaceId: string): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.fileWatch, workspaceId) as Promise<void>,
+  },
+  gitDiff: {
+    list: async (workspaceId: string): Promise<GitChangeList> =>
+      ipcRenderer.invoke(ipcChannels.gitDiffList, workspaceId) as Promise<GitChangeList>,
+    read: async (workspaceId: string, kind: GitChangeKind, relativePath: string): Promise<GitDiffSnapshot> =>
+      ipcRenderer.invoke(ipcChannels.gitDiffRead, workspaceId, kind, relativePath) as Promise<GitDiffSnapshot>,
+    version: async (workspaceId: string, relativePath?: string): Promise<string | null> =>
+      ipcRenderer.invoke(ipcChannels.gitDiffVersion, workspaceId, relativePath) as Promise<string | null>,
   },
   preferences: {
     getPinnedGroupOpen: async (): Promise<boolean> =>

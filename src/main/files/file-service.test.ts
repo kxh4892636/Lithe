@@ -195,4 +195,29 @@ describe('file service', (): void => {
       rmSync(root, { force: true, recursive: true })
     }
   })
+
+  it('watches nested directories only after they are listed lazily', async (): Promise<void> => {
+    const { root, workspace } = fixture()
+    const changed = vi.fn<(event: FileChangeEvent) => void>()
+    const service = createFileService({ changed, getWorkspace: () => workspace })
+    try {
+      mkdirSync(join(root, 'folder'))
+      const path = join(root, 'folder', 'nested.txt')
+      writeFileSync(path, 'before')
+      await service.watch(workspace.id)
+      await service.listDirectory(workspace.id, 'folder', false)
+      writeFileSync(path, 'after')
+
+      await vi.waitFor((): void => {
+        expect(changed).toHaveBeenCalledWith({
+          relativePath: 'folder/nested.txt',
+          type: 'change',
+          workspaceId: workspace.id,
+        })
+      })
+    } finally {
+      await service.close()
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
 })

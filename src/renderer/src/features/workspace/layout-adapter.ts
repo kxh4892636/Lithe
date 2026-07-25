@@ -1,6 +1,6 @@
 import { Actions, DockLocation, Model, TabNode, TabSetNode, type IJsonModel, type IJsonTabNode } from 'flexlayout-react'
 
-import type { WorkspaceLayoutSnapshot } from '../../../../shared/app-contract'
+import type { GitChangeKind, WorkspaceLayoutSnapshot } from '../../../../shared/app-contract'
 import { parseWorkspaceLayoutSnapshot } from '../../../../shared/workspace-layout-schema'
 
 export interface TerminalPanelConfig {
@@ -15,6 +15,12 @@ export interface AgentPanelConfig {
 }
 
 export interface FilePanelConfig {
+  panelId: string
+  relativePath: string
+}
+
+export interface GitDiffPanelConfig {
+  kind: GitChangeKind
   panelId: string
   relativePath: string
 }
@@ -34,6 +40,7 @@ export interface WorkspaceLayoutAdapter {
   getModel: () => Model
   listPanelIds: () => string[]
   movePanel: (panelId: string, targetGroupId: string) => void
+  openDiff: (panel: GitDiffPanelConfig, name: string) => void
   openFile: (panel: FilePanelConfig, name: string) => void
   removePanel: (panelId: string) => void
   serialize: () => WorkspaceLayoutSnapshot
@@ -118,6 +125,17 @@ export const createLayoutAdapter = (snapshot?: WorkspaceLayoutSnapshot): Workspa
     },
     movePanel: (panelId: string, targetGroupId: string): void => {
       model.doAction(Actions.moveNode(panelId, targetGroupId, DockLocation.CENTER, -1, true))
+    },
+    openDiff: (panel: GitDiffPanelConfig, name: string): void => {
+      const tab: IJsonTabNode = {
+        component: 'git-diff',
+        config: panel,
+        enableRenderOnDemand: false,
+        id: panel.panelId,
+        name,
+        type: 'tab',
+      }
+      model.doAction(Actions.addTab(tab, activeGroup().getId(), DockLocation.CENTER, -1, true))
     },
     openFile: (panel: FilePanelConfig, name: string): void => {
       const tab: IJsonTabNode = {

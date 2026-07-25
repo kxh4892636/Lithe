@@ -30,6 +30,7 @@ test('E2E-LITHE-003 adds a directory and restores its default workspace', async 
     window = await electronSession.application.firstWindow()
     await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()
   } finally {
+    await electronSession.application.close()
     rmSync(projectDirectory, { force: true, recursive: true })
   }
 })
@@ -56,6 +57,7 @@ test('E2E-LITHE-004 adds a newly created directory from the system picker', asyn
     await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()
     await expect(window.getByRole('button', { name: '默认' })).toBeVisible()
   } finally {
+    await electronSession.application.close()
     rmSync(parentDirectory, { force: true, recursive: true })
   }
 })
@@ -144,6 +146,7 @@ test('E2E-LITHE-009 creates and deletes a managed Git workspace from project nav
     await expect(window.getByRole('button', { name: 'Review', exact: true })).toHaveCount(0)
     await expect.poll((): boolean => existsSync(managedPath)).toBe(false)
   } finally {
+    await electronSession.application.close()
     rmSync(projectDirectory, { force: true, recursive: true })
   }
 })

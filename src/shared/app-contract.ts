@@ -127,6 +127,24 @@ export interface FileChangeEvent {
 
 export type FileCloseResult = 'cancel' | 'discarded' | 'saved'
 
+export type GitChangeKind = 'staged' | 'unstaged' | 'untracked'
+
+export interface GitChangeEntry {
+  id: string
+  kind: GitChangeKind
+  relativePath: string
+}
+
+export interface GitChangeList {
+  changes: GitChangeEntry[]
+  isRepository: boolean
+}
+
+export interface GitDiffSnapshot extends GitChangeEntry {
+  modified: string
+  original: string
+}
+
 export interface LitheBridge {
   adapters: {
     create: (name: string, definition: AdapterDefinition) => Promise<AdapterSummary>
@@ -159,6 +177,11 @@ export interface LitheBridge {
     ) => Promise<FileDocumentSnapshot>
     setDraft: (draft: FileDraft) => Promise<void>
     watch: (workspaceId: string) => Promise<void>
+  }
+  gitDiff: {
+    list: (workspaceId: string) => Promise<GitChangeList>
+    read: (workspaceId: string, kind: GitChangeKind, relativePath: string) => Promise<GitDiffSnapshot>
+    version: (workspaceId: string, relativePath?: string) => Promise<string | null>
   }
   preferences: {
     getPinnedGroupOpen: () => Promise<boolean>

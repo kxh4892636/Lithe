@@ -8,14 +8,16 @@ import { Input } from '@/components/ui/input'
 import { fileDocumentKey, useFileDocumentStore } from '@/features/files/file-document-store'
 import { FileEditorPanel } from '@/features/files/file-editor-panel'
 import { WorkspaceNavigator } from '@/features/files/workspace-navigator'
+import { GitDiffPanel } from '@/features/git-diff/git-diff-panel'
 
-import type { AdapterSummary, Task, Workspace } from '../../../../shared/app-contract'
+import type { AdapterSummary, GitChangeEntry, Task, Workspace } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from '../tasks/task-store'
 import { AgentPanel } from './agent-panel'
 import {
   createLayoutAdapter,
   type AgentPanelConfig,
   type FilePanelConfig,
+  type GitDiffPanelConfig,
   type TerminalPanelConfig,
   type WorkspaceLayoutAdapter,
 } from './layout-adapter'
@@ -155,6 +157,10 @@ const createPanelFactory =
     if (node.getComponent() === 'file') {
       const config = node.getConfig() as FilePanelConfig
       return <FileEditorPanel relativePath={config.relativePath} workspaceId={workspaceId} />
+    }
+    if (node.getComponent() === 'git-diff') {
+      const config = node.getConfig() as GitDiffPanelConfig
+      return <GitDiffPanel kind={config.kind} relativePath={config.relativePath} workspaceId={workspaceId} />
     }
     const config = node.getConfig() as TerminalPanelConfig
     return <TerminalPanel config={config} updateTerminal={layout.updateTerminal} workspaceId={workspaceId} />
@@ -379,9 +385,15 @@ const WorkspaceLayoutBody = ({
       relativePath.split('/').at(-1) ?? relativePath,
     )
   }
+  const openDiff = (change: GitChangeEntry): void => {
+    layout.openDiff(
+      { kind: change.kind, panelId: `git-diff:${crypto.randomUUID()}`, relativePath: change.relativePath },
+      change.relativePath.split('/').at(-1) ?? change.relativePath,
+    )
+  }
   return (
     <section
-      className="flex size-full min-h-0 flex-col"
+      className="flex size-full min-h-0 flex-col overflow-hidden"
       aria-label={t('terminal.workspaceLabel', { name: workspace.name })}
     >
       <WorkspaceToolbar
@@ -391,7 +403,7 @@ const WorkspaceLayoutBody = ({
         openNavigator={(): void => navigation.setOpen(true)}
       />
       {taskError ? <p className="text-destructive border-b px-3 py-1 text-xs">{taskError}</p> : null}
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="relative min-w-0 flex-1">
           <Layout
             factory={createPanelFactory(layout, tasks, workspace.id)}
@@ -412,7 +424,9 @@ const WorkspaceLayoutBody = ({
         </div>
         {navigation.open ? (
           <WorkspaceNavigator
+            key={workspace.id}
             onClose={(): void => navigation.setOpen(false)}
+            onOpenDiff={openDiff}
             onOpenFile={openFile}
             onShowIgnoredChange={navigation.setShowIgnored}
             onWidthChange={navigation.setWidth}

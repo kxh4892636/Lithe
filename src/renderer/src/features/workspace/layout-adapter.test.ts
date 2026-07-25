@@ -25,4 +25,14 @@ describe('workspace Agent layout', (): void => {
     expect(layout.listPanelIds()).toEqual(['file:view-1', 'file:view-2'])
     expect(layout.getModel().getActiveTabset()?.getSelectedNode()?.getId()).toBe('file:view-2')
   })
+
+  it('opens every Git change click as a new panel in the active group', (): void => {
+    const layout = createLayoutAdapter()
+
+    layout.openDiff({ kind: 'staged', panelId: 'diff:view-1', relativePath: 'src/index.ts' }, 'index.ts')
+    layout.openDiff({ kind: 'staged', panelId: 'diff:view-2', relativePath: 'src/index.ts' }, 'index.ts')
+
+    expect(layout.listPanelIds()).toEqual(['diff:view-1', 'diff:view-2'])
+    expect(layout.getModel().getActiveTabset()?.getSelectedNode()?.getId()).toBe('diff:view-2')
+  })
 })

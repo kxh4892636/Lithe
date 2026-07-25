@@ -56,7 +56,24 @@ const fileTabSchema = z
   })
   .strict()
 
-const tabSchema = z.discriminatedUnion('component', [terminalTabSchema, agentTabSchema, fileTabSchema])
+const diffTabSchema = z
+  .object({
+    component: z.literal('git-diff'),
+    config: z
+      .object({
+        kind: z.enum(['staged', 'unstaged', 'untracked']),
+        panelId: identifier,
+        relativePath: z.string().min(1).max(4_096),
+      })
+      .strict(),
+    enableRenderOnDemand: z.boolean().optional(),
+    id: identifier,
+    name: z.string().min(1).max(128),
+    type: z.literal('tab'),
+  })
+  .strict()
+
+const tabSchema = z.discriminatedUnion('component', [terminalTabSchema, agentTabSchema, fileTabSchema, diffTabSchema])
 
 const tabSetSchema = z
   .object({

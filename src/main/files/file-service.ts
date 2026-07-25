@@ -242,10 +242,26 @@ export const createFileService = (options: FileServiceOptions): FileService => {
       watchers.clear()
     },
     getDrafts: (): FileDraft[] => [...drafts.values()],
-    listDirectory: async (workspaceId, relativeDirectory, showIgnored): Promise<FileTreeEntry[]> =>
-      await listDirectory(options, workspaceId, relativeDirectory, showIgnored),
-    read: async (workspaceId, relativePath): Promise<FileDocumentSnapshot> =>
-      await snapshot(await workspaceRoot(options, workspaceId), relativePath),
+    listDirectory: async (workspaceId, relativeDirectory, showIgnored): Promise<FileTreeEntry[]> => {
+      const entries = await listDirectory(options, workspaceId, relativeDirectory, showIgnored)
+      const root = await workspaceRoot(options, workspaceId)
+      const watcher = watchers.get(workspaceId)
+      if (watcher) {
+        watcher.add(resolve(root, relativeDirectory))
+        if ((options.platform ?? process.platform) === 'win32') {
+          await new Promise<void>((resolveReady): void => {
+            setTimeout(resolveReady, 120)
+          })
+        }
+      }
+      return entries
+    },
+    read: async (workspaceId, relativePath): Promise<FileDocumentSnapshot> => {
+      const root = await workspaceRoot(options, workspaceId)
+      const document = await snapshot(root, relativePath)
+      watchers.get(workspaceId)?.add(resolve(root, relativePath))
+      return document
+    },
     save: async (workspaceId, relativePath, content, expectedFingerprint, force = false) => {
       if (Buffer.byteLength(content, 'utf8') > fileContentMaxBytes) throw new TypeError('File is too large to edit')
       const root = await workspaceRoot(options, workspaceId)
@@ -264,10 +280,12 @@ export const createFileService = (options: FileServiceOptions): FileService => {
       if (watchers.has(workspaceId)) return
       const root = await workspaceRoot(options, workspaceId)
       const platform = options.platform ?? process.platform
+      const gitDirectory = resolve(root, '.git')
       const watcher = chokidar.watch(root, {
+        depth: 0,
         followSymlinks: false,
         ignoreInitial: true,
-        ignored: (path): boolean => path === resolve(root, '.git') || isWithin(resolve(root, '.git'), resolve(path)),
+        ignored: (path): boolean => path === gitDirectory || isWithin(gitDirectory, resolve(path)),
         usePolling: platform === 'win32',
       })
       const notify = (type: FileChangeEvent['type'], path: string): void => {

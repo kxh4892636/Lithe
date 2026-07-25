@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { electronApp, is } from '@electron-toolkit/utils'
 import { app, BrowserWindow, dialog, type MessageBoxOptions, Notification, shell } from 'electron'
@@ -17,11 +17,12 @@ import { inspectAdapterAvailability, isAdapterAvailable } from './agents/command
 import { installLitheToolSkill, readLitheToolSkill } from './agents/skill-installer'
 import type { AppDatabase } from './database/app-database'
 import { createAppDatabase } from './database/app-database'
-import { registerFileIpc } from './files/file-ipc'
 import { createFileService, type FileService } from './files/file-service'
 import { commitDiscardedDrafts, prepareDirtyFilesBeforeQuit } from './files/file-shutdown'
+import { registerWorkspaceContentIpc } from './files/workspace-content-ipc'
 import { registerIpcHandlers, removeIpcHandlers } from './ipc-handlers'
 import { countDirectoryEntries } from './tasks/directory-entry-count'
+import { createManagedPathBoundary } from './tasks/managed-path-boundary'
 import { createScratchWorkspaceService } from './tasks/scratch-workspace-service'
 import { createTaskDeleteApproval } from './tasks/task-delete-approval'
 import { createTaskService } from './tasks/task-service'
@@ -61,27 +62,19 @@ const taskNotifications = new Map<string, Notification>()
 const scratchRoot = resolve(homedir(), '.lithe', 'scratch')
 const scratchTrashStagingRoot = resolve(homedir(), '.lithe', 'trash-staging')
 
-const assertScratchPath = (path: string): string => {
-  const resolved = resolve(path)
-  const child = relative(scratchRoot, resolved)
-  if (!child || child.startsWith('..') || isAbsolute(child)) {
-    throw new TypeError('Temporary workspace path is outside the managed scratch root')
-  }
-  return resolved
-}
+const assertScratchPath = createManagedPathBoundary(
+  scratchRoot,
+  'Temporary workspace path is outside the managed scratch root',
+)
 
 const removeScratchDirectory = (path: string): void => {
   rmSync(assertScratchPath(path), { force: true, recursive: true })
 }
 
-const assertStagedScratchPath = (path: string): string => {
-  const resolved = resolve(path)
-  const child = relative(scratchTrashStagingRoot, resolved)
-  if (!child || child.startsWith('..') || isAbsolute(child)) {
-    throw new TypeError('Staged temporary workspace path is outside the managed cleanup root')
-  }
-  return resolved
-}
+const assertStagedScratchPath = createManagedPathBoundary(
+  scratchTrashStagingRoot,
+  'Staged temporary workspace path is outside the managed cleanup root',
+)
 
 interface ScratchDeletionManifest {
   originalPath: string
@@ -277,7 +270,11 @@ const openMainWindow = async (): Promise<void> => {
     changed: (event): void => mainWindow?.webContents.send(ipcChannels.fileChanged, event),
     getWorkspace: appDatabase.projects.getWorkspace,
   })
-  removeFileIpc = registerFileIpc({ service: fileService, window: mainWindow })
+  removeFileIpc = registerWorkspaceContentIpc({
+    fileService,
+    getWorkspace: appDatabase.projects.getWorkspace,
+    window: mainWindow,
+  })
   registerIpcHandlers({
     database: appDatabase,
     forgetInvalidProject: workspaceLifecycle.forgetInvalidProject,
