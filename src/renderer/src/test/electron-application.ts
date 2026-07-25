@@ -7,6 +7,7 @@ import { _electron as electron, expect, test as base, type ElectronApplication }
 export interface ElectronTestSession {
   application: ElectronApplication
   close: () => Promise<void>
+  controlDiscoveryPath: string
   restart: () => Promise<ElectronApplication>
 }
 
@@ -51,13 +52,21 @@ const resolveExecutablePath = (): string | undefined => {
   }
 }
 
-const launchApplication = async (userDataDirectory: string): Promise<ElectronApplication> => {
+const launchApplication = async (
+  userDataDirectory: string,
+  controlDiscoveryPath: string,
+): Promise<ElectronApplication> => {
   const executablePath = resolveExecutablePath()
   try {
     return await electron.launch({
       args: executablePath ? [] : ['.'],
       ...(executablePath ? { executablePath } : { cwd: process.cwd() }),
-      env: { ...process.env, LITHE_USER_DATA_DIR: userDataDirectory },
+      env: {
+        ...process.env,
+        LITHE_CONTROL_DISCOVERY_PATH: controlDiscoveryPath,
+        LITHE_E2E: '1',
+        LITHE_USER_DATA_DIR: userDataDirectory,
+      },
     })
   } catch (error: unknown) {
     logBoundaryError('application launch', error)
@@ -79,12 +88,14 @@ export const test = base.extend<ElectronTestFixtures>({
   // eslint-disable-next-line no-empty-pattern
   electronSession: async ({}: object, use: (session: ElectronTestSession) => Promise<void>): Promise<void> => {
     const userDataDirectory = createUserDataDirectory()
+    const controlDiscoveryPath = join(userDataDirectory, 'control.json')
     let application: ElectronApplication | undefined
     const errors: unknown[] = []
     try {
-      application = await launchApplication(userDataDirectory)
+      application = await launchApplication(userDataDirectory, controlDiscoveryPath)
       const electronSession: ElectronTestSession = {
         application,
+        controlDiscoveryPath,
         close: async (): Promise<void> => {
           if (!application) return
           await closeApplication(application)
@@ -94,7 +105,7 @@ export const test = base.extend<ElectronTestFixtures>({
           if (!application) throw new Error('Electron 应用尚未启动')
           await closeApplication(application)
           application = undefined
-          application = await launchApplication(userDataDirectory)
+          application = await launchApplication(userDataDirectory, controlDiscoveryPath)
           electronSession.application = application
           return application
         },

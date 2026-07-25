@@ -55,6 +55,14 @@ _避免使用_：会话
 **任务工具**：
 Lithe 提供给 Agent 或外部终端、且受绑定或显式目标上下文约束的任务操作。
 
+**本地控制通道**：
+`lithe-tool` 与同一用户正在运行的 Lithe 主进程之间，通过 Named Pipe 或 Unix
+Domain Socket 建立的版本化 JSON 请求通道；它不监听 TCP，也不启动应用。
+
+**Agent capability**：
+Lithe 为一个 CLI 实例随机签发、限定其项目、工作区和任务上下文的临时凭据；
+实例结束后立即失效，不写入持久化或日志。
+
 **Lithe Tool Skill**：
 由 Lithe 安装、供 Coding Agent 发现并读取的跨 CLI 调用契约，说明如何使用
 `lithe-tool`，但不增加新的工具入口。

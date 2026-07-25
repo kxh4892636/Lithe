@@ -14,6 +14,7 @@ import {
   createWorkspaceLayoutPersistence,
   type WorkspaceLayoutPersistence,
 } from './terminal/workspace-layout-persistence'
+import { createToolControlRuntime, type ToolControlRuntime } from './tool-control/tool-control-runtime'
 import { resolveWindowOptions } from './window-state'
 
 const userDataOverride = process.env.LITHE_USER_DATA_DIR
@@ -24,6 +25,9 @@ let mainWindow: BrowserWindow | undefined
 let persistTimer: NodeJS.Timeout | undefined
 let ptyRuntime: PtyRuntime | undefined
 let workspaceLayoutPersistence: WorkspaceLayoutPersistence | undefined
+let toolControlRuntime: ToolControlRuntime | undefined
+let shutdownStarted = false
+let shutdownComplete = false
 
 const resolveMigrationsFolder = (): string =>
   is.dev ? join(app.getAppPath(), 'drizzle') : join(process.resourcesPath, 'drizzle')
@@ -117,12 +121,17 @@ if (!app.requestSingleInstanceLock()) {
 
   void app
     .whenReady()
-    .then((): void => {
+    .then(async (): Promise<void> => {
       electronApp.setAppUserModelId('com.kxh.lithe')
       appDatabase = createAppDatabase({
         databasePath: join(app.getPath('userData'), 'lithe.db'),
         migrationsFolder: resolveMigrationsFolder(),
       })
+      toolControlRuntime = createToolControlRuntime(
+        appDatabase,
+        process.env.LITHE_E2E === '1' ? { discoveryPath: join(app.getPath('userData'), 'control.json') } : {},
+      )
+      await toolControlRuntime.listen()
       openMainWindow()
       app.on('activate', (): void => {
         if (BrowserWindow.getAllWindows().length === 0) openMainWindow()
@@ -139,7 +148,11 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform !== 'darwin') app.quit()
   })
 
-  app.on('before-quit', (): void => {
+  app.on('before-quit', (event): void => {
+    if (shutdownComplete) return
+    event.preventDefault()
+    if (shutdownStarted) return
+    shutdownStarted = true
     if (persistTimer) clearTimeout(persistTimer)
     persistWindowState()
     removeIpcHandlers()
@@ -148,7 +161,25 @@ if (!app.requestSingleInstanceLock()) {
     ptyRuntime = undefined
     workspaceLayoutPersistence?.flushAll(false)
     workspaceLayoutPersistence = undefined
-    appDatabase?.close()
-    appDatabase = undefined
+    void (async (): Promise<void> => {
+      try {
+        await toolControlRuntime?.close()
+      } catch (error: unknown) {
+        const message = error instanceof Error ? (error.stack ?? error.message) : String(error)
+        process.stderr.write(`Lithe tool control shutdown failed: ${message}\n`)
+      } finally {
+        toolControlRuntime = undefined
+        try {
+          appDatabase?.close()
+        } catch (error: unknown) {
+          const message = error instanceof Error ? (error.stack ?? error.message) : String(error)
+          process.stderr.write(`Lithe database shutdown failed: ${message}\n`)
+        } finally {
+          appDatabase = undefined
+          shutdownComplete = true
+          app.quit()
+        }
+      }
+    })()
   })
 }
