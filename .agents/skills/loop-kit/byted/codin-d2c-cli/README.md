@@ -73,6 +73,7 @@ export FIGMA_ACCESS_TOKEN=<你的 Figma Token>
 ```
 
 Agent 会自动：
+
 1. 安装（或通过 npx 调用）`codin-d2c` CLI
 2. 先检查 CLI 版本是否满足 Skill 要求，不足时自动切到 `npx -y --registry=https://bnpm.byted.org --package @byted/codin-d2c-mcp@latest`
 3. 检测目标项目平台
@@ -94,12 +95,12 @@ Agent 会自动：
 
 不同的 Agent 有不同的 skill 目录约定：
 
-| Agent | Skill 目录 | 操作 |
-|-------|-----------|------|
-| **Claude Code** | `.claude/skills/` 或 项目根目录 | 复制 `codin-d2c-cli/` 文件夹到 skill 目录 |
-| **Gemini CLI** | `.gemini/skills/` 或 `.agent/skills/` | 同上 |
-| **Codex** | 项目根目录或 `.agent/` | 同上 |
-| **自定义 Agent** | 取决于框架约定 | 参考框架文档 |
+| Agent            | Skill 目录                            | 操作                                      |
+| ---------------- | ------------------------------------- | ----------------------------------------- |
+| **Claude Code**  | `.claude/skills/` 或 项目根目录       | 复制 `codin-d2c-cli/` 文件夹到 skill 目录 |
+| **Gemini CLI**   | `.gemini/skills/` 或 `.agent/skills/` | 同上                                      |
+| **Codex**        | 项目根目录或 `.agent/`                | 同上                                      |
+| **自定义 Agent** | 取决于框架约定                        | 参考框架文档                              |
 
 ```bash
 # 示例：Claude Code
@@ -182,6 +183,7 @@ source ~/.zshrc
 ### 场景：用户在 Claude Code 中使用
 
 **用户输入：**
+
 ```
 请根据这个 Figma 设计实现一个 React 页面：
 https://www.figma.com/design/ABC123/MyDesign?node-id=1-100
@@ -293,11 +295,11 @@ https://www.figma.com/design/ABC123/MyDesign?node-id=1-100
 
 各 stage 的核心返回字段：
 
-| Stage | 返回字段 | Agent 行为 |
-| --- | --- | --- |
-| `discover` | `componentsMenu` | 只用于选择组件名，不能直接生成代码 |
-| `implement` | `rulesMarkdown` | 生成 Lynx 代码前必须读取，包含 `<LYNX_CRITICAL_RULES>` / `<LYNX_USAGE_DOCS>` |
-| `generation-detail-example` | `topicMarkdown` | 只作为 `rulesMarkdown` 的补充，`queryKeys` 必须从 `deepDive.availableTopics[].queryKey` 复制 |
+| Stage                       | 返回字段         | Agent 行为                                                                                   |
+| --------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| `discover`                  | `componentsMenu` | 只用于选择组件名，不能直接生成代码                                                           |
+| `implement`                 | `rulesMarkdown`  | 生成 Lynx 代码前必须读取，包含 `<LYNX_CRITICAL_RULES>` / `<LYNX_USAGE_DOCS>`                 |
+| `generation-detail-example` | `topicMarkdown`  | 只作为 `rulesMarkdown` 的补充，`queryKeys` 必须从 `deepDive.availableTopics[].queryKey` 复制 |
 
 不要传旧查询标签：`--stage routing`、`--stage implementing`、`--stage verifying`、`verify`、`--dsl-snippet`、`--signals`、`--rule-types` 都是无效输入。Agent 仍然负责基于 DSL、用户要求和项目约定选择组件。
 
@@ -316,6 +318,7 @@ Non-Lynx 平台跳过 `query-ui-rules`，不要用 Lynx 规则作为兜底。
 ### Q: 我需要手动运行任何命令吗？
 
 **A:** 不需要。你只需要：
+
 1. 配置好两个 Token 环境变量
 2. 将 SKILL.md 交给 Agent
 3. 告诉 Agent Figma URL 和目标目录
@@ -325,6 +328,7 @@ Non-Lynx 平台跳过 `query-ui-rules`，不要用 Lynx 规则作为兜底。
 ### Q: 支持哪些 Agent？
 
 **A:** 任何支持 shell 命令执行的 Agent 都可以使用，包括但不限于：
+
 - Trae
 - Claude Code
 - Codex
@@ -337,17 +341,17 @@ Non-Lynx 平台跳过 `query-ui-rules`，不要用 Lynx 规则作为兜底。
 **A:**
 两者功能完全等价，只是适配不同的 Agent 生态。
 
-| 维度 | MCP 方式 | CLI Skill 方式 |
-|------|---------|---------------|
-| 安装方式 | MCP Server 配置 | npm 全局安装 / npx |
+| 维度       | MCP 方式                       | CLI Skill 方式              |
+| ---------- | ------------------------------ | --------------------------- |
+| 安装方式   | MCP Server 配置                | npm 全局安装 / npx          |
 | Token 消耗 | ~28K-55K tokens（schema 注入） | ~0 tokens（无 schema 成本） |
-| 交互方式 | Tool Call 协议 | Shell 命令 |
-| 功能 | 完全相同 | 完全相同 |
-
+| 交互方式   | Tool Call 协议                 | Shell 命令                  |
+| 功能       | 完全相同                       | 完全相同                    |
 
 ### Q: 出错了怎么办？
 
 **A:** CLI 遵循 Agentic CLI Design 规范，每个错误响应都包含：
+
 - `error.code`：机器可读的错误码
 - `fix`：自然语言修复建议
 - `next_actions`：修复后的下一步操作
@@ -382,11 +386,13 @@ codin-d2c download-icons \
 **A:** 支持三种格式：
 
 1. **JSON 数组**（推荐，最精确）：
+
    ```bash
    --code-files '[{"path":"/src/Card.tsx","type":"new"},{"path":"/src/App.tsx","type":"modify"}]'
    ```
 
 2. **带类型前缀的逗号分隔**（CLI 友好）：
+
    ```bash
    --code-files '/src/Card.tsx,modify:/src/App.tsx'
    ```
@@ -420,6 +426,7 @@ codin-d2c download-icons \
 ### Q: 为什么要同时读取 XML 和预览图？
 
 **A:** XML DSL 提供精确的结构和样式数据（组件层级、布局属性、颜色值、字体大小等），但无法完全表达视觉语义。预览图是设计的**视觉真相**，能帮助 Agent：
+
 - 理解组件的视觉层级和空间关系
 - 区分交互元素和装饰元素
 - 解决 XML 中模糊的布局关系
@@ -430,9 +437,11 @@ codin-d2c download-icons \
 ### Q: 如何确认 Skill 被正确加载？
 
 **A:** 你可以直接询问 Agent：
+
 ```
 你是否加载了 codin-d2c-cli Skill？请描述一下 D2C 的工作流程。
 ```
+
 如果 Agent 能正确描述完整工作流（检测平台 → 获取数据 → 读取 XML+预览图 → 下载图标 → 生成代码 → Code Review → 可选 Runtime Design Review + design-review-fix 回环 → 清理），
 说明 Skill 已成功加载。
 对 Lynx 项目，还应能描述 `get-figma-data → 读取 DSL/预览图/CodeGenGuid → query-ui-rules discover/implement 读取 rulesMarkdown → 生成代码 → generation-detail-example 按 deepDive.availableTopics[].queryKey 拉取 topicMarkdown → verify-code ruleContext`。
@@ -443,13 +452,13 @@ codin-d2c download-icons \
 
 ### 新增内容
 
-| 维度 | v3.3.0 | v4.0 |
-|------|--------|------|
-| **最低版本门槛** | 3.3.0 | 4.0.0 |
-| **Runtime Design Review** | 无 | 新增 Step 5：`design-review` 把运行页截图/URL 与 Figma 比对，产出本地 HTML + 尽力可分享报告 URL，修复回环最多 3 轮 |
-| **修复回环** | 无 | 新增 Step 6：本机直接读 `analysis_path`/`issues_path` 修，或用 `design-review-fix` 把报告 URL 转成定位过的 unified-diff 建议（只建议、不写文件） |
-| **运行图贴图入口** | 无 | 新增 `paste-screenshot`：用户只在对话里贴了图、coding agent 落不了盘时，从系统剪贴板抓图落盘（同机、单图规则、`--reveal` 可视确认）再喂给 `--live-screenshot` |
-| **截图获取纪律** | 含"agent 可把对话内图片落盘"的错误表述 | 修正为：coding agent **无法**把对话里的图落盘，必须走 `paste-screenshot`；并给出 4 步截图获取决策序 |
+| 维度                      | v3.3.0                                 | v4.0                                                                                                                                                          |
+| ------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **最低版本门槛**          | 3.3.0                                  | 4.0.0                                                                                                                                                         |
+| **Runtime Design Review** | 无                                     | 新增 Step 5：`design-review` 把运行页截图/URL 与 Figma 比对，产出本地 HTML + 尽力可分享报告 URL，修复回环最多 3 轮                                            |
+| **修复回环**              | 无                                     | 新增 Step 6：本机直接读 `analysis_path`/`issues_path` 修，或用 `design-review-fix` 把报告 URL 转成定位过的 unified-diff 建议（只建议、不写文件）              |
+| **运行图贴图入口**        | 无                                     | 新增 `paste-screenshot`：用户只在对话里贴了图、coding agent 落不了盘时，从系统剪贴板抓图落盘（同机、单图规则、`--reveal` 可视确认）再喂给 `--live-screenshot` |
+| **截图获取纪律**          | 含"agent 可把对话内图片落盘"的错误表述 | 修正为：coding agent **无法**把对话里的图落盘，必须走 `paste-screenshot`；并给出 4 步截图获取决策序                                                           |
 
 ### 迁移建议
 
@@ -463,13 +472,13 @@ codin-d2c download-icons \
 
 ### 新增内容
 
-| 维度 | v3.0.x | v3.3.0 |
-|------|--------|--------|
-| **最低版本门槛** | 3.0.1 | 3.3.0 |
-| **Lynx 规则查询** | 无强制步骤 | XML DSL、预览图和 `CodeGenGuid` 后使用 `discover` / `implement` / `generation-detail-example` 获取 `componentsMenu`、`rulesMarkdown`、`topicMarkdown` |
-| **Lynx 平台检测** | 主要识别 `@byted-lynx/*` | 同时识别 `@byted-lynx/*`、`@lynx-js/*`、`.lynx.tsx`、Lynx tags |
-| **SVG 处理** | 仅描述下载结果 | 明确 inline `svg_code` 与 PNG fallback |
-| **verify-code** | 只传代码文件 | Lynx 传 LLM 总结的自然语言 `ruleContext` |
+| 维度              | v3.0.x                   | v3.3.0                                                                                                                                                |
+| ----------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **最低版本门槛**  | 3.0.1                    | 3.3.0                                                                                                                                                 |
+| **Lynx 规则查询** | 无强制步骤               | XML DSL、预览图和 `CodeGenGuid` 后使用 `discover` / `implement` / `generation-detail-example` 获取 `componentsMenu`、`rulesMarkdown`、`topicMarkdown` |
+| **Lynx 平台检测** | 主要识别 `@byted-lynx/*` | 同时识别 `@byted-lynx/*`、`@lynx-js/*`、`.lynx.tsx`、Lynx tags                                                                                        |
+| **SVG 处理**      | 仅描述下载结果           | 明确 inline `svg_code` 与 PNG fallback                                                                                                                |
+| **verify-code**   | 只传代码文件             | Lynx 传 LLM 总结的自然语言 `ruleContext`                                                                                                              |
 
 ### 迁移建议
 
@@ -483,11 +492,11 @@ codin-d2c download-icons \
 
 ### 新增内容
 
-| 维度 | v3.0.0 | v3.0.1 |
-|------|--------|--------|
-| **CLI 版本校验** | 默认假设本地 CLI 可直接使用 | 新增 Step -1，要求先读取 `codin-d2c commands` 的 `result.version` 并与 Skill `version` 比较 |
-| **升级策略** | 示例中主要展示直接使用 CLI | 明确要求版本不足时切到 `npx -y --registry=https://bnpm.byted.org --package @byted/codin-d2c-mcp@latest` |
-| **运行时版本引用** | 容易被误解为固定安装某个包版本 | 明确 Skill `version` 只是最低兼容门槛，运行时命令应优先使用 `@latest` 刷新 |
+| 维度               | v3.0.0                         | v3.0.1                                                                                                  |
+| ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| **CLI 版本校验**   | 默认假设本地 CLI 可直接使用    | 新增 Step -1，要求先读取 `codin-d2c commands` 的 `result.version` 并与 Skill `version` 比较             |
+| **升级策略**       | 示例中主要展示直接使用 CLI     | 明确要求版本不足时切到 `npx -y --registry=https://bnpm.byted.org --package @byted/codin-d2c-mcp@latest` |
+| **运行时版本引用** | 容易被误解为固定安装某个包版本 | 明确 Skill `version` 只是最低兼容门槛，运行时命令应优先使用 `@latest` 刷新                              |
 
 ### 迁移建议
 
@@ -501,16 +510,16 @@ codin-d2c download-icons \
 
 ### 新增内容
 
-| 维度 | v2.2 | v2.3 |
-|------|------|------|
-| **平台检测** | 简单提及 | 新增 Step 0，提供完整检测清单，强调"错误平台比 universal 更差" |
-| **预览图指导** | 仅提及读取 XML | 强调必须同时读取 XML + 预览图，预览图是"视觉真相" |
-| **代码生成指导** | 无 | 新增 Step 3 代码生成最佳实践（6 条） |
-| **verify-code 格式** | 仅逗号分隔 | 完整描述三种输入格式（JSON 数组、类型前缀、纯逗号） |
-| **文件排序** | 无 | 强调按重要性排序：主页面优先 → 大组件 → 样式 → 小组件 |
-| **文件类型语义** | 无 | 解释 new/modify 的行为差异（modify 自动提取 git diff） |
-| **新参数** | — | `--xml-mode`（含 `raw_html_only`）、`--xml-response-mode 4`、`--xml-cache`、`--icon-format`、`--trace-id` |
-| **Guardrails** | 5 条 | 8 条，新增文件排序、类型标注、URL 一致性 |
+| 维度                 | v2.2           | v2.3                                                                                                      |
+| -------------------- | -------------- | --------------------------------------------------------------------------------------------------------- |
+| **平台检测**         | 简单提及       | 新增 Step 0，提供完整检测清单，强调"错误平台比 universal 更差"                                            |
+| **预览图指导**       | 仅提及读取 XML | 强调必须同时读取 XML + 预览图，预览图是"视觉真相"                                                         |
+| **代码生成指导**     | 无             | 新增 Step 3 代码生成最佳实践（6 条）                                                                      |
+| **verify-code 格式** | 仅逗号分隔     | 完整描述三种输入格式（JSON 数组、类型前缀、纯逗号）                                                       |
+| **文件排序**         | 无             | 强调按重要性排序：主页面优先 → 大组件 → 样式 → 小组件                                                     |
+| **文件类型语义**     | 无             | 解释 new/modify 的行为差异（modify 自动提取 git diff）                                                    |
+| **新参数**           | —              | `--xml-mode`（含 `raw_html_only`）、`--xml-response-mode 4`、`--xml-cache`、`--icon-format`、`--trace-id` |
+| **Guardrails**       | 5 条           | 8 条，新增文件排序、类型标注、URL 一致性                                                                  |
 
 ### 设计理念
 

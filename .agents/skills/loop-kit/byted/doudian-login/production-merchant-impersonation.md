@@ -39,15 +39,15 @@ https://ecop.bytedance.net/businessManage/industryShop
 页面加载完成后，在页面主执行上下文执行：
 
 ```js
-(() => {
-  const token = window.__PRELOAD_CONTEXT__?.userInfo?.token ?? null;
+;(() => {
+  const token = window.__PRELOAD_CONTEXT__?.userInfo?.token ?? null
   return JSON.stringify({
     href: location.href,
     title: document.title,
     hasPreload: Boolean(window.__PRELOAD_CONTEXT__),
     hasToken: Boolean(token),
-    tokenLength: token ? String(token).length : 0
-  });
+    tokenLength: token ? String(token).length : 0,
+  })
 })()
 ```
 
@@ -62,16 +62,19 @@ https://ecop.bytedance.net/businessManage/industryShop
 继续在 ECOP 页面主执行上下文中调用。推荐把 token 的读取和接口请求放在同一个页面内表达式中，避免 token 被带出页面上下文：
 
 ```js
-(async () => {
-  const token = window.__PRELOAD_CONTEXT__?.userInfo?.token ?? null;
-  const shopId = '<SHOP_ID>';
-  const base = 'https://ecop.bytedance.net/doudian/ecop/fake_login';
-  if (!token) return JSON.stringify({ step: 'check', ok: false, error: 'NO_TOKEN' });
-  const resp = await fetch(base + '/auth/check?shop_id=' + encodeURIComponent(shopId) + '&__token=' + encodeURIComponent(token), {
-    credentials: 'include',
-  });
-  const data = await resp.json();
-  return JSON.stringify({ step: 'check', httpStatus: resp.status, data });
+;(async () => {
+  const token = window.__PRELOAD_CONTEXT__?.userInfo?.token ?? null
+  const shopId = '<SHOP_ID>'
+  const base = 'https://ecop.bytedance.net/doudian/ecop/fake_login'
+  if (!token) return JSON.stringify({ step: 'check', ok: false, error: 'NO_TOKEN' })
+  const resp = await fetch(
+    base + '/auth/check?shop_id=' + encodeURIComponent(shopId) + '&__token=' + encodeURIComponent(token),
+    {
+      credentials: 'include',
+    },
+  )
+  const data = await resp.json()
+  return JSON.stringify({ step: 'check', httpStatus: resp.status, data })
 })()
 ```
 
@@ -114,18 +117,18 @@ GET https://ecop.bytedance.net/doudian/ecop/fake_login/auth/check?shop_id=<SHOP_
 ### 5. 获取附身链接并打开
 
 ```js
-(async () => {
-  const token = window.__PRELOAD_CONTEXT__?.userInfo?.token ?? null;
-  const shopId = '<SHOP_ID>';
-  const base = 'https://ecop.bytedance.net/doudian/ecop/fake_login';
-  if (!token) return JSON.stringify({ step: 'url', ok: false, error: 'NO_TOKEN' });
+;(async () => {
+  const token = window.__PRELOAD_CONTEXT__?.userInfo?.token ?? null
+  const shopId = '<SHOP_ID>'
+  const base = 'https://ecop.bytedance.net/doudian/ecop/fake_login'
+  if (!token) return JSON.stringify({ step: 'url', ok: false, error: 'NO_TOKEN' })
   const resp = await fetch(base + '/url?__token=' + encodeURIComponent(token), {
     method: 'POST',
     credentials: 'include',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ shop_id: shopId }),
-  });
-  const data = await resp.json();
+  })
+  const data = await resp.json()
   return JSON.stringify({
     step: 'url',
     httpStatus: resp.status,
@@ -133,8 +136,8 @@ GET https://ecop.bytedance.net/doudian/ecop/fake_login/auth/check?shop_id=<SHOP_
     msg: data?.msg,
     hasUrl: Boolean(data?.data),
     urlPrefix: data?.data ? String(data.data).slice(0, 80) : null,
-    url: data?.data
-  });
+    url: data?.data,
+  })
 })()
 ```
 
@@ -158,14 +161,14 @@ https://fxg.jinritemai.com/ffa/eco/experience-score
 
 ## 异常处理
 
-| 异常                                             | 处理                                                                     |
-| ------------------------------------------------ | ------------------------------------------------------------------------ |
-| ECOP token 为空                                  | 刷新 ECOP 页面重试；仍为空则提示用户登录 ECOP                            |
-| 当前 JS 执行方式看不到 `__PRELOAD_CONTEXT__`      | 不要判定未登录；切到页面主执行上下文读取                                  |
-| 权限检查接口异常                                 | 记录响应与错误，标为待确认                                               |
-| 附身次数已达上限                                 | 停止附身，记录 `fake_num_check` 结果                                     |
-| 权限申请失败                                     | 记录 `code/msg`，标为待确认                                              |
-| 轮询审批超时                                     | 停止等待，报告审批超时和目标 `shopId`                                    |
-| 获取附身链接失败                                 | 记录 `code/msg`，标为待确认                                              |
-| 附身链接打开后未进入抖店域                       | 记录最终 URL、页面标题和接口返回，标为待确认                             |
-| 目标页有弹窗遮挡                                 | 先用 URL、店铺名和主体内容判断商家态；按测试需要再关闭弹窗               |
+| 异常                                         | 处理                                                       |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| ECOP token 为空                              | 刷新 ECOP 页面重试；仍为空则提示用户登录 ECOP              |
+| 当前 JS 执行方式看不到 `__PRELOAD_CONTEXT__` | 不要判定未登录；切到页面主执行上下文读取                   |
+| 权限检查接口异常                             | 记录响应与错误，标为待确认                                 |
+| 附身次数已达上限                             | 停止附身，记录 `fake_num_check` 结果                       |
+| 权限申请失败                                 | 记录 `code/msg`，标为待确认                                |
+| 轮询审批超时                                 | 停止等待，报告审批超时和目标 `shopId`                      |
+| 获取附身链接失败                             | 记录 `code/msg`，标为待确认                                |
+| 附身链接打开后未进入抖店域                   | 记录最终 URL、页面标题和接口返回，标为待确认               |
+| 目标页有弹窗遮挡                             | 先用 URL、店铺名和主体内容判断商家态；按测试需要再关闭弹窗 |

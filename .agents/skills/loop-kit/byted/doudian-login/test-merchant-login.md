@@ -33,43 +33,40 @@ https://ecop.bytedance.net
 在 `ecop.bytedance.net` 页面上下文执行：
 
 ```js
-(async () => {
-  const jwtRes = await fetch(
-    "https://cloud-boe.bytedance.net/auth/api/v1/jwt",
-    {
-      method: "GET",
-      mode: "cors",
-      credentials: "include",
-    },
-  );
-  const jwtToken = jwtRes.headers.get("X-Jwt-Token");
+;(async () => {
+  const jwtRes = await fetch('https://cloud-boe.bytedance.net/auth/api/v1/jwt', {
+    method: 'GET',
+    mode: 'cors',
+    credentials: 'include',
+  })
+  const jwtToken = jwtRes.headers.get('X-Jwt-Token')
   if (!jwtToken) {
     return {
-      error: "JWT 获取失败，请确认 SSO 是否已登录",
+      error: 'JWT 获取失败，请确认 SSO 是否已登录',
       status: jwtRes.status,
-    };
+    }
   }
 
-  const shopId = "<SHOP_ID>";
+  const shopId = '<SHOP_ID>'
   const res = await fetch(
     `/ecomauth/manage/loginfake/get_ticket_by_bus_info?fake_type=2&expire_time=86400&account_id=${shopId}&account_type=1&website_code=doudian`,
     {
-      method: "GET",
-      headers: { "x-jwt-token": jwtToken },
+      method: 'GET',
+      headers: { 'x-jwt-token': jwtToken },
     },
-  );
-  const data = await res.json();
+  )
+  const data = await res.json()
 
   if (data?.data?.url) {
-    window.location.href = data.data.url;
-    return { success: true, msg: `正在跳转登录 shopId=${shopId}...` };
+    window.location.href = data.data.url
+    return { success: true, msg: `正在跳转登录 shopId=${shopId}...` }
   }
 
   return {
     success: false,
     code: data?.code,
-    msg: data?.msg || "登录失败，请确认是否有 fake login 权限",
-  };
+    msg: data?.msg || '登录失败，请确认是否有 fake login 权限',
+  }
 })()
 ```
 
