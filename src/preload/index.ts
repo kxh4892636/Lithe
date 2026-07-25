@@ -5,6 +5,11 @@ import type {
   AdapterSummary,
   AgentLaunch,
   BackgroundAgentLaunch,
+  FileChangeEvent,
+  FileCloseResult,
+  FileDocumentSnapshot,
+  FileDraft,
+  FileTreeEntry,
   LitheBridge,
   ProjectRemovalPreview,
   ProjectWithWorkspaces,
@@ -56,6 +61,48 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.agentStart, taskId) as Promise<AgentLaunch>,
     stop: async (taskId: string): Promise<void> => ipcRenderer.invoke(ipcChannels.agentStop, taskId) as Promise<void>,
     shouldRestore: async (): Promise<boolean> => ipcRenderer.invoke(ipcChannels.agentShouldRestore) as Promise<boolean>,
+  },
+  files: {
+    clearDraft: async (workspaceId: string, relativePath: string): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.fileClearDraft, workspaceId, relativePath) as Promise<void>,
+    closeLastView: async (workspaceId: string, relativePath: string): Promise<FileCloseResult> =>
+      ipcRenderer.invoke(ipcChannels.fileCloseLastView, workspaceId, relativePath) as Promise<FileCloseResult>,
+    listDirectory: async (
+      workspaceId: string,
+      relativeDirectory: string,
+      showIgnored: boolean,
+    ): Promise<FileTreeEntry[]> =>
+      ipcRenderer.invoke(ipcChannels.fileListDirectory, workspaceId, relativeDirectory, showIgnored) as Promise<
+        FileTreeEntry[]
+      >,
+    onChanged: (listener: (event: FileChangeEvent) => void): (() => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, value: FileChangeEvent): void => listener(value)
+      ipcRenderer.on(ipcChannels.fileChanged, wrapped)
+      return (): void => {
+        ipcRenderer.removeListener(ipcChannels.fileChanged, wrapped)
+      }
+    },
+    read: async (workspaceId: string, relativePath: string): Promise<FileDocumentSnapshot> =>
+      ipcRenderer.invoke(ipcChannels.fileRead, workspaceId, relativePath) as Promise<FileDocumentSnapshot>,
+    save: async (
+      workspaceId: string,
+      relativePath: string,
+      content: string,
+      expectedFingerprint: string,
+      force?: boolean,
+    ): Promise<FileDocumentSnapshot> =>
+      ipcRenderer.invoke(
+        ipcChannels.fileSave,
+        workspaceId,
+        relativePath,
+        content,
+        expectedFingerprint,
+        force,
+      ) as Promise<FileDocumentSnapshot>,
+    setDraft: async (draft: FileDraft): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.fileSetDraft, draft) as Promise<void>,
+    watch: async (workspaceId: string): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.fileWatch, workspaceId) as Promise<void>,
   },
   preferences: {
     getPinnedGroupOpen: async (): Promise<boolean> =>

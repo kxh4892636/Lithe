@@ -14,6 +14,11 @@ export interface AgentPanelConfig {
   taskId: string
 }
 
+export interface FilePanelConfig {
+  panelId: string
+  relativePath: string
+}
+
 type Placement = 'center' | 'right' | 'bottom'
 
 interface AddPanelOptions {
@@ -29,6 +34,7 @@ export interface WorkspaceLayoutAdapter {
   getModel: () => Model
   listPanelIds: () => string[]
   movePanel: (panelId: string, targetGroupId: string) => void
+  openFile: (panel: FilePanelConfig, name: string) => void
   removePanel: (panelId: string) => void
   serialize: () => WorkspaceLayoutSnapshot
   toggleMaximize: (groupId: string) => void
@@ -112,6 +118,17 @@ export const createLayoutAdapter = (snapshot?: WorkspaceLayoutSnapshot): Workspa
     },
     movePanel: (panelId: string, targetGroupId: string): void => {
       model.doAction(Actions.moveNode(panelId, targetGroupId, DockLocation.CENTER, -1, true))
+    },
+    openFile: (panel: FilePanelConfig, name: string): void => {
+      const tab: IJsonTabNode = {
+        component: 'file',
+        config: panel,
+        enableRenderOnDemand: false,
+        id: panel.panelId,
+        name,
+        type: 'tab',
+      }
+      model.doAction(Actions.addTab(tab, activeGroup().getId(), DockLocation.CENTER, -1, true))
     },
     removePanel: (panelId: string): void => {
       if (model.getNodeById(panelId)) model.doAction(Actions.deleteTab(panelId))

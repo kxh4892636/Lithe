@@ -1,14 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-  type Dirent,
-} from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 
@@ -26,7 +17,11 @@ import { inspectAdapterAvailability, isAdapterAvailable } from './agents/command
 import { installLitheToolSkill, readLitheToolSkill } from './agents/skill-installer'
 import type { AppDatabase } from './database/app-database'
 import { createAppDatabase } from './database/app-database'
+import { registerFileIpc } from './files/file-ipc'
+import { createFileService, type FileService } from './files/file-service'
+import { commitDiscardedDrafts, prepareDirtyFilesBeforeQuit } from './files/file-shutdown'
 import { registerIpcHandlers, removeIpcHandlers } from './ipc-handlers'
+import { countDirectoryEntries } from './tasks/directory-entry-count'
 import { createScratchWorkspaceService } from './tasks/scratch-workspace-service'
 import { createTaskDeleteApproval } from './tasks/task-delete-approval'
 import { createTaskService } from './tasks/task-service'
@@ -49,6 +44,7 @@ if (userDataOverride) app.setPath('userData', userDataOverride)
 
 let appDatabase: AppDatabase | undefined
 let agentManager: AgentManager | undefined
+let fileService: FileService | undefined
 let mainWindow: BrowserWindow | undefined
 let persistTimer: NodeJS.Timeout | undefined
 let ptyRuntime: PtyRuntime | undefined
@@ -60,9 +56,11 @@ let shutdownComplete = false
 let skillConflicts: string[] = []
 let visibleTaskId: string | null = null
 let restoreAgentsThisLaunch = true
+let removeFileIpc = (): void => undefined
 const taskNotifications = new Map<string, Notification>()
 const scratchRoot = resolve(homedir(), '.lithe', 'scratch')
 const scratchTrashStagingRoot = resolve(homedir(), '.lithe', 'trash-staging')
+
 const assertScratchPath = (path: string): string => {
   const resolved = resolve(path)
   const child = relative(scratchRoot, resolved)
@@ -130,26 +128,6 @@ const retryStagedScratchCleanup = async (database: AppDatabase): Promise<void> =
       process.stderr.write(`Lithe staged scratch cleanup deferred: ${message}\n`)
     }
   }
-}
-
-const countDirectoryEntries = (path: string): number => {
-  let count = 0
-  const pending = [assertScratchPath(path)]
-  while (pending.length > 0) {
-    const current = pending.pop()
-    if (!current) continue
-    let entries: Dirent[]
-    try {
-      entries = readdirSync(current, { withFileTypes: true, encoding: 'utf8' })
-    } catch {
-      continue
-    }
-    for (const entry of entries) {
-      count += 1
-      if (entry.isDirectory() && !entry.isSymbolicLink()) pending.push(join(current, entry.name))
-    }
-  }
-  return count
 }
 
 const deleteManagedTask = async (task: Task): Promise<void> => {
@@ -272,7 +250,9 @@ const openMainWindow = async (): Promise<void> => {
   removeIpcHandlers()
   removeAgentIpc()
   removeTerminalIpc()
+  removeFileIpc()
   await ptyRuntime?.closeAll()
+  await fileService?.close()
   visibleTaskId = null
   mainWindow = createWindow()
   if (skillConflicts.length > 0) {
@@ -293,6 +273,11 @@ const openMainWindow = async (): Promise<void> => {
   const { worktrees } = workspaceLifecycle
   workspaceLifecycle.refreshProjectValidity()
   mainWindow.on('focus', workspaceLifecycle.refreshProjectValidity)
+  fileService = createFileService({
+    changed: (event): void => mainWindow?.webContents.send(ipcChannels.fileChanged, event),
+    getWorkspace: appDatabase.projects.getWorkspace,
+  })
+  removeFileIpc = registerFileIpc({ service: fileService, window: mainWindow })
   registerIpcHandlers({
     database: appDatabase,
     forgetInvalidProject: workspaceLifecycle.forgetInvalidProject,
@@ -542,6 +527,8 @@ if (!app.requestSingleInstanceLock()) {
     if (shutdownStarted) return
     shutdownStarted = true
     void (async (): Promise<void> => {
+      let exitCommitted = false
+      let commitFiles = (): void => undefined
       try {
         const runningTasks = appDatabase?.tasks.listRunning() ?? []
         if (runningTasks.length > 0) {
@@ -562,7 +549,14 @@ if (!app.requestSingleInstanceLock()) {
             return
           }
         }
+        const fileQuit = await prepareDirtyFilesBeforeQuit(fileService, mainWindow)
+        if (!fileQuit.proceed) {
+          shutdownStarted = false
+          return
+        }
+        commitFiles = (): void => commitDiscardedDrafts(fileService, fileQuit)
         await ptyRuntime?.closeAll()
+        exitCommitted = true
         for (const task of runningTasks) {
           appDatabase?.tasks.clearRunMarks(task.id)
         }
@@ -571,11 +565,9 @@ if (!app.requestSingleInstanceLock()) {
         removeIpcHandlers()
         removeAgentIpc()
         removeTerminalIpc()
-        ptyRuntime = undefined
-        agentManager = undefined
-        taskStateService = undefined
+        removeFileIpc()
+        await fileService?.close()
         workspaceLayoutPersistence?.flushAll(false)
-        workspaceLayoutPersistence = undefined
         try {
           await toolControlRuntime?.close()
         } catch (error: unknown) {
@@ -583,6 +575,12 @@ if (!app.requestSingleInstanceLock()) {
           process.stderr.write(`Lithe tool control shutdown failed: ${message}\n`)
         } finally {
           toolControlRuntime = undefined
+          commitDiscardedDrafts(fileService, fileQuit)
+          fileService = undefined
+          ptyRuntime = undefined
+          agentManager = undefined
+          taskStateService = undefined
+          workspaceLayoutPersistence = undefined
           try {
             appDatabase?.preferences.setLastExitClean(true)
             appDatabase?.close()
@@ -596,9 +594,15 @@ if (!app.requestSingleInstanceLock()) {
           }
         }
       } catch (error: unknown) {
-        shutdownStarted = false
         const message = error instanceof Error ? (error.stack ?? error.message) : String(error)
         process.stderr.write(`Lithe shutdown failed: ${message}\n`)
+        if (exitCommitted) {
+          commitFiles()
+          shutdownComplete = true
+          app.quit()
+          return
+        }
+        shutdownStarted = false
       }
     })()
   })

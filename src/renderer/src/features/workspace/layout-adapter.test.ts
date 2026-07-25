@@ -15,4 +15,14 @@ describe('workspace Agent layout', (): void => {
     expect(layout.getModel().getActiveTabset()?.getSelectedNode()?.getId()).toBe('agent:task-2')
     expect(layout.serialize().layout.layout).toBeDefined()
   })
+
+  it('opens every file click as a new panel in the active group', (): void => {
+    const layout = createLayoutAdapter()
+
+    layout.openFile({ panelId: 'file:view-1', relativePath: 'src/index.ts' }, 'index.ts')
+    layout.openFile({ panelId: 'file:view-2', relativePath: 'src/index.ts' }, 'index.ts')
+
+    expect(layout.listPanelIds()).toEqual(['file:view-1', 'file:view-2'])
+    expect(layout.getModel().getActiveTabset()?.getSelectedNode()?.getId()).toBe('file:view-2')
+  })
 })

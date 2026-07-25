@@ -38,7 +38,25 @@ const agentTabSchema = z
   })
   .strict()
 
-const tabSchema = z.discriminatedUnion('component', [terminalTabSchema, agentTabSchema])
+const fileConfigSchema = z
+  .object({
+    panelId: identifier,
+    relativePath: z.string().min(1).max(4_096),
+  })
+  .strict()
+
+const fileTabSchema = z
+  .object({
+    component: z.literal('file'),
+    config: fileConfigSchema,
+    enableRenderOnDemand: z.boolean().optional(),
+    id: identifier,
+    name: z.string().min(1).max(128),
+    type: z.literal('tab'),
+  })
+  .strict()
+
+const tabSchema = z.discriminatedUnion('component', [terminalTabSchema, agentTabSchema, fileTabSchema])
 
 const tabSetSchema = z
   .object({
