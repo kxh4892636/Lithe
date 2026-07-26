@@ -8,6 +8,42 @@ description: Manage the current Lithe project, workspace, task, and Coding Agent
 Use the globally available `lithe-tool` command when working inside Lithe.
 Every command returns one JSON object on stdout. Check `ok` before using `data`.
 
+## Installed and development Lithe
+
+The default `lithe-tool` discovery file belongs to the installed Lithe. An Agent
+launched by `pnpm run dev` receives the development discovery path
+automatically, so use `lithe-tool` normally inside that Agent and never replace
+its injected `LITHE_CONTROL_DISCOVERY_PATH`.
+
+From a normal PowerShell terminal, explicitly select the running development
+Lithe, then remove the override before returning to the installed Lithe:
+
+```powershell
+$env:LITHE_CONTROL_DISCOVERY_PATH = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.lithe-development\control.json'
+lithe-tool context
+Remove-Item Env:LITHE_CONTROL_DISCOVERY_PATH
+```
+
+On macOS or Linux, scope the override to one command:
+
+```sh
+LITHE_CONTROL_DISCOVERY_PATH="$HOME/.lithe-development/control.json" lithe-tool context
+```
+
+To exercise the CLI implementation from the current repository instead of the
+globally installed CLI, build it and run the generated entry with the same
+development discovery override:
+
+```powershell
+pnpm run build:cli
+$env:LITHE_CONTROL_DISCOVERY_PATH = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.lithe-development\control.json'
+node packages/lithe-tool/dist/index.cjs context
+Remove-Item Env:LITHE_CONTROL_DISCOVERY_PATH
+```
+
+The development Lithe must be running before these external-terminal commands.
+Without the override, `lithe-tool` continues to target the installed Lithe.
+
 Start by running `lithe-tool context` to obtain stable project, workspace, and
 task IDs. Calls from a normal terminal must pass the explicit IDs requested by
 each command. Calls from a Lithe-launched Agent are restricted to its injected

@@ -54,6 +54,7 @@ describe('workspace lifecycle', (): void => {
       isDirectory: (path: string): boolean => path !== 'D:\\worktrees\\review',
       notifyNavigation,
       trash: async (): Promise<void> => undefined,
+      worktreeRoot: 'D:\\worktrees',
     })
 
     lifecycle.refreshProjectValidity()

@@ -95,7 +95,7 @@ export const AppShell = (): React.JSX.Element => {
           </main>
         </SidebarInset>
       </SidebarProvider>
-      <footer className="border-t" aria-label="应用状态栏" />
+      <footer className={import.meta.env.DEV ? 'border-t bg-green-100' : 'border-t'} aria-label="应用状态栏" />
     </div>
   )
 }

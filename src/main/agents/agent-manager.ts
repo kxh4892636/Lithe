@@ -17,6 +17,7 @@ interface RunningAgent {
 
 interface AgentManagerOptions {
   capabilities: CapabilityRegistry
+  controlDiscoveryPath?: string
   createId?: () => string
   database: AppDatabase
   isDirectory?: (path: string) => boolean
@@ -36,6 +37,7 @@ export interface AgentManager {
 
 interface AgentLauncherOptions {
   capabilities: CapabilityRegistry
+  controlDiscoveryPath?: string
   createId: () => string
   database: AppDatabase
   isDirectory: (path: string) => boolean
@@ -93,7 +95,10 @@ const createAgentLauncher =
         args: command.args,
         columns: 80,
         cwd: workspace.rootPath,
-        environment: { LITHE_CAPABILITY: capability },
+        environment: {
+          LITHE_CAPABILITY: capability,
+          ...(options.controlDiscoveryPath ? { LITHE_CONTROL_DISCOVERY_PATH: options.controlDiscoveryPath } : {}),
+        },
         rows: 24,
         sessionId,
         shell: options.resolveExecutable(command.executable) ?? command.executable,
@@ -109,6 +114,7 @@ const createAgentLauncher =
 
 export const createAgentManager = ({
   capabilities,
+  controlDiscoveryPath,
   createId = randomUUID,
   database,
   isDirectory = isExistingDirectory,
@@ -121,6 +127,7 @@ export const createAgentManager = ({
   const taskBySession = new Map<string, string>()
   const launch = createAgentLauncher({
     capabilities,
+    controlDiscoveryPath,
     createId,
     database,
     isDirectory,

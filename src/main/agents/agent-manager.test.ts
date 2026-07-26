@@ -50,6 +50,7 @@ const adapter: AdapterVersion = {
 const setup = (
   resolveExecutable = (executable: string): string => executable,
   isDirectory = (_path: string): boolean => true,
+  controlDiscoveryPath?: string,
 ) => {
   let savedTask = { ...task }
   const runtime = {
@@ -76,6 +77,7 @@ const setup = (
   const capabilities = createCapabilityRegistry()
   const manager = createAgentManager({
     capabilities,
+    ...(controlDiscoveryPath ? { controlDiscoveryPath } : {}),
     createId: (): string => 'instance-1',
     database,
     isDirectory,
@@ -118,6 +120,17 @@ describe('Agent manager', (): void => {
         shell: 'C:\\Tools\\fake-agent.exe',
       }),
     )
+  })
+
+  it('pins an Agent to the control discovery file of its runtime profile', (): void => {
+    const discoveryPath = 'C:\\Users\\kxh\\.lithe-development\\control.json'
+    const { manager, runtime } = setup(undefined, undefined, discoveryPath)
+
+    manager.launch(task.id, 'start')
+
+    expect(runtime.create.mock.calls[0]?.[0].environment).toMatchObject({
+      LITHE_CONTROL_DISCOVERY_PATH: discoveryPath,
+    })
   })
 
   it('revokes capability when the Agent instance exits', (): void => {

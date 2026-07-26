@@ -114,6 +114,14 @@ afterEach((): void => {
 })
 
 describe('app shell', (): void => {
+  it('marks the development footer with a light green background', (): void => {
+    window.lithe = createBridge()
+
+    const { container } = render(<AppShell />)
+
+    expect(container.querySelector('footer')).toHaveClass('bg-green-100')
+  })
+
   it('keeps the rounded framed shell while arranged by Windows Snap', async (): Promise<void> => {
     window.lithe = createBridge({ isSnapped: true })
 

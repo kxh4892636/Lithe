@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 import { Command } from 'commander'
 
@@ -17,7 +18,8 @@ const resolveDiscovery = (): ControlDiscovery | undefined => {
   if (endpoint && token) return { endpoint, token }
   try {
     return readControlDiscovery(
-      process.env.LITHE_CONTROL_DISCOVERY_PATH ?? resolveControlDiscoveryPath(homedir(), process.platform),
+      process.env.LITHE_CONTROL_DISCOVERY_PATH ??
+        resolveControlDiscoveryPath(join(homedir(), '.lithe'), process.platform),
     )
   } catch {
     return undefined

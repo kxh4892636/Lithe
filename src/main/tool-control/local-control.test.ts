@@ -72,18 +72,33 @@ afterEach(async (): Promise<void> => {
 describe('local tool control', (): void => {
   it('uses a per-user named pipe on Windows and a user socket elsewhere', (): void => {
     const windows = resolveLocalControlEndpoint({
-      homeDirectory: 'C:\\Users\\kxh',
       platform: 'win32',
+      runtimeDirectory: 'C:\\Users\\kxh\\.lithe',
       userIdentity: 'kxh',
     })
     const unix = resolveLocalControlEndpoint({
-      homeDirectory: '/home/kxh',
       platform: 'linux',
+      runtimeDirectory: '/home/kxh/.lithe',
       userIdentity: 'kxh',
     })
 
     expect(windows).toMatch(/^\\\\\.\\pipe\\lithe-[a-f0-9]{20}$/)
     expect(unix).toBe('/home/kxh/.lithe/control.sock')
+  })
+
+  it('uses different endpoints for installed and development profiles', (): void => {
+    const installed = resolveLocalControlEndpoint({
+      platform: 'win32',
+      runtimeDirectory: 'C:\\Users\\kxh\\.lithe',
+      userIdentity: 'kxh',
+    })
+    const development = resolveLocalControlEndpoint({
+      platform: 'win32',
+      runtimeDirectory: 'C:\\Users\\kxh\\.lithe-development',
+      userIdentity: 'kxh',
+    })
+
+    expect(development).not.toBe(installed)
   })
 
   it('scopes Agent context and revokes it with the instance', (): void => {

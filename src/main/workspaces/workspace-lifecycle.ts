@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { isAbsolute, relative, resolve } from 'node:path'
 
 import type { AgentManager } from '../agents/agent-manager'
@@ -16,6 +15,7 @@ interface WorkspaceLifecycleOptions {
   isDirectory?: (path: string) => boolean
   notifyNavigation: () => void
   trash: (path: string) => Promise<void>
+  worktreeRoot: string
 }
 
 export interface WorkspaceLifecycle {
@@ -24,9 +24,7 @@ export interface WorkspaceLifecycle {
   worktrees: WorktreeService
 }
 
-const worktreeRoot = resolve(homedir(), '.lithe', 'worktree')
-
-const managedWorktreePath = (path: string): string => {
+const managedWorktreePath = (worktreeRoot: string, path: string): string => {
   const candidate = resolve(path)
   const boundary = relative(worktreeRoot, candidate)
   if (!boundary || boundary.startsWith('..') || isAbsolute(boundary)) {
@@ -37,6 +35,7 @@ const managedWorktreePath = (path: string): string => {
 
 export const createWorkspaceLifecycle = (options: WorkspaceLifecycleOptions): WorkspaceLifecycle => {
   const directoryExists = options.isDirectory ?? isExistingDirectory
+  const worktreeRoot = resolve(options.worktreeRoot)
   const worktrees = createWorktreeService({
     addWorkspace: options.database.projects.addWorkspace,
     createId: randomUUID,
@@ -61,7 +60,7 @@ export const createWorkspaceLifecycle = (options: WorkspaceLifecycleOptions): Wo
       if (!project || project.isValid) throw new TypeError('只有无效项目可以忘记')
       if (confirmation !== project.name) throw new TypeError('必须输入完整项目名称确认')
       for (const workspace of project.workspaces.filter((candidate): boolean => candidate.kind === 'derived')) {
-        const path = managedWorktreePath(workspace.rootPath)
+        const path = managedWorktreePath(worktreeRoot, workspace.rootPath)
         if (existsSync(path)) await options.trash(path)
       }
       options.database.projects.remove(project.id)

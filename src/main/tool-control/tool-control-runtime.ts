@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { chmodSync, mkdirSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import type { AppDatabase } from '../database/app-database'
 import { createApprovalQueue, type ApprovalQueue } from './approval-queue'
@@ -22,6 +22,7 @@ export interface ToolControlRuntime {
 
 interface ToolControlRuntimeOptions {
   discoveryPath?: string
+  runtimeDirectory?: string
 }
 
 export const createToolControlRuntime = (
@@ -30,11 +31,11 @@ export const createToolControlRuntime = (
 ): ToolControlRuntime => {
   const approvals = createApprovalQueue()
   const capabilities = createCapabilityRegistry()
-  const homeDirectory = homedir()
+  const runtimeDirectory = options.runtimeDirectory ?? join(homedir(), '.lithe')
   const externalToken = randomBytes(32).toString('base64url')
   const endpoint = resolveLocalControlEndpoint({
-    homeDirectory,
     platform: process.platform,
+    runtimeDirectory,
     userIdentity: userInfo().username,
   })
   const commands = createToolCommandDispatcher(
@@ -56,7 +57,7 @@ export const createToolControlRuntime = (
       process.stderr.write(`Lithe local control socket error: ${code}\n`)
     },
   })
-  const discoveryPath = options.discoveryPath ?? resolveControlDiscoveryPath(homeDirectory, process.platform)
+  const discoveryPath = options.discoveryPath ?? resolveControlDiscoveryPath(runtimeDirectory, process.platform)
 
   return {
     approvals,

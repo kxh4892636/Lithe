@@ -21,6 +21,7 @@ import { createFileService, type FileService } from './files/file-service'
 import { commitDiscardedDrafts, prepareDirtyFilesBeforeQuit } from './files/file-shutdown'
 import { registerWorkspaceContentIpc } from './files/workspace-content-ipc'
 import { registerIpcHandlers, removeIpcHandlers } from './ipc-handlers'
+import { resolveRuntimeProfile } from './runtime-profile'
 import { closeRendererWindow } from './shutdown-sequence'
 import { countDirectoryEntries } from './tasks/directory-entry-count'
 import { createManagedPathBoundary } from './tasks/managed-path-boundary'
@@ -35,6 +36,7 @@ import {
   createWorkspaceLayoutPersistence,
   type WorkspaceLayoutPersistence,
 } from './terminal/workspace-layout-persistence'
+import { resolveControlDiscoveryPath } from './tool-control/control-discovery'
 import { createWorkspaceApproval } from './tool-control/native-approval'
 import { createToolControlRuntime, type ToolControlRuntime } from './tool-control/tool-control-runtime'
 import {
@@ -47,7 +49,29 @@ import {
 import { createWorkspaceLifecycle } from './workspaces/workspace-lifecycle'
 import { registerWorkspaceToolCommands } from './workspaces/workspace-tool-commands'
 
-if (process.env.LITHE_USER_DATA_DIR) app.setPath('userData', process.env.LITHE_USER_DATA_DIR)
+const runtimeProfile = resolveRuntimeProfile({
+  appDataDirectory: app.getPath('appData'),
+  homeDirectory: homedir(),
+  isDevelopment: is.dev,
+  platform: process.platform,
+  ...(process.env.LITHE_RUNTIME_DIR ? { runtimeDirectory: process.env.LITHE_RUNTIME_DIR } : {}),
+  ...(process.env.LITHE_USER_DATA_DIR ? { userDataDirectory: process.env.LITHE_USER_DATA_DIR } : {}),
+})
+
+app.setName(runtimeProfile.displayName)
+if (runtimeProfile.userDataDirectory) {
+  const profileDirectories = [
+    runtimeProfile.userDataDirectory,
+    join(runtimeProfile.userDataDirectory, 'session'),
+    join(runtimeProfile.userDataDirectory, 'logs'),
+    join(runtimeProfile.userDataDirectory, 'crash-dumps'),
+  ]
+  for (const directory of profileDirectories) mkdirSync(directory, { recursive: true })
+  app.setPath('userData', runtimeProfile.userDataDirectory)
+  app.setPath('sessionData', join(runtimeProfile.userDataDirectory, 'session'))
+  app.setPath('logs', join(runtimeProfile.userDataDirectory, 'logs'))
+  app.setPath('crashDumps', join(runtimeProfile.userDataDirectory, 'crash-dumps'))
+}
 
 let appDatabase: AppDatabase | undefined
 let agentManager: AgentManager | undefined
@@ -65,8 +89,14 @@ let visibleTaskId: string | null = null
 let restoreAgentsThisLaunch = true
 let removeFileIpc = (): void => undefined
 const taskNotifications = new Map<string, Notification>()
-const scratchRoot = resolve(homedir(), '.lithe', 'scratch')
-const scratchTrashStagingRoot = resolve(homedir(), '.lithe', 'trash-staging')
+const scratchRoot = resolve(runtimeProfile.runtimeDirectory, 'scratch')
+const scratchTrashStagingRoot = resolve(runtimeProfile.runtimeDirectory, 'trash-staging')
+const worktreeRoot = resolve(runtimeProfile.runtimeDirectory, 'worktree')
+const controlDiscoveryPath =
+  process.env.LITHE_CONTROL_DISCOVERY_PATH ??
+  (process.env.LITHE_E2E === '1'
+    ? join(app.getPath('userData'), 'control.json')
+    : resolveControlDiscoveryPath(runtimeProfile.runtimeDirectory, process.platform))
 
 const assertScratchPath = createManagedPathBoundary(
   scratchRoot,
@@ -175,6 +205,7 @@ const resolveMigrationsFolder = (): string =>
   is.dev ? join(app.getAppPath(), 'drizzle') : join(process.resourcesPath, 'drizzle')
 
 const installAgentSkill = (): string[] => {
+  if (runtimeProfile.isDevelopment && !process.env.LITHE_SKILL_HOME) return []
   const resourcePath = is.dev ? join(app.getAppPath(), 'resources') : process.resourcesPath
   const result = installLitheToolSkill(process.env.LITHE_SKILL_HOME ?? homedir(), readLitheToolSkill(resourcePath))
   for (const conflict of result.conflicts) {
@@ -193,7 +224,7 @@ const createWindow = (): BrowserWindow => {
     autoHideMenuBar: true,
     ...resolveWindowFrameOptions(),
     show: false,
-    title: 'Lithe',
+    title: runtimeProfile.displayName,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -251,6 +282,7 @@ const openMainWindow = async (): Promise<void> => {
     getAgentManager: (): AgentManager | undefined => agentManager,
     notifyNavigation: (): void => mainWindow?.webContents.send(ipcChannels.workspaceNavigationChanged),
     trash: async (path: string): Promise<void> => await shell.trashItem(path),
+    worktreeRoot,
   })
   const { worktrees } = workspaceLifecycle
   workspaceLifecycle.refreshProjectValidity()
@@ -282,6 +314,7 @@ const openMainWindow = async (): Promise<void> => {
   if (!toolControlRuntime) throw new Error('本地控制通道尚未初始化')
   agentManager = createAgentManager({
     capabilities: toolControlRuntime.capabilities,
+    controlDiscoveryPath,
     database: appDatabase,
     onInstanceExit: appDatabase.tasks.clearInstanceRunMark,
     onTaskBound: (task): void => mainWindow?.webContents.send(ipcChannels.taskChanged, task),
@@ -468,7 +501,7 @@ if (!app.requestSingleInstanceLock()) {
   void app
     .whenReady()
     .then(async (): Promise<void> => {
-      electronApp.setAppUserModelId('com.kxh.lithe')
+      electronApp.setAppUserModelId(runtimeProfile.appUserModelId)
       appDatabase = createAppDatabase({
         databasePath: join(app.getPath('userData'), 'lithe.db'),
         migrationsFolder: resolveMigrationsFolder(),
@@ -491,10 +524,10 @@ if (!app.requestSingleInstanceLock()) {
       }
       await retryStagedScratchCleanup(appDatabase)
       skillConflicts = installAgentSkill()
-      toolControlRuntime = createToolControlRuntime(
-        appDatabase,
-        process.env.LITHE_E2E === '1' ? { discoveryPath: join(app.getPath('userData'), 'control.json') } : {},
-      )
+      toolControlRuntime = createToolControlRuntime(appDatabase, {
+        discoveryPath: controlDiscoveryPath,
+        runtimeDirectory: runtimeProfile.runtimeDirectory,
+      })
       await toolControlRuntime.listen()
       await openMainWindow()
       app.on('activate', (): void => {

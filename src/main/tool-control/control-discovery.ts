@@ -12,8 +12,8 @@ const controlDiscoverySchema = z
 
 export type ControlDiscovery = z.infer<typeof controlDiscoverySchema>
 
-export const resolveControlDiscoveryPath = (homeDirectory: string, platform: NodeJS.Platform): string =>
-  (platform === 'win32' ? win32 : posix).join(homeDirectory, '.lithe', 'control.json')
+export const resolveControlDiscoveryPath = (runtimeDirectory: string, platform: NodeJS.Platform): string =>
+  (platform === 'win32' ? win32 : posix).join(runtimeDirectory, 'control.json')
 
 export const readControlDiscovery = (path: string): ControlDiscovery =>
   controlDiscoverySchema.parse(JSON.parse(readFileSync(path, 'utf8')))
