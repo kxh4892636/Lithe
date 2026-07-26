@@ -81,11 +81,9 @@ export const registerIpcHandlers = ({
     assertTrustedSender(event, window)
     return window.isMaximized()
   })
-  ipcMain.handle(ipcChannels.toggleWindowMaximized, (event): boolean => {
+  ipcMain.handle(ipcChannels.getWindowSnapped, (event): boolean => {
     assertTrustedSender(event, window)
-    if (window.isMaximized()) window.unmaximize()
-    else window.maximize()
-    return window.isMaximized()
+    return window.snapped
   })
   ipcMain.handle(ipcChannels.getTheme, (event): Theme => {
     assertTrustedSender(event, window)
@@ -168,6 +166,8 @@ export const registerIpcHandlers = ({
 export const removeIpcHandlers = (): void => {
   removeWorkspaceIpc()
   ipcMain.removeHandler(ipcChannels.getRuntimeInfo)
+  ipcMain.removeHandler(ipcChannels.getWindowMaximized)
+  ipcMain.removeHandler(ipcChannels.getWindowSnapped)
   ipcMain.removeHandler(ipcChannels.getTheme)
   ipcMain.removeHandler(ipcChannels.getSidebarOpen)
   ipcMain.removeHandler(ipcChannels.getSidebarWidth)

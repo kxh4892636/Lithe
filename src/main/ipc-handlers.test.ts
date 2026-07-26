@@ -151,6 +151,21 @@ describe('terminal IPC', (): void => {
 })
 
 describe('project IPC', (): void => {
+  it('reports whether the native window is arranged by Windows Snap', (): void => {
+    const userDataDirectory = mkdtempSync(join(tmpdir(), 'lithe-window-ipc-'))
+    temporaryDirectories.push(userDataDirectory)
+    const database = createAppDatabase({ databasePath: join(userDataDirectory, 'lithe.db') })
+    openDatabases.push(database)
+    const webContents = { mainFrame: {} }
+    const window = { snapped: true, webContents } as unknown as BrowserWindow
+    const event = { sender: webContents, senderFrame: webContents.mainFrame } as unknown as IpcMainInvokeEvent
+
+    registerIpcHandlers({ database, window })
+
+    const getWindowSnapped = electronMocks.handlers.get(ipcChannels.getWindowSnapped)
+    expect(getWindowSnapped?.(event)).toBe(true)
+  })
+
   it('adds a selected directory through the trusted narrow channel', async (): Promise<void> => {
     const userDataDirectory = mkdtempSync(join(tmpdir(), 'lithe-ipc-'))
     const projectDirectory = mkdtempSync(join(tmpdir(), 'lithe-ipc-project-'))

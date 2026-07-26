@@ -203,8 +203,9 @@ export interface LitheBridge {
   }
   window: {
     getMaximized: () => Promise<boolean>
+    getSnapped: () => Promise<boolean>
     onMaximizedChanged: (listener: (isMaximized: boolean) => void) => () => void
-    toggleMaximized: () => Promise<boolean>
+    onSnappedChanged: (listener: (isSnapped: boolean) => void) => () => void
   }
   projects: {
     addDirectory: () => Promise<ProjectWithWorkspaces | null>

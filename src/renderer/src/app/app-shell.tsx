@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { PanelLeftCloseIcon } from 'lucide-react'
-import { type CSSProperties, useEffect, useState } from 'react'
+import { type CSSProperties, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -10,17 +10,14 @@ import { useTaskStore } from '@/features/tasks/task-store'
 
 import { AppSidebar } from './app-sidebar'
 import { useNavigationAppearance } from './navigation-appearance'
+import { useWindowFrameState, windowFrameClassNames } from './window-frame-state'
 
 export const AppShell = (): React.JSX.Element => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const appearance = useNavigationAppearance()
   const isSettings = useRouterState({ select: (state): boolean => state.location.pathname === '/settings' })
-  const [isMaximized, setIsMaximized] = useState(false)
-  useEffect((): (() => void) => {
-    void window.lithe.window.getMaximized().then(setIsMaximized).catch(globalThis.console.error)
-    return window.lithe.window.onMaximizedChanged(setIsMaximized)
-  }, [])
+  const windowState = useWindowFrameState()
   useEffect(
     (): (() => void) =>
       window.lithe.tasks.onNavigate((taskId: string): void => {
@@ -61,22 +58,8 @@ export const AppShell = (): React.JSX.Element => {
   )
 
   return (
-    <div
-      data-slot="app-shell"
-      className={
-        isMaximized
-          ? 'bg-background grid size-full grid-rows-[44px_minmax(0,1fr)_1.5rem] overflow-hidden'
-          : 'bg-background border-foreground/20 grid size-full grid-rows-[44px_minmax(0,1fr)_1.5rem] overflow-hidden rounded-xl border shadow-sm'
-      }
-    >
-      <header
-        data-slot="app-titlebar"
-        className="drag-region flex items-center border-b px-3 pr-36"
-        onDoubleClick={(event): void => {
-          if (event.target !== event.currentTarget) return
-          void window.lithe.window.toggleMaximized().then(setIsMaximized).catch(globalThis.console.error)
-        }}
-      >
+    <div data-slot="app-shell" data-window-state={windowState} className={windowFrameClassNames[windowState]}>
+      <header data-slot="app-titlebar" className="drag-region flex items-center border-b px-3 pr-36">
         <Button
           aria-label={t('navigation.toggleSidebar')}
           className="no-drag"

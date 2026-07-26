@@ -1,17 +1,70 @@
-import type { BrowserWindowConstructorOptions, Rectangle } from 'electron'
+import type { BrowserWindow, BrowserWindowConstructorOptions, Rectangle } from 'electron'
 import { screen } from 'electron'
 
 import type { WindowState } from '../shared/app-contract'
 
 const minimumVisibleSize = 80
+const minimumWindowHeight = 360
+const minimumWindowWidth = 480
+
+interface PersistedWindowStateInput {
+  bounds: Rectangle
+  isMaximized: boolean
+  normalBounds: Rectangle
+}
+
+export interface WindowStatePersistence {
+  cancel: () => void
+  flush: (window: BrowserWindow) => void
+  schedule: (window: BrowserWindow) => void
+}
+
+export const resolvePersistedWindowState = (input: PersistedWindowStateInput): WindowState => ({
+  ...(input.isMaximized ? input.normalBounds : input.bounds),
+  isMaximized: input.isMaximized,
+})
+
+export const createWindowStatePersistence = (save: (state: WindowState) => void): WindowStatePersistence => {
+  let timer: NodeJS.Timeout | undefined
+  const cancel = (): void => {
+    if (timer) clearTimeout(timer)
+    timer = undefined
+  }
+  const flush = (window: BrowserWindow): void => {
+    cancel()
+    if (window.isDestroyed()) return
+    save(
+      resolvePersistedWindowState({
+        bounds: window.getBounds(),
+        isMaximized: window.isMaximized(),
+        normalBounds: window.getNormalBounds(),
+      }),
+    )
+  }
+  return {
+    cancel,
+    flush,
+    schedule: (window: BrowserWindow): void => {
+      cancel()
+      timer = setTimeout((): void => flush(window), 250)
+    },
+  }
+}
 
 export const resolveWindowFrameOptions = (
   platform: NodeJS.Platform = process.platform,
 ): BrowserWindowConstructorOptions => ({
   backgroundColor: '#00000000',
+  hasShadow: true,
   ...(platform === 'darwin'
     ? { titleBarStyle: 'hiddenInset', vibrancy: 'under-window', visualEffectState: 'active' }
-    : { titleBarOverlay: { color: '#00000000', height: 44, symbolColor: '#64748b' }, titleBarStyle: 'hidden' }),
+    : {
+        accentColor: false,
+        roundedCorners: true,
+        thickFrame: true,
+        titleBarOverlay: { color: '#00000000', height: 44, symbolColor: '#52525b' },
+        titleBarStyle: 'hidden',
+      }),
   transparent: true,
 })
 
@@ -25,12 +78,12 @@ export const resolveWindowOptions = (
   state: WindowState | undefined,
   primaryWorkArea: Rectangle = screen.getPrimaryDisplay().workArea,
 ): BrowserWindowConstructorOptions => {
-  const width = Math.max(800, Math.round(primaryWorkArea.width * 0.61))
-  const height = Math.max(560, Math.round(primaryWorkArea.height * 0.61))
+  const width = Math.max(minimumWindowWidth, Math.round(primaryWorkArea.width * 0.61))
+  const height = Math.max(minimumWindowHeight, Math.round(primaryWorkArea.height * 0.61))
   const defaults = {
     height,
-    minHeight: 560,
-    minWidth: 800,
+    minHeight: minimumWindowHeight,
+    minWidth: minimumWindowWidth,
     width,
     x: Math.round(primaryWorkArea.x + (primaryWorkArea.width - width) / 2),
     y: Math.round(primaryWorkArea.y + (primaryWorkArea.height - height) / 2),

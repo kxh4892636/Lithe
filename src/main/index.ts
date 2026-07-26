@@ -36,20 +36,24 @@ import {
 } from './terminal/workspace-layout-persistence'
 import { createWorkspaceApproval } from './tool-control/native-approval'
 import { createToolControlRuntime, type ToolControlRuntime } from './tool-control/tool-control-runtime'
-import { resolveWindowFrameOptions, resolveWindowOptions } from './window-state'
+import {
+  createWindowStatePersistence,
+  resolveWindowFrameOptions,
+  resolveWindowOptions,
+  type WindowStatePersistence,
+} from './window-state'
 import { createWorkspaceLifecycle } from './workspaces/workspace-lifecycle'
 import { registerWorkspaceToolCommands } from './workspaces/workspace-tool-commands'
 
-const userDataOverride = process.env.LITHE_USER_DATA_DIR
-if (userDataOverride) app.setPath('userData', userDataOverride)
+if (process.env.LITHE_USER_DATA_DIR) app.setPath('userData', process.env.LITHE_USER_DATA_DIR)
 
 let appDatabase: AppDatabase | undefined
 let agentManager: AgentManager | undefined
 let fileService: FileService | undefined
 let mainWindow: BrowserWindow | undefined
-let persistTimer: NodeJS.Timeout | undefined
 let ptyRuntime: PtyRuntime | undefined
 let workspaceLayoutPersistence: WorkspaceLayoutPersistence | undefined
+let windowStatePersistence: WindowStatePersistence | undefined
 let toolControlRuntime: ToolControlRuntime | undefined
 let taskStateService: TaskStateService | undefined
 let shutdownStarted = false
@@ -177,19 +181,10 @@ const installAgentSkill = (): string[] => {
   return result.conflicts
 }
 
-const persistWindowState = (): void => {
-  if (!appDatabase || !mainWindow || mainWindow.isDestroyed()) return
-  const bounds = mainWindow.getNormalBounds()
-  appDatabase.windowState.save({ ...bounds, isMaximized: mainWindow.isMaximized() })
-}
-
-const scheduleWindowStatePersistence = (): void => {
-  if (persistTimer) clearTimeout(persistTimer)
-  persistTimer = setTimeout(persistWindowState, 250)
-}
-
 const createWindow = (): BrowserWindow => {
   if (!appDatabase) throw new Error('数据库尚未初始化')
+  if (!windowStatePersistence) throw new Error('窗口状态持久化尚未初始化')
+  const persistence = windowStatePersistence
   const savedState = appDatabase.windowState.get()
   const window = new BrowserWindow({
     ...resolveWindowOptions(savedState),
@@ -209,17 +204,21 @@ const createWindow = (): BrowserWindow => {
   if (savedState?.isMaximized) window.maximize()
   window.once('ready-to-show', (): void => window.show())
   window.on('maximize', (): void => {
-    scheduleWindowStatePersistence()
+    persistence.schedule(window)
     window.webContents.send(ipcChannels.windowMaximizedChanged, true)
   })
-  window.on('move', scheduleWindowStatePersistence)
-  window.on('resize', scheduleWindowStatePersistence)
+  const boundsChanged = (): void => {
+    persistence.schedule(window)
+    window.webContents.send(ipcChannels.windowSnappedChanged, window.snapped)
+  }
+  window.on('move', boundsChanged)
+  window.on('resize', boundsChanged)
   window.on('unmaximize', (): void => {
-    scheduleWindowStatePersistence()
+    persistence.schedule(window)
     window.webContents.send(ipcChannels.windowMaximizedChanged, false)
   })
   window.on('close', (event): void => {
-    persistWindowState()
+    persistence.flush(window)
     if (!shutdownStarted && !shutdownComplete) {
       event.preventDefault()
       app.quit()
@@ -484,6 +483,7 @@ if (!app.requestSingleInstanceLock()) {
         databasePath: join(app.getPath('userData'), 'lithe.db'),
         migrationsFolder: resolveMigrationsFolder(),
       })
+      windowStatePersistence = createWindowStatePersistence(appDatabase.windowState.save)
       const previousExitWasClean = appDatabase.preferences.getLastExitClean()
       if (!previousExitWasClean) appDatabase.tasks.clearAllRunMarks()
       appDatabase.preferences.setLastExitClean(false)
@@ -561,8 +561,8 @@ if (!app.requestSingleInstanceLock()) {
         for (const task of runningTasks) {
           appDatabase?.tasks.clearRunMarks(task.id)
         }
-        if (persistTimer) clearTimeout(persistTimer)
-        persistWindowState()
+        if (mainWindow) windowStatePersistence?.flush(mainWindow)
+        else windowStatePersistence?.cancel()
         removeIpcHandlers()
         removeAgentIpc()
         removeTerminalIpc()

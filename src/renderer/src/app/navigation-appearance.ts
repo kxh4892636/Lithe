@@ -2,6 +2,8 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } f
 
 import { useProjectStore } from '@/features/projects/project-store'
 
+import { useSidebarHoverState } from './sidebar-hover-state'
+
 const persistPreference = (operation: string, promise: Promise<void>): void => {
   void promise.catch((error: unknown): void => {
     globalThis.console.error(`Lithe ${operation} failed`, error)
@@ -57,31 +59,13 @@ const useSidebarResize = (sidebarWidth: number, setSidebarWidth: (width: number)
 
 export const useNavigationAppearance = (): NavigationAppearance => {
   const hydrateProjects = useProjectStore((state) => state.hydrate)
-  const sidebarHoverCloseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const sidebarHoverSources = useRef({ sidebar: false, trigger: false })
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false)
+  const sidebarHover = useSidebarHoverState()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isPinnedGroupOpen, setIsPinnedGroupOpenState] = useState(true)
   const [isProjectGroupOpen, setIsProjectGroupOpenState] = useState(true)
   const [platform, setPlatform] = useState('')
   const [sidebarWidth, setSidebarWidth] = useState(256)
   const resizeHandlers = useSidebarResize(sidebarWidth, setSidebarWidth)
-
-  const setSidebarHovered = (isHovered: boolean, source: 'sidebar' | 'trigger' = 'sidebar'): void => {
-    if (sidebarHoverCloseTimeout.current) {
-      globalThis.clearTimeout(sidebarHoverCloseTimeout.current)
-      sidebarHoverCloseTimeout.current = null
-    }
-    sidebarHoverSources.current[source] = isHovered
-    if (isHovered) {
-      setIsSidebarHovered(true)
-      return
-    }
-    sidebarHoverCloseTimeout.current = globalThis.setTimeout((): void => {
-      setIsSidebarHovered(sidebarHoverSources.current.sidebar || sidebarHoverSources.current.trigger)
-      sidebarHoverCloseTimeout.current = null
-    }, 120)
-  }
 
   useEffect((): void => {
     void hydrateProjects()
@@ -104,17 +88,10 @@ export const useNavigationAppearance = (): NavigationAppearance => {
       })
   }, [hydrateProjects])
 
-  useEffect(
-    (): (() => void) => (): void => {
-      if (sidebarHoverCloseTimeout.current) globalThis.clearTimeout(sidebarHoverCloseTimeout.current)
-    },
-    [],
-  )
-
   return {
     isPinnedGroupOpen,
     isProjectGroupOpen,
-    isSidebarHovered,
+    isSidebarHovered: sidebarHover.isHovered,
     isSidebarOpen,
     platform,
     resizeHandlers,
@@ -126,8 +103,10 @@ export const useNavigationAppearance = (): NavigationAppearance => {
       setIsProjectGroupOpenState(isOpen)
       persistPreference('project group preference persistence', window.lithe.preferences.setProjectGroupOpen(isOpen))
     },
-    setIsSidebarHovered: setSidebarHovered,
+    setIsSidebarHovered: sidebarHover.setHovered,
     setIsSidebarOpen: (isOpen: boolean): void => {
+      if (isOpen) sidebarHover.allowTriggerHover()
+      else sidebarHover.closeUntilTriggerLeaves()
       setIsSidebarOpen(isOpen)
       persistPreference('sidebar preference persistence', window.lithe.preferences.setSidebarOpen(isOpen))
     },
