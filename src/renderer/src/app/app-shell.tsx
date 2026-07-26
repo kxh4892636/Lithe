@@ -65,11 +65,12 @@ export const AppShell = (): React.JSX.Element => {
       data-slot="app-shell"
       className={
         isMaximized
-          ? 'bg-background grid size-full grid-rows-[3rem_minmax(0,1fr)_1.5rem] overflow-hidden'
-          : 'bg-background border-foreground/20 grid size-full grid-rows-[3rem_minmax(0,1fr)_1.5rem] overflow-hidden rounded-xl border shadow-sm'
+          ? 'bg-background grid size-full grid-rows-[44px_minmax(0,1fr)_1.5rem] overflow-hidden'
+          : 'bg-background border-foreground/20 grid size-full grid-rows-[44px_minmax(0,1fr)_1.5rem] overflow-hidden rounded-xl border shadow-sm'
       }
     >
       <header
+        data-slot="app-titlebar"
         className="drag-region flex items-center border-b px-3 pr-36"
         onDoubleClick={(event): void => {
           if (event.target !== event.currentTarget) return

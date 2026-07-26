@@ -11,7 +11,7 @@ export const resolveWindowFrameOptions = (
   backgroundColor: '#00000000',
   ...(platform === 'darwin'
     ? { titleBarStyle: 'hiddenInset', vibrancy: 'under-window', visualEffectState: 'active' }
-    : { titleBarOverlay: { color: '#00000000', height: 32, symbolColor: '#64748b' }, titleBarStyle: 'hidden' }),
+    : { titleBarOverlay: { color: '#00000000', height: 44, symbolColor: '#64748b' }, titleBarStyle: 'hidden' }),
   transparent: true,
 })
 

@@ -26,7 +26,7 @@ describe('window state', (): void => {
   it('keeps native Windows controls compact without filling transparent corners', (): void => {
     expect(resolveWindowFrameOptions('win32')).toEqual({
       backgroundColor: '#00000000',
-      titleBarOverlay: { color: '#00000000', height: 32, symbolColor: '#64748b' },
+      titleBarOverlay: { color: '#00000000', height: 44, symbolColor: '#64748b' },
       titleBarStyle: 'hidden',
       transparent: true,
     })

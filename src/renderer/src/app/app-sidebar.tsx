@@ -89,7 +89,7 @@ const SettingsSidebar = ({ appearance }: { appearance: NavigationAppearance }): 
   ]
   return (
     <Sidebar
-      className="top-12 bottom-6 h-auto bg-sidebar/75 backdrop-blur-xl"
+      className="top-[44px] bottom-6 h-auto bg-sidebar/75 backdrop-blur-xl"
       collapsible="offcanvas"
       innerClassName="bg-transparent"
       overlayExpanded={!appearance.isSidebarOpen && appearance.isSidebarHovered}
@@ -141,7 +141,7 @@ export const AppSidebar = ({
   if (settings) return <SettingsSidebar appearance={appearance} />
   return (
     <Sidebar
-      className="top-12 bottom-6 h-auto bg-sidebar/75 backdrop-blur-xl"
+      className="top-[44px] bottom-6 h-auto bg-sidebar/75 backdrop-blur-xl"
       collapsible="offcanvas"
       innerClassName="bg-transparent"
       overlayExpanded={!appearance.isSidebarOpen && appearance.isSidebarHovered}
