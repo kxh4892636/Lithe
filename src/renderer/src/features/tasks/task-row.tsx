@@ -1,4 +1,4 @@
-import { ArchiveIcon, BotIcon, CircleIcon, GitForkIcon, PencilIcon } from 'lucide-react'
+import { ArchiveIcon, BotIcon, CircleIcon, GitForkIcon, PencilIcon, SquareIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -77,10 +77,14 @@ interface TaskRowProps {
 export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Element => {
   const archiveTask = useTaskStore((state: TaskState) => state.archiveTask)
   const forkTask = useTaskStore((state: TaskState) => state.forkTask)
+  const launch = useTaskStore((state: TaskState) => state.launchesByTask[task.id])
+  const stopTask = useTaskStore((state: TaskState) => state.stopTask)
   const [renaming, setRenaming] = useState(false)
+  const isRunning = launch?.isRunning ?? task.isRunning
   const canFork = Boolean(task.agentSessionId && adapter?.forkAvailable)
   const fork = (): void => reportTaskAction(forkTask(task.id))
   const archive = (): void => reportTaskAction(archiveTask(task.id))
+  const stop = (): void => reportTaskAction(stopTask(task.id))
   return (
     <>
       <ContextMenu>
@@ -94,7 +98,7 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
             onClick={onOpen}
             type="button"
           >
-            {task.isRunning ? (
+            {isRunning ? (
               <CircleIcon className="size-3 shrink-0 fill-emerald-500 text-emerald-500" />
             ) : (
               <BotIcon className="size-3 shrink-0" />
@@ -113,10 +117,10 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
             ) : null}
             <Button
               aria-label={`归档 ${task.name}`}
-              disabled={task.isRunning}
+              disabled={isRunning}
               onClick={archive}
               size="icon-xs"
-              title={task.isRunning ? '运行中任务不能归档' : '归档'}
+              title={isRunning ? '运行中任务不能归档' : '归档'}
               variant="ghost"
             >
               <ArchiveIcon />
@@ -134,8 +138,14 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
               Fork
             </ContextMenuItem>
           ) : null}
+          {isRunning ? (
+            <ContextMenuItem onClick={stop}>
+              <SquareIcon />
+              停止
+            </ContextMenuItem>
+          ) : null}
           <ContextMenuSeparator />
-          <ContextMenuItem disabled={task.isRunning} onClick={archive}>
+          <ContextMenuItem disabled={isRunning} onClick={archive}>
             <ArchiveIcon />
             归档
           </ContextMenuItem>

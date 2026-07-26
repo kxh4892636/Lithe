@@ -1,0 +1,1 @@
+ALTER TABLE `workspaces` ADD `is_valid` integer DEFAULT true NOT NULL;

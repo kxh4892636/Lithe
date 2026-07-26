@@ -166,6 +166,30 @@ describe('project IPC', (): void => {
     expect(getWindowSnapped?.(event)).toBe(true)
   })
 
+  it('toggles the native window maximized state', (): void => {
+    const userDataDirectory = mkdtempSync(join(tmpdir(), 'lithe-window-toggle-ipc-'))
+    temporaryDirectories.push(userDataDirectory)
+    const database = createAppDatabase({ databasePath: join(userDataDirectory, 'lithe.db') })
+    openDatabases.push(database)
+    const webContents = { mainFrame: {} }
+    const maximize = vi.fn<() => void>()
+    const unmaximize = vi.fn<() => void>()
+    const window = {
+      isMaximized: vi.fn<() => boolean>(() => false),
+      maximize,
+      unmaximize,
+      webContents,
+    } as unknown as BrowserWindow
+    const event = { sender: webContents, senderFrame: webContents.mainFrame } as unknown as IpcMainInvokeEvent
+
+    registerIpcHandlers({ database, window })
+
+    const toggleWindowMaximized = electronMocks.handlers.get(ipcChannels.toggleWindowMaximized)
+    expect(toggleWindowMaximized?.(event)).toBe(true)
+    expect(maximize).toHaveBeenCalledOnce()
+    expect(unmaximize).not.toHaveBeenCalled()
+  })
+
   it('adds a selected directory through the trusted narrow channel', async (): Promise<void> => {
     const userDataDirectory = mkdtempSync(join(tmpdir(), 'lithe-ipc-'))
     const projectDirectory = mkdtempSync(join(tmpdir(), 'lithe-ipc-project-'))

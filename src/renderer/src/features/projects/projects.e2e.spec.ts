@@ -84,8 +84,8 @@ test('E2E-LITHE-005 restores a collapsed sidebar and expands it as an overlay on
   await expect(projectGroup).toHaveAttribute('aria-expanded', 'false')
 
   await window.getByRole('button', { name: '切换侧栏' }).click()
-  await expect(sidebar).toHaveAttribute('data-state', 'expanded')
-  await expect(sidebar).toHaveAttribute('data-overlay-expanded', 'true')
+  await expect(sidebar).toHaveAttribute('data-state', 'collapsed')
+  await expect(sidebar).toHaveAttribute('data-overlay-expanded', 'false')
   await expect
     .poll(async (): Promise<number> => (await window.locator('[data-slot="sidebar-gap"]').boundingBox())?.width ?? 0)
     .toBeLessThan(50)

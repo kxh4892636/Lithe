@@ -47,7 +47,10 @@ const adapter: AdapterVersion = {
   createdAt: new Date(0),
 }
 
-const setup = (resolveExecutable = (executable: string): string => executable) => {
+const setup = (
+  resolveExecutable = (executable: string): string => executable,
+  isDirectory = (_path: string): boolean => true,
+) => {
   let savedTask = { ...task }
   const runtime = {
     close: vi.fn<(sessionId: string) => void>(),
@@ -75,6 +78,7 @@ const setup = (resolveExecutable = (executable: string): string => executable) =
     capabilities,
     createId: (): string => 'instance-1',
     database,
+    isDirectory,
     resolveExecutable,
     runtime,
   })
@@ -139,5 +143,19 @@ describe('Agent manager', (): void => {
     expect(launch).toMatchObject({ error: 'spawn failed', isRunning: false, task: { id: task.id } })
     expect(capability ? capabilities.resolve(capability) : undefined).toBeUndefined()
     expect(() => manager.launch(task.id, 'start')).not.toThrow()
+  })
+
+  it('rejects a missing workspace directory before creating a PTY', (): void => {
+    const { manager, runtime } = setup(undefined, (): boolean => false)
+
+    const launch = manager.launch(task.id, 'start')
+
+    expect(launch).toMatchObject({
+      cwd: workspace.rootPath,
+      error: '工作区目录不存在',
+      isRunning: false,
+      task: { id: task.id },
+    })
+    expect(runtime.create).not.toHaveBeenCalled()
   })
 })

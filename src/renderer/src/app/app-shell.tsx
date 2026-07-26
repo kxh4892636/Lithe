@@ -59,7 +59,14 @@ export const AppShell = (): React.JSX.Element => {
 
   return (
     <div data-slot="app-shell" data-window-state={windowState} className={windowFrameClassNames[windowState]}>
-      <header data-slot="app-titlebar" className="drag-region flex items-center border-b px-3 pr-36">
+      <header
+        data-slot="app-titlebar"
+        className="drag-region flex items-center border-b px-3 pr-36"
+        onDoubleClick={(event): void => {
+          if ((event.target as HTMLElement).closest('.no-drag')) return
+          void window.lithe.window.toggleMaximized().catch(globalThis.console.error)
+        }}
+      >
         <Button
           aria-label={t('navigation.toggleSidebar')}
           className="no-drag"

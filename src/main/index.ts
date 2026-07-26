@@ -21,6 +21,7 @@ import { createFileService, type FileService } from './files/file-service'
 import { commitDiscardedDrafts, prepareDirtyFilesBeforeQuit } from './files/file-shutdown'
 import { registerWorkspaceContentIpc } from './files/workspace-content-ipc'
 import { registerIpcHandlers, removeIpcHandlers } from './ipc-handlers'
+import { closeRendererWindow } from './shutdown-sequence'
 import { countDirectoryEntries } from './tasks/directory-entry-count'
 import { createManagedPathBoundary } from './tasks/managed-path-boundary'
 import { createScratchWorkspaceService } from './tasks/scratch-workspace-service'
@@ -37,6 +38,7 @@ import {
 import { createWorkspaceApproval } from './tool-control/native-approval'
 import { createToolControlRuntime, type ToolControlRuntime } from './tool-control/tool-control-runtime'
 import {
+  attachWindowFrameStateEvents,
   createWindowStatePersistence,
   resolveWindowFrameOptions,
   resolveWindowOptions,
@@ -203,20 +205,7 @@ const createWindow = (): BrowserWindow => {
 
   if (savedState?.isMaximized) window.maximize()
   window.once('ready-to-show', (): void => window.show())
-  window.on('maximize', (): void => {
-    persistence.schedule(window)
-    window.webContents.send(ipcChannels.windowMaximizedChanged, true)
-  })
-  const boundsChanged = (): void => {
-    persistence.schedule(window)
-    window.webContents.send(ipcChannels.windowSnappedChanged, window.snapped)
-  }
-  window.on('move', boundsChanged)
-  window.on('resize', boundsChanged)
-  window.on('unmaximize', (): void => {
-    persistence.schedule(window)
-    window.webContents.send(ipcChannels.windowMaximizedChanged, false)
-  })
+  attachWindowFrameStateEvents(window, persistence)
   window.on('close', (event): void => {
     persistence.flush(window)
     if (!shutdownStarted && !shutdownComplete) {
@@ -563,6 +552,7 @@ if (!app.requestSingleInstanceLock()) {
         }
         if (mainWindow) windowStatePersistence?.flush(mainWindow)
         else windowStatePersistence?.cancel()
+        await closeRendererWindow(mainWindow)
         removeIpcHandlers()
         removeAgentIpc()
         removeTerminalIpc()

@@ -1,0 +1,138 @@
+import { GitBranchIcon, GitForkIcon, PencilIcon, PinIcon, SquarePenIcon, Trash2Icon } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
+import { SidebarMenuSubButton, SidebarMenuSubItem } from '@/components/ui/sidebar'
+
+import type { AdapterSummary, ProjectWithWorkspaces, Task, Workspace } from '../../../../shared/app-contract'
+import { TaskRow } from '../tasks/task-row'
+import type { ProjectOperation } from './project-operation-dialog'
+
+interface WorkspaceRowProps {
+  activateTask: (taskId: string) => Promise<unknown>
+  activeWorkspaceId: string | null
+  adaptersByVersion: Map<string, AdapterSummary>
+  openTaskDialog: (workspace: Workspace) => void
+  project: ProjectWithWorkspaces
+  selectWorkspace: (workspaceId: string) => Promise<void>
+  setOperation: (operation: ProjectOperation) => void
+  setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
+  tasks: Task[]
+  workspace: Workspace
+}
+
+const WorkspaceContextItems = ({
+  openTaskDialog,
+  project,
+  setOperation,
+  setWorkspacePinned,
+  workspace,
+}: WorkspaceRowProps): React.JSX.Element => (
+  <>
+    {workspace.isValid !== false ? (
+      <>
+        <ContextMenuItem onClick={(): void => openTaskDialog(workspace)}>
+          <SquarePenIcon />
+          创建任务
+        </ContextMenuItem>
+        <ContextMenuItem onClick={(): void => void setWorkspacePinned(workspace.id, !workspace.pinnedAt)}>
+          <PinIcon />
+          {workspace.pinnedAt ? '取消置顶' : '置顶'}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={(): void => setOperation({ kind: 'create', project, sourceWorkspace: workspace })}>
+          <GitForkIcon />
+          派生工作区
+        </ContextMenuItem>
+      </>
+    ) : null}
+    {workspace.kind === 'derived' ? (
+      <>
+        <ContextMenuSeparator />
+        {workspace.isValid !== false ? (
+          <ContextMenuItem onClick={(): void => setOperation({ kind: 'rename', workspace })}>
+            <PencilIcon />
+            重命名
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuItem onClick={(): void => setOperation({ kind: 'delete', workspace })} variant="destructive">
+          <Trash2Icon />
+          删除
+        </ContextMenuItem>
+      </>
+    ) : null}
+  </>
+)
+
+export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Element => {
+  const { activateTask, activeWorkspaceId, adaptersByVersion, selectWorkspace, tasks, workspace } = props
+  return (
+    <SidebarMenuSubItem className="group/workspace">
+      <ContextMenu>
+        <ContextMenuTrigger render={<div className="flex min-w-0 items-center" />}>
+          <SidebarMenuSubButton
+            className={workspace.isValid === false ? 'text-destructive min-w-0 flex-1' : 'min-w-0 flex-1'}
+            isActive={workspace.id === activeWorkspaceId}
+            onClick={(): void => void selectWorkspace(workspace.id)}
+            render={<button aria-label={workspace.name} type="button" />}
+          >
+            <span className="flex min-w-0 flex-col items-start py-1">
+              <span className="truncate">{workspace.name}</span>
+              {workspace.isValid === false ? (
+                <span className="text-destructive text-[10px]">工作区目录不存在</span>
+              ) : workspace.gitBranch ? (
+                <span className="text-muted-foreground flex max-w-full items-center gap-1 truncate text-[10px]">
+                  <GitBranchIcon className="size-2.5" />
+                  {workspace.gitBranch}
+                </span>
+              ) : null}
+            </span>
+          </SidebarMenuSubButton>
+          <div className="invisible flex shrink-0 items-center group-focus-within/workspace:visible group-hover/workspace:visible">
+            {workspace.isValid !== false ? (
+              <>
+                <Button
+                  aria-label={`在 ${workspace.name} 创建任务`}
+                  onClick={(): void => props.openTaskDialog(workspace)}
+                  size="icon-xs"
+                  title="创建任务"
+                  variant="ghost"
+                >
+                  <SquarePenIcon />
+                </Button>
+                <Button
+                  aria-label={workspace.pinnedAt ? '取消置顶此工作区' : '置顶此工作区'}
+                  onClick={(): void => void props.setWorkspacePinned(workspace.id, !workspace.pinnedAt)}
+                  size="icon-xs"
+                  variant="ghost"
+                >
+                  <PinIcon className={workspace.pinnedAt ? 'fill-current' : ''} />
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <WorkspaceContextItems {...props} />
+        </ContextMenuContent>
+      </ContextMenu>
+      {tasks.map((task) => (
+        <TaskRow
+          adapter={adaptersByVersion.get(task.adapterVersionId)}
+          key={task.id}
+          onOpen={(): void =>
+            void selectWorkspace(workspace.id)
+              .then((): Promise<unknown> => activateTask(task.id))
+              .catch(globalThis.console.error)
+          }
+          task={task}
+        />
+      ))}
+    </SidebarMenuSubItem>
+  )
+}

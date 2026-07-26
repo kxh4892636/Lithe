@@ -241,6 +241,8 @@ const bridge: LitheBridge = {
   window: {
     getMaximized: async (): Promise<boolean> => ipcRenderer.invoke(ipcChannels.getWindowMaximized) as Promise<boolean>,
     getSnapped: async (): Promise<boolean> => ipcRenderer.invoke(ipcChannels.getWindowSnapped) as Promise<boolean>,
+    toggleMaximized: async (): Promise<boolean> =>
+      ipcRenderer.invoke(ipcChannels.toggleWindowMaximized) as Promise<boolean>,
     onMaximizedChanged: (listener: (isMaximized: boolean) => void): (() => void) => {
       const wrapped = (_event: Electron.IpcRendererEvent, value: boolean): void => listener(value)
       ipcRenderer.on(ipcChannels.windowMaximizedChanged, wrapped)

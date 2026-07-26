@@ -23,16 +23,15 @@ describe('window state', (): void => {
     })
   })
 
-  it('keeps the Windows frame resizable and transparent for native Snap and app-drawn corners', (): void => {
+  it('keeps the Windows frame opaque and resizable for native Snap', (): void => {
     expect(resolveWindowFrameOptions('win32')).toEqual({
       accentColor: false,
-      backgroundColor: '#00000000',
+      backgroundColor: '#f4f4f5',
       hasShadow: true,
       roundedCorners: true,
       thickFrame: true,
       titleBarOverlay: { color: '#00000000', height: 44, symbolColor: '#52525b' },
       titleBarStyle: 'hidden',
-      transparent: true,
     })
   })
 

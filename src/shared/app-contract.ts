@@ -43,6 +43,7 @@ export interface Workspace {
   rootPath: string
   gitBranch: string | null
   kind: WorkspaceKind
+  isValid?: boolean
   pinnedAt?: Date | null
   createdAt: Date
 }
@@ -206,6 +207,7 @@ export interface LitheBridge {
     getSnapped: () => Promise<boolean>
     onMaximizedChanged: (listener: (isMaximized: boolean) => void) => () => void
     onSnappedChanged: (listener: (isSnapped: boolean) => void) => () => void
+    toggleMaximized: () => Promise<boolean>
   }
   projects: {
     addDirectory: () => Promise<ProjectWithWorkspaces | null>

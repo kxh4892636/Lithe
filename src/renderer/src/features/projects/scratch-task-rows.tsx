@@ -2,8 +2,8 @@ import type { AdapterSummary, Task, Workspace } from '../../../../shared/app-con
 import { TaskRow } from '../tasks/task-row'
 
 interface ScratchTaskRowsProps {
+  activateTask: (taskId: string) => Promise<unknown>
   adaptersByVersion: Map<string, AdapterSummary>
-  openTask: (taskId: string) => void
   query: string
   selectWorkspace: (workspaceId: string) => Promise<void>
   tasksByWorkspace: Record<string, Task[]>
@@ -19,7 +19,12 @@ export const ScratchTaskRows = (props: ScratchTaskRowsProps): React.JSX.Element 
           <TaskRow
             adapter={props.adaptersByVersion.get(task.adapterVersionId)}
             key={task.id}
-            onOpen={(): void => void props.selectWorkspace(workspace.id).then((): void => props.openTask(task.id))}
+            onOpen={(): void =>
+              void props
+                .selectWorkspace(workspace.id)
+                .then((): Promise<unknown> => props.activateTask(task.id))
+                .catch(globalThis.console.error)
+            }
             task={task}
           />
         )),

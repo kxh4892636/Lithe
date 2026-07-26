@@ -1,18 +1,8 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
-import { GitForkIcon, PlayIcon, SquareIcon } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
-import { Button } from '@/components/ui/button'
-
-import type {
-  AdapterDefinition,
-  AdapterSummary,
-  AgentLaunch,
-  Task,
-  TerminalDataEvent,
-  TerminalExitEvent,
-} from '../../../../shared/app-contract'
+import type { Task, TerminalDataEvent, TerminalExitEvent } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from '../tasks/task-store'
 import type { AgentPanelConfig } from './layout-adapter'
 
@@ -84,94 +74,26 @@ const AgentTerminal = ({ config, isRunning }: { config: AgentPanelConfig; isRunn
 }
 
 export const AgentPanel = ({ config, task }: AgentPanelProps): React.JSX.Element => {
-  const addLaunch = useTaskStore((state: TaskState) => state.addLaunch)
-  const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
+  const activationError = useTaskStore((state: TaskState) => state.activationErrorsByTask[task.id])
+  const autoRestoreTask = useTaskStore((state: TaskState) => state.autoRestoreTask)
   const launch = useTaskStore((state: TaskState) => state.launchesByTask[task.id])
-  const [adapter, setAdapter] = useState<AdapterSummary>()
-  const definition: AdapterDefinition | undefined = adapter?.currentVersion.definition
-  const [error, setError] = useState<string | null>(launch?.error ?? null)
-  const [isRunning, setIsRunning] = useState(launch?.isRunning ?? false)
+  const error = launch?.error ?? activationError
+  const isRunning = launch?.isRunning ?? task.isRunning ?? false
   const restoreAttempted = useRef(false)
-  useEffect((): void => {
-    void window.lithe.adapters
-      .get(task.adapterVersionId)
-      .then((summary: AdapterSummary | null): void => setAdapter(summary ?? undefined))
-      .catch((reason: unknown): void => setError(reason instanceof Error ? reason.message : String(reason)))
-  }, [task.adapterVersionId])
   useEffect((): void => {
     if (restoreAttempted.current || launch || task.lifecycle !== 'active' || !task.shouldAutoRestore) return
     restoreAttempted.current = true
-    void window.lithe.agents
-      .shouldRestore()
-      .then(async (shouldRestore: boolean): Promise<void> => {
-        if (!shouldRestore) return
-        const restored = task.agentSessionId
-          ? await window.lithe.agents.resume(task.id)
-          : await window.lithe.agents.start(task.id)
-        addLaunch(restored)
-        setIsRunning(restored.isRunning)
-        setError(restored.error)
-      })
-      .catch((reason: unknown): void => {
-        setError(reason instanceof Error ? reason.message : String(reason))
-      })
-  }, [addLaunch, launch, task.agentSessionId, task.id, task.lifecycle, task.shouldAutoRestore])
-  const run = (operation: 'fork' | 'resume' | 'start' | 'stop'): void => {
-    const request =
-      operation === 'fork'
-        ? window.lithe.agents.fork(task.id)
-        : operation === 'resume'
-          ? window.lithe.agents.resume(task.id)
-          : operation === 'start'
-            ? window.lithe.agents.start(task.id)
-            : window.lithe.agents.stop(task.id)
-    void request
-      .then((launch: AgentLaunch | void): void => {
-        if (launch) {
-          addLaunch(launch, operation === 'fork' ? task.id : undefined)
-          if (operation !== 'fork') setIsRunning(launch.isRunning)
-          setError(launch.error)
-        } else {
-          setIsRunning(false)
-          void hydrateWorkspace(task.workspaceId)
-          setError(null)
-        }
-      })
-      .catch((reason: unknown): void => {
-        setError(reason instanceof Error ? reason.message : String(reason))
-      })
-  }
+    void autoRestoreTask(task.id).catch((): void => undefined)
+  }, [autoRestoreTask, launch, task.id, task.lifecycle, task.shouldAutoRestore])
 
   return (
-    <div className="flex size-full min-h-0 flex-col">
-      <div className="flex h-9 items-center gap-1 border-b px-2">
-        {!isRunning && !task.agentSessionId ? (
-          <Button onClick={(): void => run('start')} size="sm" variant="ghost">
-            <PlayIcon />
-            启动
-          </Button>
-        ) : null}
-        {!isRunning && task.agentSessionId && definition?.resume && adapter?.resumeAvailable ? (
-          <Button onClick={(): void => run('resume')} size="sm" variant="ghost">
-            <PlayIcon />
-            恢复
-          </Button>
-        ) : null}
-        {isRunning ? (
-          <Button onClick={(): void => run('stop')} size="sm" variant="ghost">
-            <SquareIcon />
-            停止
-          </Button>
-        ) : null}
-        {isRunning && definition?.fork && adapter?.forkAvailable ? (
-          <Button onClick={(): void => run('fork')} size="sm" variant="ghost">
-            <GitForkIcon />
-            Fork
-          </Button>
-        ) : null}
-        {error ? <span className="text-destructive ml-2 text-xs">{error}</span> : null}
-      </div>
+    <div className="relative flex size-full min-h-0 flex-col overflow-hidden">
       <AgentTerminal config={config} isRunning={isRunning} />
+      {error ? (
+        <div className="bg-destructive/10 text-destructive pointer-events-none absolute inset-x-3 top-3 rounded-md px-3 py-2 text-xs">
+          {error}
+        </div>
+      ) : null}
     </div>
   )
 }

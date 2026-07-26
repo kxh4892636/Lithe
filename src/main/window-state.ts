@@ -2,6 +2,7 @@ import type { BrowserWindow, BrowserWindowConstructorOptions, Rectangle } from '
 import { screen } from 'electron'
 
 import type { WindowState } from '../shared/app-contract'
+import { ipcChannels } from '../shared/ipc-channels'
 
 const minimumVisibleSize = 80
 const minimumWindowHeight = 360
@@ -51,10 +52,28 @@ export const createWindowStatePersistence = (save: (state: WindowState) => void)
   }
 }
 
+export const attachWindowFrameStateEvents = (window: BrowserWindow, persistence: WindowStatePersistence): void => {
+  window.on('maximize', (): void => {
+    persistence.schedule(window)
+    window.webContents.send(ipcChannels.windowMaximizedChanged, true)
+  })
+  const boundsChanged = (): void => {
+    persistence.schedule(window)
+    window.webContents.send(ipcChannels.windowSnappedChanged, window.snapped)
+  }
+  window.on('move', boundsChanged)
+  window.on('resize', boundsChanged)
+  window.on('unmaximize', (): void => {
+    persistence.schedule(window)
+    window.webContents.send(ipcChannels.windowMaximizedChanged, false)
+    window.webContents.send(ipcChannels.windowSnappedChanged, window.snapped)
+  })
+}
+
 export const resolveWindowFrameOptions = (
   platform: NodeJS.Platform = process.platform,
 ): BrowserWindowConstructorOptions => ({
-  backgroundColor: '#00000000',
+  backgroundColor: '#f4f4f5',
   hasShadow: true,
   ...(platform === 'darwin'
     ? { titleBarStyle: 'hiddenInset', vibrancy: 'under-window', visualEffectState: 'active' }
@@ -65,7 +84,6 @@ export const resolveWindowFrameOptions = (
         titleBarOverlay: { color: '#00000000', height: 44, symbolColor: '#52525b' },
         titleBarStyle: 'hidden',
       }),
-  transparent: true,
 })
 
 const intersectsDisplay = (bounds: Rectangle, workArea: Rectangle): boolean => {

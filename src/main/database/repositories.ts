@@ -56,6 +56,7 @@ export interface ProjectRepository {
   remove: (projectId: string) => void
   renameWorkspace: (workspaceId: string, name: string) => Workspace
   setValidity: (projectId: string, isValid: boolean) => void
+  setWorkspaceValidity: (workspaceId: string, isValid: boolean) => void
   setPinned: (workspaceId: string, pinnedAt: Date | null) => Workspace
 }
 
@@ -274,6 +275,9 @@ export const createProjectRepository = (database: Database, sqlite: DatabaseSync
     },
     setValidity: (projectId: string, isValid: boolean): void => {
       database.update(projects).set({ isValid }).where(eq(projects.id, projectId)).run()
+    },
+    setWorkspaceValidity: (workspaceId: string, isValid: boolean): void => {
+      database.update(workspaces).set({ isValid }).where(eq(workspaces.id, workspaceId)).run()
     },
   }
 }

@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, relative, resolve } from 'node:path'
 
 import type { AgentManager } from '../agents/agent-manager'
 import type { AppDatabase } from '../database/app-database'
+import { isExistingDirectory } from '../directory-validity'
 import { createWorkspaceRecoveryStore } from './create-recovery-store'
 import { createGitWorktreeDriver } from './git-worktree-driver'
 import { createWorktreeService, type WorktreeService } from './worktree-service'
@@ -12,6 +13,7 @@ import { createWorktreeService, type WorktreeService } from './worktree-service'
 interface WorkspaceLifecycleOptions {
   database: AppDatabase
   getAgentManager: () => AgentManager | undefined
+  isDirectory?: (path: string) => boolean
   notifyNavigation: () => void
   trash: (path: string) => Promise<void>
 }
@@ -24,14 +26,6 @@ export interface WorkspaceLifecycle {
 
 const worktreeRoot = resolve(homedir(), '.lithe', 'worktree')
 
-const isExistingDirectory = (path: string): boolean => {
-  try {
-    return statSync(path).isDirectory()
-  } catch {
-    return false
-  }
-}
-
 const managedWorktreePath = (path: string): string => {
   const candidate = resolve(path)
   const boundary = relative(worktreeRoot, candidate)
@@ -42,6 +36,7 @@ const managedWorktreePath = (path: string): string => {
 }
 
 export const createWorkspaceLifecycle = (options: WorkspaceLifecycleOptions): WorkspaceLifecycle => {
+  const directoryExists = options.isDirectory ?? isExistingDirectory
   const worktrees = createWorktreeService({
     addWorkspace: options.database.projects.addWorkspace,
     createId: randomUUID,
@@ -75,10 +70,18 @@ export const createWorkspaceLifecycle = (options: WorkspaceLifecycleOptions): Wo
     refreshProjectValidity: (): void => {
       let changed = false
       for (const project of options.database.projects.list()) {
-        const isValid = isExistingDirectory(project.rootPath)
-        if (isValid === project.isValid) continue
-        options.database.projects.setValidity(project.id, isValid)
-        changed = true
+        const projectIsValid = directoryExists(project.rootPath)
+        if (projectIsValid !== project.isValid) {
+          options.database.projects.setValidity(project.id, projectIsValid)
+          changed = true
+        }
+        if (!projectIsValid) continue
+        for (const workspace of project.workspaces) {
+          const workspaceIsValid = directoryExists(workspace.rootPath)
+          if (workspaceIsValid === (workspace.isValid ?? true)) continue
+          options.database.projects.setWorkspaceValidity(workspace.id, workspaceIsValid)
+          changed = true
+        }
       }
       if (changed) options.notifyNavigation()
     },

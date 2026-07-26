@@ -25,6 +25,7 @@ export const ipcChannels = {
   getRuntimeInfo: 'runtime:get-info',
   getWindowMaximized: 'window:get-maximized',
   getWindowSnapped: 'window:get-snapped',
+  toggleWindowMaximized: 'window:toggle-maximized',
   getPinnedGroupOpen: 'preferences:get-pinned-group-open',
   getNotificationsEnabled: 'preferences:get-notifications-enabled',
   getProjectGroupOpen: 'preferences:get-project-group-open',

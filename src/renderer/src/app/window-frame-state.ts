@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 
 export type WindowFrameState = 'maximized' | 'snapped' | 'windowed'
 
+const framedWindow =
+  'bg-background grid size-full grid-rows-[44px_minmax(0,1fr)_1.5rem] overflow-hidden rounded-[12px] ring-1 ring-inset ring-foreground/25 shadow-[0_24px_64px_-28px_rgb(9_9_11/0.42)]'
+
 export const windowFrameClassNames: Record<WindowFrameState, string> = {
   maximized: 'bg-background grid size-full grid-rows-[44px_minmax(0,1fr)_1.5rem] overflow-hidden',
-  snapped:
-    'bg-background border-foreground/25 grid size-full grid-rows-[44px_minmax(0,1fr)_1.5rem] overflow-hidden border',
-  windowed:
-    'bg-background border-foreground/25 grid size-full grid-rows-[44px_minmax(0,1fr)_1.5rem] overflow-hidden rounded-[12px] border shadow-[0_24px_64px_-28px_rgb(9_9_11/0.42)]',
+  snapped: framedWindow,
+  windowed: framedWindow,
 }
 
 export const useWindowFrameState = (): WindowFrameState => {

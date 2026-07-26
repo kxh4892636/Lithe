@@ -114,7 +114,7 @@ afterEach((): void => {
 })
 
 describe('app shell', (): void => {
-  it('uses an edge-attached frame while arranged by Windows Snap', async (): Promise<void> => {
+  it('keeps the rounded framed shell while arranged by Windows Snap', async (): Promise<void> => {
     window.lithe = createBridge({ isSnapped: true })
 
     const { container } = render(<AppShell />)
@@ -124,11 +124,12 @@ describe('app shell', (): void => {
     await waitFor((): void => {
       expect(shell).toHaveAttribute('data-window-state', 'snapped')
     })
-    expect(shell).not.toHaveClass('rounded-xl')
-    expect(shell).toHaveClass('border')
+    expect(shell).toHaveClass('rounded-[12px]')
+    expect(shell).toHaveClass('ring-1')
+    expect(shell.className).toContain('shadow-[')
   })
 
-  it('leaves title-bar double-click handling to the native draggable region', (): void => {
+  it('toggles maximize when the draggable title bar is double-clicked', (): void => {
     window.lithe = createBridge()
 
     const { container } = render(<AppShell />)
@@ -136,7 +137,7 @@ describe('app shell', (): void => {
     if (!(titlebar instanceof HTMLElement)) throw new Error('应用标题栏未渲染')
     fireEvent.doubleClick(titlebar)
 
-    expect(toggleMaximizedProbe).not.toHaveBeenCalled()
+    expect(toggleMaximizedProbe).toHaveBeenCalledOnce()
   })
 
   it('hides the sidebar immediately and requires leaving the trigger before hover expansion', async (): Promise<void> => {

@@ -78,6 +78,7 @@ describe('app database', (): void => {
       rootPath: project.rootPath,
       gitBranch: 'main',
       kind: 'default' as const,
+      isValid: true,
       createdAt: project.createdAt,
     }
 

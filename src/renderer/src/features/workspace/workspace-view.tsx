@@ -283,11 +283,12 @@ const WorkspaceLayoutBody = ({ layout, taskError, tasks, workspace }: WorkspaceL
   return (
     <section
       className="flex size-full min-h-0 flex-col overflow-hidden"
+      data-slot="workspace-main"
       aria-label={t('terminal.workspaceLabel', { name: workspace.name })}
     >
       {taskError ? <p className="text-destructive border-b px-3 py-1 text-xs">{taskError}</p> : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
           <Layout
             factory={createPanelFactory(layout, tasks, workspace.id)}
             model={layout.getModel()}

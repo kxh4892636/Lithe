@@ -3,10 +3,9 @@ import {
   FolderIcon,
   FolderPlusIcon,
   GitForkIcon,
-  GitBranchIcon,
+  PencilIcon,
   PinIcon,
   PlusIcon,
-  PencilIcon,
   SquarePenIcon,
   Trash2Icon,
 } from 'lucide-react'
@@ -30,8 +29,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from '@/components/ui/sidebar'
 
 import type { AdapterSummary, ProjectWithWorkspaces, Task, Workspace } from '../../../../shared/app-contract'
@@ -44,6 +41,7 @@ import { filterProjects } from './project-navigation-filter'
 import { ProjectOperationDialog, type ProjectOperation } from './project-operation-dialog'
 import { useProjectStore } from './project-store'
 import { ScratchTaskRows } from './scratch-task-rows'
+import { WorkspaceNavigationRow } from './workspace-navigation-row'
 
 interface NavigationGroupProps {
   isOpen: boolean
@@ -60,117 +58,8 @@ interface ProjectTreeProps {
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
 }
 
-interface WorkspaceRowProps extends Omit<ProjectTreeProps, 'projects'> {
-  openTask: (taskId: string) => void
-  project: ProjectWithWorkspaces
-  tasks: Task[]
-  workspace: Workspace
-}
-
-interface WorkspaceContextItemsProps {
-  openTaskDialog: (workspace: Workspace) => void
-  project: ProjectWithWorkspaces
-  setOperation: (operation: ProjectOperation) => void
-  setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
-  workspace: Workspace
-}
-
-const WorkspaceContextItems = ({
-  openTaskDialog,
-  project,
-  setOperation,
-  setWorkspacePinned,
-  workspace,
-}: WorkspaceContextItemsProps): React.JSX.Element => (
-  <>
-    <ContextMenuItem onClick={(): void => openTaskDialog(workspace)}>
-      <SquarePenIcon />
-      创建任务
-    </ContextMenuItem>
-    <ContextMenuItem onClick={(): void => void setWorkspacePinned(workspace.id, !workspace.pinnedAt)}>
-      <PinIcon />
-      {workspace.pinnedAt ? '取消置顶' : '置顶'}
-    </ContextMenuItem>
-    <ContextMenuItem onClick={(): void => setOperation({ kind: 'create', project, sourceWorkspace: workspace })}>
-      <GitForkIcon />
-      派生工作区
-    </ContextMenuItem>
-    {workspace.kind === 'derived' ? (
-      <>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={(): void => setOperation({ kind: 'rename', workspace })}>
-          <PencilIcon />
-          重命名
-        </ContextMenuItem>
-        <ContextMenuItem onClick={(): void => setOperation({ kind: 'delete', workspace })} variant="destructive">
-          <Trash2Icon />
-          删除
-        </ContextMenuItem>
-      </>
-    ) : null}
-  </>
-)
-
-const WorkspaceRow = (props: WorkspaceRowProps): React.JSX.Element => {
-  const { activeWorkspaceId, adaptersByVersion, openTask, selectWorkspace, tasks, workspace } = props
-  return (
-    <SidebarMenuSubItem className="group/workspace">
-      <ContextMenu>
-        <ContextMenuTrigger render={<div className="flex min-w-0 items-center" />}>
-          <SidebarMenuSubButton
-            className="min-w-0 flex-1"
-            isActive={workspace.id === activeWorkspaceId}
-            onClick={(): void => void selectWorkspace(workspace.id)}
-            render={<button aria-label={workspace.name} type="button" />}
-          >
-            <span className="flex min-w-0 flex-col items-start py-1">
-              <span className="truncate">{workspace.name}</span>
-              {workspace.gitBranch ? (
-                <span className="text-muted-foreground flex max-w-full items-center gap-1 truncate text-[10px]">
-                  <GitBranchIcon className="size-2.5" />
-                  {workspace.gitBranch}
-                </span>
-              ) : null}
-            </span>
-          </SidebarMenuSubButton>
-          <div className="invisible flex shrink-0 items-center group-focus-within/workspace:visible group-hover/workspace:visible">
-            <Button
-              aria-label={`在 ${workspace.name} 创建任务`}
-              onClick={(): void => props.openTaskDialog(workspace)}
-              size="icon-xs"
-              title="创建任务"
-              variant="ghost"
-            >
-              <SquarePenIcon />
-            </Button>
-            <Button
-              aria-label={workspace.pinnedAt ? '取消置顶此工作区' : '置顶此工作区'}
-              onClick={(): void => void props.setWorkspacePinned(workspace.id, !workspace.pinnedAt)}
-              size="icon-xs"
-              variant="ghost"
-            >
-              <PinIcon className={workspace.pinnedAt ? 'fill-current' : ''} />
-            </Button>
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <WorkspaceContextItems {...props} />
-        </ContextMenuContent>
-      </ContextMenu>
-      {tasks.map((task) => (
-        <TaskRow
-          adapter={adaptersByVersion.get(task.adapterVersionId)}
-          key={task.id}
-          onOpen={(): void => void selectWorkspace(workspace.id).then((): void => openTask(task.id))}
-          task={task}
-        />
-      ))}
-    </SidebarMenuSubItem>
-  )
-}
-
 interface ProjectRowProps extends Omit<ProjectTreeProps, 'projects'> {
-  openTask: (taskId: string) => void
+  activateTask: (taskId: string) => Promise<unknown>
   project: ProjectWithWorkspaces
   tasksByWorkspace: Record<string, Task[]>
 }
@@ -224,7 +113,7 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
       </ContextMenu>
       <SidebarMenuSub>
         {project.workspaces.map((workspace) => (
-          <WorkspaceRow
+          <WorkspaceNavigationRow
             {...props}
             key={workspace.id}
             tasks={props.tasksByWorkspace[workspace.id] ?? []}
@@ -237,8 +126,8 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
 }
 
 const ProjectTree = (props: ProjectTreeProps): React.JSX.Element => {
+  const activateTask = useTaskStore((state: TaskState) => state.activateTask)
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
-  const openTask = useTaskStore((state: TaskState) => state.openTask)
   const tasksByWorkspace = useTaskStore((state: TaskState) => state.tasksByWorkspace)
   useEffect((): void => {
     for (const project of props.projects) {
@@ -251,7 +140,7 @@ const ProjectTree = (props: ProjectTreeProps): React.JSX.Element => {
         <ProjectRow
           {...props}
           key={project.id}
-          openTask={openTask}
+          activateTask={activateTask}
           project={project}
           tasksByWorkspace={tasksByWorkspace}
         />
@@ -261,12 +150,12 @@ const ProjectTree = (props: ProjectTreeProps): React.JSX.Element => {
 }
 
 interface PinnedWorkspaceRowProps {
+  activateTask: (taskId: string) => Promise<unknown>
   active: boolean
   adapterByVersion: Map<string, AdapterSummary>
   entry: { project?: ProjectWithWorkspaces; workspace: Workspace }
   onOperation: (operation: ProjectOperation) => void
   onTaskCreate: (workspace: Workspace) => void
-  openTask: (taskId: string) => void
   selectWorkspace: (workspaceId: string) => Promise<void>
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
   tasks: Task[]
@@ -286,15 +175,17 @@ const PinnedContextItems = ({
   setWorkspacePinned,
 }: PinnedContextItemsProps): React.JSX.Element => (
   <>
-    <ContextMenuItem onClick={(): void => onTaskCreate(workspace)}>
-      <SquarePenIcon />
-      创建任务
-    </ContextMenuItem>
+    {workspace.isValid !== false ? (
+      <ContextMenuItem onClick={(): void => onTaskCreate(workspace)}>
+        <SquarePenIcon />
+        创建任务
+      </ContextMenuItem>
+    ) : null}
     <ContextMenuItem onClick={(): void => void setWorkspacePinned(workspace.id, false)}>
       <PinIcon />
       取消置顶
     </ContextMenuItem>
-    {project ? (
+    {project && workspace.isValid !== false ? (
       <ContextMenuItem onClick={(): void => onOperation({ kind: 'create', project, sourceWorkspace: workspace })}>
         <GitForkIcon />
         派生工作区
@@ -303,10 +194,12 @@ const PinnedContextItems = ({
     {workspace.kind === 'derived' ? (
       <>
         <ContextMenuSeparator />
-        <ContextMenuItem onClick={(): void => onOperation({ kind: 'rename', workspace })}>
-          <PencilIcon />
-          重命名
-        </ContextMenuItem>
+        {workspace.isValid !== false ? (
+          <ContextMenuItem onClick={(): void => onOperation({ kind: 'rename', workspace })}>
+            <PencilIcon />
+            重命名
+          </ContextMenuItem>
+        ) : null}
         <ContextMenuItem onClick={(): void => onOperation({ kind: 'delete', workspace })} variant="destructive">
           <Trash2Icon />
           删除
@@ -317,28 +210,34 @@ const PinnedContextItems = ({
 )
 
 const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element => {
-  const { adapterByVersion, entry, openTask, selectWorkspace, setWorkspacePinned, tasks } = props
+  const { activateTask, adapterByVersion, entry, selectWorkspace, setWorkspacePinned, tasks } = props
   const { workspace } = entry
   return (
     <div className={props.active ? 'group/pinned bg-sidebar-accent/60 rounded-md' : 'group/pinned'}>
       <ContextMenu>
         <ContextMenuTrigger render={<div className="flex items-center px-2 py-1 text-xs" />}>
           <button
-            className="min-w-0 flex-1 truncate text-left font-medium"
+            className={
+              workspace.isValid === false
+                ? 'text-destructive min-w-0 flex-1 truncate text-left font-medium'
+                : 'min-w-0 flex-1 truncate text-left font-medium'
+            }
             onClick={(): void => void selectWorkspace(workspace.id)}
             type="button"
           >
             {workspace.name}
           </button>
-          <Button
-            aria-label={`在 ${workspace.name} 创建任务`}
-            className="invisible group-focus-within/pinned:visible group-hover/pinned:visible"
-            onClick={(): void => props.onTaskCreate(workspace)}
-            size="icon-xs"
-            variant="ghost"
-          >
-            <SquarePenIcon />
-          </Button>
+          {workspace.isValid !== false ? (
+            <Button
+              aria-label={`在 ${workspace.name} 创建任务`}
+              className="invisible group-focus-within/pinned:visible group-hover/pinned:visible"
+              onClick={(): void => props.onTaskCreate(workspace)}
+              size="icon-xs"
+              variant="ghost"
+            >
+              <SquarePenIcon />
+            </Button>
+          ) : null}
           <Button
             aria-label="取消置顶此工作区"
             className="invisible group-focus-within/pinned:visible group-hover/pinned:visible"
@@ -357,7 +256,11 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
         <TaskRow
           adapter={adapterByVersion.get(task.adapterVersionId)}
           key={task.id}
-          onOpen={(): void => void selectWorkspace(workspace.id).then((): void => openTask(task.id))}
+          onOpen={(): void =>
+            void selectWorkspace(workspace.id)
+              .then((): Promise<unknown> => activateTask(task.id))
+              .catch(globalThis.console.error)
+          }
           task={task}
         />
       ))}
@@ -397,8 +300,8 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
   const scratchWorkspaces = useProjectStore((state) => state.scratchWorkspaces)
   const selectWorkspace = useProjectStore((state) => state.selectWorkspace)
   const setWorkspacePinned = useProjectStore((state) => state.setWorkspacePinned)
+  const activateTask = useTaskStore((state: TaskState) => state.activateTask)
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
-  const openTask = useTaskStore((state: TaskState) => state.openTask)
   const tasksByWorkspace = useTaskStore((state: TaskState) => state.tasksByWorkspace)
   const normalizedQuery = useNavigationSearchStore((state) => state.query.trim().toLocaleLowerCase())
   const [operation, setOperation] = useState<ProjectOperation | null>(null)
@@ -444,12 +347,12 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
               {pinned.map((entry) => (
                 <PinnedWorkspaceRow
                   active={entry.workspace.id === activeWorkspaceId}
+                  activateTask={activateTask}
                   adapterByVersion={adaptersByVersion}
                   entry={entry}
                   key={entry.workspace.id}
                   onOperation={setOperation}
                   onTaskCreate={setTaskWorkspace}
-                  openTask={openTask}
                   selectWorkspace={selectWorkspace}
                   setWorkspacePinned={setWorkspacePinned}
                   tasks={tasksByWorkspace[entry.workspace.id] ?? []}
@@ -518,8 +421,8 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
   const scratchWorkspaces = useProjectStore((state) => state.scratchWorkspaces)
   const selectWorkspace = useProjectStore((state) => state.selectWorkspace)
   const setWorkspacePinned = useProjectStore((state) => state.setWorkspacePinned)
+  const activateTask = useTaskStore((state: TaskState) => state.activateTask)
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
-  const openTask = useTaskStore((state: TaskState) => state.openTask)
   const tasksByWorkspace = useTaskStore((state: TaskState) => state.tasksByWorkspace)
   const [operation, setOperation] = useState<ProjectOperation | null>(null)
   const [taskWorkspace, setTaskWorkspace] = useState<Workspace | null>(null)
@@ -574,7 +477,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
           )}
           <ScratchTaskRows
             adaptersByVersion={adaptersByVersion}
-            openTask={openTask}
+            activateTask={activateTask}
             query={normalizedQuery}
             selectWorkspace={selectWorkspace}
             tasksByWorkspace={tasksByWorkspace}

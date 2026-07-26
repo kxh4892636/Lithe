@@ -31,6 +31,7 @@ export const workspaces = sqliteTable('workspaces', {
   rootPath: text('root_path').notNull().unique(),
   gitBranch: text('git_branch'),
   kind: text('kind', { enum: ['default', 'derived', 'scratch'] }).notNull(),
+  isValid: integer('is_valid', { mode: 'boolean' }).notNull().default(true),
   pinnedAt: integer('pinned_at', { mode: 'timestamp_ms' }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })

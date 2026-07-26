@@ -64,12 +64,28 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await taskDialog.getByRole('button', { name: '创建任务' }).click()
     await expect(page.locator('[data-agent-id]')).toHaveCount(1)
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_READY')
+    await expect
+      .poll(
+        async (): Promise<boolean> =>
+          page?.evaluate((): boolean => {
+            const main = document.querySelector('[data-slot="workspace-main"]')
+            if (!(main instanceof HTMLElement)) return false
+            return (
+              document.documentElement.scrollHeight === globalThis.innerHeight && main.scrollHeight <= main.clientHeight
+            )
+          }) ?? false,
+      )
+      .toBe(true)
 
-    await page.getByRole('button', { name: '停止' }).click()
-    await page.getByRole('button', { name: '恢复' }).click()
+    const sourceTaskButton = page.getByText('-Review', { exact: true }).locator('..')
+    await expect(page.getByRole('button', { name: '停止' })).toHaveCount(0)
+    await sourceTaskButton.click({ button: 'right' })
+    await page.getByRole('menuitem', { name: '停止' }).click()
+    await sourceTaskButton.click()
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_RESUMED fake-session-1')
 
-    await page.getByRole('button', { name: 'Fork' }).click()
+    await sourceTaskButton.hover()
+    await page.getByRole('button', { name: 'Fork Review' }).click()
     await expect(page.getByRole('button', { name: /Review-1/ })).toBeVisible()
     await expect
       .poll(async (): Promise<string | null> => {
