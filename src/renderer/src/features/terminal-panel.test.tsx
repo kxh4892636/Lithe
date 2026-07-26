@@ -1,4 +1,5 @@
 import { cleanup, render, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { LitheBridge } from '../../../shared/app-contract'
@@ -9,6 +10,7 @@ const terminalInstances = vi.hoisted(
     dispose: ReturnType<typeof vi.fn>
   }> => [],
 )
+const terminalInputListeners = vi.hoisted((): Array<(data: string) => void> => [])
 
 vi.mock('@xterm/addon-fit', (): { FitAddon: new () => { fit: ReturnType<typeof vi.fn<() => void>> } } => ({
   FitAddon: class {
@@ -22,7 +24,12 @@ vi.mock('@xterm/xterm', (): { Terminal: new () => (typeof terminalInstances)[num
     dispose = vi.fn<() => void>()
     focus = vi.fn<() => void>()
     loadAddon = vi.fn<(...arguments_: unknown[]) => void>()
-    onData = vi.fn<() => { dispose: () => void }>(() => ({ dispose: vi.fn<() => void>() }))
+    onData = vi.fn<(listener: (data: string) => void) => { dispose: () => void }>(
+      (listener: (data: string) => void): { dispose: () => void } => {
+        terminalInputListeners.push(listener)
+        return { dispose: vi.fn<() => void>() }
+      },
+    )
     onResize = vi.fn<() => { dispose: () => void }>(() => ({ dispose: vi.fn<() => void>() }))
     open = vi.fn<(...arguments_: unknown[]) => void>()
     rows = 24
@@ -59,11 +66,54 @@ beforeEach((): void => {
 
 afterEach((): void => {
   cleanup()
+  terminalInputListeners.length = 0
   terminalInstances.length = 0
   vi.clearAllMocks()
 })
 
 describe('terminal panel', (): void => {
+  it('keeps the session through the development StrictMode effect replay', async (): Promise<void> => {
+    let sessionExists = false
+    vi.mocked(window.lithe.terminals.create).mockImplementation(
+      async (): Promise<{
+        cwd: string
+        panelId: string
+        shell: string
+      }> => {
+        sessionExists = true
+        return { cwd: 'D:\\repo', panelId: 'terminal-strict', shell: 'pwsh.exe' }
+      },
+    )
+    vi.mocked(window.lithe.terminals.close).mockImplementation(async (): Promise<void> => {
+      sessionExists = false
+    })
+    vi.mocked(window.lithe.terminals.write).mockImplementation(async (): Promise<void> => {
+      if (!sessionExists) throw new TypeError('终端会话不存在')
+    })
+    const updateTerminal = vi.fn<(panelId: string, panel: { cwd: string; panelId: string; shell: string }) => void>()
+
+    render(
+      <StrictMode>
+        <TerminalPanel
+          config={{ cwd: 'D:\\repo', panelId: 'terminal-strict', shell: 'pwsh.exe' }}
+          updateTerminal={updateTerminal}
+          workspaceId="workspace-1"
+        />
+      </StrictMode>,
+    )
+
+    await waitFor((): void => {
+      expect(window.lithe.terminals.create).toHaveBeenCalledOnce()
+    })
+    await Promise.resolve()
+    expect(window.lithe.terminals.close).not.toHaveBeenCalled()
+    terminalInputListeners.at(-1)?.('codex\r')
+    await waitFor((): void => {
+      expect(window.lithe.terminals.write).toHaveBeenCalledWith('terminal-strict', 'codex\r')
+    })
+    expect(sessionExists).toBe(true)
+  })
+
   it('keeps one session across config updates and closes it with the tab', async (): Promise<void> => {
     const updateTerminal = vi.fn<(panelId: string, panel: { cwd: string; panelId: string; shell: string }) => void>()
     const config = { cwd: 'D:\\repo', panelId: 'terminal-1', shell: 'pwsh.exe' }

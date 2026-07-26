@@ -38,6 +38,8 @@ const useTerminalSession = (
   const lease = useRef<ReturnType<typeof terminalSessionCoordinator.acquire>>(undefined)
   const exited = useRef(false)
   const mounted = useRef(true)
+  const mountGeneration = useRef(0)
+  const sessionGeneration = useRef(0)
   const update = useRef(updateTerminal)
   const [ready, setReady] = useState(false)
   update.current = updateTerminal
@@ -47,6 +49,8 @@ const useTerminalSession = (
     (dimensions: TerminalDimensions): void => {
       if (lease.current) return
       const launch = initialConfig.current
+      const generation = sessionGeneration.current + 1
+      sessionGeneration.current = generation
       exited.current = false
       lease.current = terminalSessionCoordinator.acquire(
         launch.panelId,
@@ -55,9 +59,10 @@ const useTerminalSession = (
       )
       void lease.current.ready
         .then((): void => {
-          if (mounted.current && !exited.current) setReady(true)
+          if (mounted.current && !exited.current && sessionGeneration.current === generation) setReady(true)
         })
         .catch((error: unknown): void => {
+          if (sessionGeneration.current !== generation) return
           writeTerminalViewLine(
             launch.panelId,
             `[终端启动失败: ${error instanceof Error ? error.message : String(error)}]`,
@@ -70,12 +75,19 @@ const useTerminalSession = (
 
   useEffect((): (() => void) => {
     mounted.current = true
+    const generation = mountGeneration.current + 1
+    mountGeneration.current = generation
     return (): void => {
       mounted.current = false
-      const session = lease.current
-      if (!session) return
-      void session.release().catch((error: unknown): void => {
-        globalThis.console.error('Lithe terminal cleanup failed', error)
+      globalThis.queueMicrotask((): void => {
+        if (mounted.current || mountGeneration.current !== generation) return
+        const session = lease.current
+        lease.current = undefined
+        sessionGeneration.current += 1
+        if (!session) return
+        void session.release().catch((error: unknown): void => {
+          globalThis.console.error('Lithe terminal cleanup failed', error)
+        })
       })
     }
   }, [])
