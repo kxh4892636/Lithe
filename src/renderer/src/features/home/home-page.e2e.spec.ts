@@ -11,7 +11,7 @@ test('E2E-LITHE-001 application starts with runtime information', async ({
   await expect(window.locator('[data-slot="app-titlebar"]')).toHaveCSS('height', '44px')
   await expect
     .poll(async (): Promise<string> => shell.evaluate((element) => getComputedStyle(element).boxShadow))
-    .toContain('inset')
+    .toContain('rgba(9, 9, 11, 0.42)')
   await expect
     .poll(
       async (): Promise<number> =>

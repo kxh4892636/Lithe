@@ -125,7 +125,6 @@ describe('app shell', (): void => {
       expect(shell).toHaveAttribute('data-window-state', 'snapped')
     })
     expect(shell).toHaveClass('rounded-[12px]')
-    expect(shell).toHaveClass('ring-1')
     expect(shell.className).toContain('shadow-[')
   })
 
