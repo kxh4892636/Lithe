@@ -8,6 +8,7 @@ import { fileDocumentKey, useFileDocumentStore } from '@/features/files/file-doc
 import { FileEditorPanel } from '@/features/files/file-editor-panel'
 import { WorkspaceNavigator } from '@/features/files/workspace-navigator'
 import { GitDiffPanel } from '@/features/git-diff/git-diff-panel'
+import { disposeTerminalView } from '@/features/terminal-view'
 
 import type { GitChangeEntry, Task, Workspace } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from '../tasks/task-store'
@@ -23,6 +24,7 @@ import {
 import { TerminalPanel } from './terminal-panel'
 
 interface WorkspaceViewProps {
+  visible: boolean
   workspace: Workspace
 }
 
@@ -145,6 +147,7 @@ const useFileNavigation = (workspaceId: string) => {
 }
 
 const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdapter | undefined) => {
+  const archivedTasks = useTaskStore((state: TaskState) => state.archivedTasks)
   const backgroundPanels = useTaskStore((state: TaskState) => state.backgroundPanels)
   const clearOpenTask = useTaskStore((state: TaskState) => state.clearOpenTask)
   const deletedTaskIds = useTaskStore((state: TaskState) => state.deletedTaskIds)
@@ -189,10 +192,16 @@ const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdap
     }
   }, [backgroundPanels, layout, workspaceId])
   useEffect((): void => {
+    for (const task of archivedTasks) {
+      if (task.workspaceId === workspaceId) disposeTerminalView(`agent:${task.id}`)
+    }
+  }, [archivedTasks, workspaceId])
+  useEffect((): void => {
     if (!layout) return
     let changed = false
     for (const taskId of deletedTaskIds) {
       const panelId = `agent:${taskId}`
+      disposeTerminalView(panelId)
       if (!layout.listPanelIds().includes(panelId)) continue
       layout.removePanel(panelId)
       changed = true
@@ -219,9 +228,9 @@ const reportVisibleTask = (layout: WorkspaceLayoutAdapter): void => {
     .catch(globalThis.console.error)
 }
 
-const useVisibleTaskReporting = (layout: WorkspaceLayoutAdapter | undefined): void => {
+const useVisibleTaskReporting = (layout: WorkspaceLayoutAdapter | undefined, visible: boolean): void => {
   useEffect((): (() => void) | undefined => {
-    if (!layout) return undefined
+    if (!layout || !visible) return undefined
     const report = (): void => reportVisibleTask(layout)
     report()
     globalThis.addEventListener('focus', report)
@@ -229,7 +238,7 @@ const useVisibleTaskReporting = (layout: WorkspaceLayoutAdapter | undefined): vo
       globalThis.removeEventListener('focus', report)
       void window.lithe.tasks.setVisible(null).catch(globalThis.console.error)
     }
-  }, [layout])
+  }, [layout, visible])
 }
 
 const topRightTabsetId = (layout: WorkspaceLayoutAdapter): string => {
@@ -357,17 +366,27 @@ const WorkspaceLayoutBody = ({ layout, taskError, tasks, workspace }: WorkspaceL
   )
 }
 
-export const WorkspaceView = ({ workspace }: WorkspaceViewProps): React.JSX.Element => {
+export const WorkspaceView = (props: WorkspaceViewProps): React.JSX.Element => {
+  const { visible, workspace } = props
   const { t } = useTranslation()
   const layout = useHydratedLayout(workspace.id)
   const taskPanels = useWorkspaceTaskPanels(workspace.id, layout)
-  useVisibleTaskReporting(layout)
+  useVisibleTaskReporting(layout, visible)
   if (!layout) {
     return (
-      <div className="text-muted-foreground grid size-full place-items-center text-sm">{t('terminal.restoring')}</div>
+      <div className={visible ? 'text-muted-foreground grid size-full place-items-center text-sm' : 'hidden'}>
+        {t('terminal.restoring')}
+      </div>
     )
   }
   return (
-    <WorkspaceLayoutBody layout={layout} taskError={taskPanels.error} tasks={taskPanels.tasks} workspace={workspace} />
+    <div className={visible ? 'size-full' : 'hidden'}>
+      <WorkspaceLayoutBody
+        layout={layout}
+        taskError={taskPanels.error}
+        tasks={taskPanels.tasks}
+        workspace={workspace}
+      />
+    </div>
   )
 }

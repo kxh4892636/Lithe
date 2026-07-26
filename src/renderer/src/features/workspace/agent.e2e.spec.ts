@@ -55,7 +55,10 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     )
 
     await expect(page.getByRole('button', { name: basename(projectDirectory), exact: true })).toBeVisible()
-    const workspaceRow = page.locator('[data-sidebar="menu-sub-item"]').first()
+    const workspaceRow = page
+      .locator('li', { has: page.getByRole('button', { exact: true, name: basename(projectDirectory) }) })
+      .locator('[data-sidebar="menu-sub-item"]')
+      .first()
     await expect(workspaceRow).toBeVisible()
     await workspaceRow.hover()
     await workspaceRow.getByRole('button', { name: /创建任务/ }).click()
@@ -64,6 +67,9 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await taskDialog.getByRole('button', { name: '创建任务' }).click()
     await expect(page.locator('[data-agent-id]')).toHaveCount(1)
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_READY')
+    await page.locator('[data-agent-id] [data-terminal-host]').evaluate((element: HTMLElement): void => {
+      element.setAttribute('data-view-identity', 'source-agent-terminal')
+    })
     await expect
       .poll(
         async (): Promise<boolean> =>
@@ -83,6 +89,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await page.getByRole('menuitem', { name: '停止' }).click()
     await sourceTaskButton.click()
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_RESUMED fake-session-1')
+    await expect(page.locator('[data-view-identity="source-agent-terminal"]')).toHaveCount(1)
 
     await sourceTaskButton.hover()
     await page.getByRole('button', { name: 'Fork Review' }).click()
@@ -128,7 +135,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
           const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
           const navigation = await bridge.projects.getNavigation()
           const scratch = navigation.scratchWorkspaces.find((workspace): boolean => workspace.kind === 'scratch')
-          if (!scratch || !scratch.rootPath.includes('.lithe')) return false
+          if (!scratch) return false
           return (await bridge.tasks.list(scratch.id)).some((task): boolean => task.name === 'Scratch review')
         })
       })

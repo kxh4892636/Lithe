@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { CpuIcon, MonitorCogIcon, RefreshCwIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton'
 import { findActiveProject, findActiveWorkspace, useProjectStore } from '@/features/projects/project-store'
 import { WorkspaceView } from '@/features/workspace/workspace-view'
+
+import type { ProjectWithWorkspaces, Workspace } from '../../../../shared/app-contract'
 
 dayjs.extend(utc)
 
@@ -20,13 +23,39 @@ export const HomePage = (): React.JSX.Element => {
   const scratchWorkspaces = useProjectStore((state) => state.scratchWorkspaces)
   const activeProject = findActiveProject(projects, activeWorkspaceId)
   const activeWorkspace = findActiveWorkspace(projects, scratchWorkspaces, activeWorkspaceId)
+  const [mountedWorkspaceIds, setMountedWorkspaceIds] = useState<string[]>((): string[] =>
+    activeWorkspaceId ? [activeWorkspaceId] : [],
+  )
+  useEffect((): void => {
+    if (!activeWorkspaceId) return
+    setMountedWorkspaceIds((current: string[]): string[] =>
+      current.includes(activeWorkspaceId) ? current : [...current, activeWorkspaceId],
+    )
+  }, [activeWorkspaceId])
   const runtimeQuery = useQuery({
     queryFn: window.lithe.runtime.getInfo,
     queryKey: ['runtime-info'],
     staleTime: Number.POSITIVE_INFINITY,
   })
 
-  if (activeWorkspace) return <WorkspaceView workspace={activeWorkspace} />
+  if (activeWorkspace) {
+    const availableWorkspaces = projects
+      .flatMap((project: ProjectWithWorkspaces): Workspace[] => project.workspaces)
+      .concat(scratchWorkspaces)
+    const visibleIds = mountedWorkspaceIds.includes(activeWorkspace.id)
+      ? mountedWorkspaceIds
+      : [...mountedWorkspaceIds, activeWorkspace.id]
+    return (
+      <>
+        {visibleIds.map((workspaceId): React.JSX.Element | null => {
+          const workspace = availableWorkspaces.find((candidate: Workspace): boolean => candidate.id === workspaceId)
+          return workspace ? (
+            <WorkspaceView key={workspace.id} visible={workspace.id === activeWorkspace.id} workspace={workspace} />
+          ) : null
+        })}
+      </>
+    )
+  }
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8 lg:p-12">

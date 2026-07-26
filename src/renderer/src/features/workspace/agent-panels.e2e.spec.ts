@@ -51,6 +51,12 @@ const createTask = async (page: Page, workspaceRow: Locator, taskName: string): 
 
 const selectedTab = (page: Page): Locator => page.locator('.flexlayout__tab_button--selected')
 
+const latestTick = async (terminal: Locator): Promise<number> => {
+  const text = await terminal.textContent()
+  const ticks = [...(text ?? '').matchAll(/LITHE_AGENT_TICK (\d+)/g)]
+  return Number(ticks.at(-1)?.[1] ?? 0)
+}
+
 test('E2E-LITHE-015 keeps a closed or manually switched Agent panel as the final state', async ({
   electronSession,
 }: ElectronTestFixtures): Promise<void> => {
@@ -61,7 +67,10 @@ test('E2E-LITHE-015 keeps a closed or manually switched Agent panel as the final
     await addProject(electronSession.application, page, projectDirectory)
     await createDefaultAdapter(
       page,
-      ["setTimeout(()=>console.log('LITHE_AGENT_READY'),300)", 'setInterval(()=>{},1000)'].join(';'),
+      [
+        "let tick=0;setTimeout(()=>console.log('LITHE_AGENT_READY'),300)",
+        "setInterval(()=>console.log('LITHE_AGENT_TICK '+(++tick)),150)",
+      ].join(';'),
     )
     const workspaceRow = workspaceRowOf(page, basename(projectDirectory))
 
@@ -74,6 +83,19 @@ test('E2E-LITHE-015 keeps a closed or manually switched Agent panel as the final
     // 侧边栏点击任务始终聚焦对应 Agent 面板（ADR 0021）
     await page.getByText('-Alpha', { exact: true }).locator('..').click()
     await expect(selectedTab(page)).toContainText('Alpha')
+    const alphaTaskId = await page.evaluate(async (): Promise<string> => {
+      const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
+      const navigation = await bridge.projects.getNavigation()
+      if (!navigation.activeWorkspaceId) throw new Error('Active workspace is missing')
+      const alpha = (await bridge.tasks.list(navigation.activeWorkspaceId)).find(
+        (task: { name: string }): boolean => task.name === 'Alpha',
+      )
+      if (!alpha) throw new Error('Alpha task is missing')
+      return alpha.id
+    })
+    const alphaTerminal = page.locator(`[data-agent-id="${alphaTaskId}"] .xterm-rows`)
+    await expect(alphaTerminal).toContainText('LITHE_AGENT_TICK')
+    const tickBeforeClose = await latestTick(alphaTerminal)
 
     // ADR 0069：关闭面板是有效终态，任务事件不再复活它
     await page.locator('.flexlayout__tab_button--selected .flexlayout__tab_button_trailing').click()
@@ -86,6 +108,7 @@ test('E2E-LITHE-015 keeps a closed or manually switched Agent panel as the final
     // ADR 0069：手动切换标签不被任务事件拉回
     await page.getByText('-Alpha', { exact: true }).locator('..').click()
     await expect(selectedTab(page)).toContainText('Alpha')
+    await expect.poll(async (): Promise<number> => latestTick(alphaTerminal)).toBeGreaterThan(tickBeforeClose + 3)
     await page.locator('.flexlayout__tab_button', { hasText: 'Beta' }).click()
     await expect(selectedTab(page)).toContainText('Beta')
     await page.waitForTimeout(1500)
@@ -129,16 +152,20 @@ test('E2E-LITHE-016 repaints the Agent panel after switching projects away and b
       })
       .toBe(true)
 
-    // 切到第二个项目：原工作区的中间主界面整体卸载
+    await page.locator('[data-agent-id] [data-terminal-host]').evaluate((element: HTMLElement): void => {
+      element.setAttribute('data-view-identity', 'project-switch-agent')
+    })
+    // 切到第二个项目：原工作区保留挂载，只切换可见性
     await addProject(electronSession.application, activePage, secondDirectory)
     const secondWorkspaceRow = workspaceRowOf(activePage, basename(secondDirectory))
     await secondWorkspaceRow.getByRole('button', { exact: true, name: '默认' }).click()
-    await expect(activePage.locator('[data-agent-id]')).toHaveCount(0)
+    await expect(activePage.locator('[data-agent-id]')).toBeHidden()
 
-    // 切回：面板重挂载为空终端，ADR 0070 的尺寸抖动触发 ConPTY 重放缓冲恢复画面
+    // 切回：同一终端视图恢复可见，不重建、不依赖 ConPTY 重放
     await firstWorkspaceRow.getByRole('button', { exact: true, name: '默认' }).click()
     await expect(activePage.locator('[data-agent-id]')).toHaveCount(1)
     await expect(activePage.locator('.xterm-rows')).toContainText('LITHE_AGENT_READY')
+    await expect(activePage.locator('[data-view-identity="project-switch-agent"]')).toHaveCount(1)
   } finally {
     await electronSession.close()
     page = undefined

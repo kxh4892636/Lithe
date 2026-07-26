@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AgentLaunch, LitheBridge, Task } from '../../../../shared/app-contract'
 import { useTaskStore } from '../tasks/task-store'
+import { disposeTerminalView } from '../terminal-view'
 import { AgentPanel } from './agent-panel'
+
+const terminalInstances = vi.hoisted((): unknown[] => [])
 
 vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class {
@@ -20,6 +23,10 @@ vi.mock('@xterm/xterm', () => ({
     open = vi.fn<(...arguments_: unknown[]) => void>()
     write = vi.fn<(...arguments_: unknown[]) => void>()
     writeln = vi.fn<(...arguments_: unknown[]) => void>()
+
+    constructor() {
+      terminalInstances.push(this)
+    }
   },
 }))
 
@@ -51,6 +58,8 @@ const launch: AgentLaunch = {
 
 afterEach((): void => {
   cleanup()
+  disposeTerminalView('agent:task-1')
+  terminalInstances.length = 0
   vi.clearAllMocks()
 })
 
@@ -107,5 +116,33 @@ describe('agent panel', (): void => {
 
     expect(container.querySelector('[data-agent-ready="true"]')).toBeInTheDocument()
     expect(screen.getByText('工作区目录不存在')).toBeInTheDocument()
+  })
+
+  it('keeps the same terminal view when the Agent running state changes', (): void => {
+    globalThis.ResizeObserver = class {
+      disconnect = vi.fn<() => void>()
+      observe = vi.fn<() => void>()
+      unobserve = vi.fn<() => void>()
+    }
+    window.lithe = {
+      terminals: {
+        onData: vi.fn<() => () => void>(() => (): void => undefined),
+        onExit: vi.fn<() => () => void>(() => (): void => undefined),
+        resize: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        write: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      },
+    } as unknown as LitheBridge
+    useTaskStore.setState({ launchesByTask: { [task.id]: launch } })
+    const config = { panelId: 'agent:task-1', taskId: task.id }
+    const { rerender } = render(<AgentPanel config={config} task={task} />)
+
+    useTaskStore.setState({
+      launchesByTask: { [task.id]: { ...launch, isRunning: false } },
+    })
+    rerender(<AgentPanel config={config} task={task} />)
+
+    expect(terminalInstances).toHaveLength(1)
+    expect(window.lithe.terminals.onData).toHaveBeenCalledOnce()
+    expect(window.lithe.terminals.onExit).toHaveBeenCalledOnce()
   })
 })

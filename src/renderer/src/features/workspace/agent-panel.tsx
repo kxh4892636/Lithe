@@ -1,9 +1,8 @@
-import { FitAddon } from '@xterm/addon-fit'
-import { Terminal } from '@xterm/xterm'
 import { useEffect, useRef } from 'react'
 
-import type { Task, TerminalDataEvent, TerminalExitEvent } from '../../../../shared/app-contract'
+import type { Task } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from '../tasks/task-store'
+import { TerminalView } from '../terminal-view'
 import type { AgentPanelConfig } from './layout-adapter'
 
 interface AgentPanelProps {
@@ -11,74 +10,11 @@ interface AgentPanelProps {
   task: Task
 }
 
-const createEmulator = (): Terminal =>
-  new Terminal({
-    allowTransparency: true,
-    cursorBlink: true,
-    fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace',
-    fontSize: 13,
-    theme: { background: '#111318', foreground: '#e5e7eb' },
-  })
-
 const AgentTerminal = ({ config, isRunning }: { config: AgentPanelConfig; isRunning: boolean }): React.JSX.Element => {
-  const container = useRef<HTMLDivElement>(null)
-
-  useEffect((): (() => void) => {
-    const element = container.current
-    if (!element) return (): void => undefined
-    const terminal = createEmulator()
-    const fit = new FitAddon()
-    terminal.loadAddon(fit)
-    terminal.open(element)
-    fit.fit()
-    const stopData = window.lithe.terminals.onData((event: TerminalDataEvent): void => {
-      if (event.panelId === config.panelId) terminal.write(event.data)
-    })
-    const stopExit = window.lithe.terminals.onExit((event: TerminalExitEvent): void => {
-      if (event.panelId === config.panelId) terminal.writeln(`\r\n[Agent 已退出: ${event.exitCode}]`)
-    })
-    const input = terminal.onData((data: string): void => {
-      if (!isRunning) return
-      void window.lithe.terminals.write(config.panelId, data).catch((error: unknown): void => {
-        globalThis.console.error('Lithe Agent input failed', error)
-      })
-    })
-    const resize = terminal.onResize(({ cols, rows }: { cols: number; rows: number }): void => {
-      if (!isRunning) return
-      void window.lithe.terminals.resize(config.panelId, cols, rows).catch((error: unknown): void => {
-        globalThis.console.error('Lithe Agent resize failed', error)
-      })
-    })
-    // ADR 0070：重挂载的终端缓冲为空；同尺寸 resize 不触发事件，而真实尺寸变化
-    // 会让 ConPTY 向新终端重放屏幕缓冲。须以一次真实尺寸抖动恢复画面，
-    // 且必须在 onResize 订阅之后执行，否则尺寸变化不会发送给主进程。
-    let restoreSize: ReturnType<typeof setTimeout> | undefined
-    if (isRunning && terminal.rows > 1) {
-      terminal.resize(terminal.cols, terminal.rows - 1)
-      restoreSize = setTimeout((): void => fit.fit(), 120)
-    }
-    const observer = new ResizeObserver((): void => {
-      if (element.clientWidth > 0 && element.clientHeight > 0) fit.fit()
-    })
-    observer.observe(element)
-    return (): void => {
-      if (restoreSize !== undefined) clearTimeout(restoreSize)
-      observer.disconnect()
-      input.dispose()
-      resize.dispose()
-      stopData()
-      stopExit()
-      terminal.dispose()
-    }
-  }, [config, isRunning])
-
   return (
-    <div
-      className="min-h-0 flex-1 bg-[#111318] p-1"
-      data-agent-id={config.taskId}
-      data-agent-ready={isRunning}
-      ref={container}
-    />
+    <div className="min-h-0 flex-1 bg-[#111318] p-1" data-agent-id={config.taskId} data-agent-ready={isRunning}>
+      <TerminalView exitLabel="Agent 已退出" interactive={isRunning} lifetime="task" panelId={config.panelId} />
+    </div>
   )
 }
 
