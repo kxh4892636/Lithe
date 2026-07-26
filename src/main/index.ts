@@ -284,6 +284,7 @@ const openMainWindow = async (): Promise<void> => {
     capabilities: toolControlRuntime.capabilities,
     database: appDatabase,
     onInstanceExit: appDatabase.tasks.clearInstanceRunMark,
+    onTaskBound: (task): void => mainWindow?.webContents.send(ipcChannels.taskChanged, task),
     runtime: ptyRuntime,
   })
   const taskService = createTaskService({

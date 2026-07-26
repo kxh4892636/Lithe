@@ -49,11 +49,20 @@ const AgentTerminal = ({ config, isRunning }: { config: AgentPanelConfig; isRunn
         globalThis.console.error('Lithe Agent resize failed', error)
       })
     })
+    // ADR 0070：重挂载的终端缓冲为空；同尺寸 resize 不触发事件，而真实尺寸变化
+    // 会让 ConPTY 向新终端重放屏幕缓冲。须以一次真实尺寸抖动恢复画面，
+    // 且必须在 onResize 订阅之后执行，否则尺寸变化不会发送给主进程。
+    let restoreSize: ReturnType<typeof setTimeout> | undefined
+    if (isRunning && terminal.rows > 1) {
+      terminal.resize(terminal.cols, terminal.rows - 1)
+      restoreSize = setTimeout((): void => fit.fit(), 120)
+    }
     const observer = new ResizeObserver((): void => {
       if (element.clientWidth > 0 && element.clientHeight > 0) fit.fit()
     })
     observer.observe(element)
     return (): void => {
+      if (restoreSize !== undefined) clearTimeout(restoreSize)
       observer.disconnect()
       input.dispose()
       resize.dispose()

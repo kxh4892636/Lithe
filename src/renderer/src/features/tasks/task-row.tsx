@@ -88,11 +88,7 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
   return (
     <>
       <ContextMenu>
-        <ContextMenuTrigger
-          render={
-            <div className="group/task flex items-center focus-within:bg-sidebar-accent/50 hover:bg-sidebar-accent/50" />
-          }
-        >
+        <ContextMenuTrigger render={<div className="group/task flex items-center hover:bg-sidebar-accent/50" />}>
           <button
             className="text-muted-foreground hover:text-foreground flex min-w-0 flex-1 items-center gap-1 py-1 pl-7 text-left text-xs"
             onClick={onOpen}

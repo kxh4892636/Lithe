@@ -14,9 +14,10 @@ export interface TaskState {
   tasksByWorkspace: Record<string, Task[]>
   activateTask: (taskId: string) => Promise<AgentLaunch | undefined>
   autoRestoreTask: (taskId: string) => Promise<AgentLaunch | undefined>
-  addLaunch: (launch: AgentLaunch, afterTaskId?: string) => void
+  addLaunch: (launch: AgentLaunch) => void
   addBackgroundLaunch: (event: BackgroundAgentLaunch) => void
   applyChange: (event: TaskChangeEvent) => void
+  clearOpenTask: () => void
   createTask: (workspaceId: string, name: string, adapterId?: string) => Promise<AgentLaunch>
   forkTask: (taskId: string) => Promise<AgentLaunch>
   archiveTask: (taskId: string) => Promise<void>
@@ -96,7 +97,7 @@ type TaskStoreGet = StoreApi<TaskState>['getState']
 const createActivationActions = (
   set: TaskStoreSet,
   get: TaskStoreGet,
-): Pick<TaskState, 'activateTask' | 'addBackgroundLaunch' | 'addLaunch' | 'autoRestoreTask'> => ({
+): Pick<TaskState, 'activateTask' | 'addBackgroundLaunch' | 'addLaunch' | 'autoRestoreTask' | 'clearOpenTask'> => ({
   activateTask: async (taskId: string): Promise<AgentLaunch | undefined> => {
     set({ openTaskAfterId: null, openTaskId: taskId })
     return launchAgentTask(taskId, set, get)
@@ -105,19 +106,22 @@ const createActivationActions = (
     const shouldRestore = await window.lithe.agents.shouldRestore()
     return shouldRestore ? launchAgentTask(taskId, set, get) : undefined
   },
-  addLaunch: (launch: AgentLaunch, afterTaskId?: string): void => {
+  // ADR 0069：addLaunch 只登记启动结果；打开/聚焦任务是由 activateTask 等
+  // 同步发出的一次性命令，异步完成的启动不得回写选中状态抢占焦点。
+  addLaunch: (launch: AgentLaunch): void => {
     set((state): Partial<TaskState> => {
       const existing = state.tasksByWorkspace[launch.task.workspaceId] ?? []
       return {
         launchesByTask: { ...state.launchesByTask, [launch.task.id]: launch },
-        openTaskAfterId: afterTaskId ?? null,
-        openTaskId: launch.task.id,
         tasksByWorkspace: {
           ...state.tasksByWorkspace,
           [launch.task.workspaceId]: upsertTask(existing, launch.task),
         },
       }
     })
+  },
+  clearOpenTask: (): void => {
+    set({ openTaskAfterId: null, openTaskId: null })
   },
   addBackgroundLaunch: (event: BackgroundAgentLaunch): void => {
     set((state): Partial<TaskState> => {

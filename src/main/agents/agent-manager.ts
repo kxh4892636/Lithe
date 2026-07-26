@@ -21,6 +21,7 @@ interface AgentManagerOptions {
   database: AppDatabase
   isDirectory?: (path: string) => boolean
   onInstanceExit?: (instanceId: string) => void
+  onTaskBound?: (task: Task) => void
   resolveExecutable?: (executable: string) => string | null
   runtime: PtyRuntime
 }
@@ -112,6 +113,7 @@ export const createAgentManager = ({
   database,
   isDirectory = isExistingDirectory,
   onInstanceExit = (): void => undefined,
+  onTaskBound,
   resolveExecutable = resolveExecutablePath,
   runtime,
 }: AgentManagerOptions): AgentManager => {
@@ -144,7 +146,9 @@ export const createAgentManager = ({
       if (!binding) throw new TypeError('Capability is invalid or expired')
       const running = runningByTask.get(binding.taskId)
       if (!running || running.capability !== capability) throw new TypeError('Capability is not active for task')
-      return database.tasks.bindSession(binding.taskId, providerSessionId)
+      const task = database.tasks.bindSession(binding.taskId, providerSessionId)
+      onTaskBound?.(task)
+      return task
     },
     handleExit: (sessionId: string): void => {
       const taskId = taskBySession.get(sessionId)

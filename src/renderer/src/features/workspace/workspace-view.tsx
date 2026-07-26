@@ -146,6 +146,7 @@ const useFileNavigation = (workspaceId: string) => {
 
 const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdapter | undefined) => {
   const backgroundPanels = useTaskStore((state: TaskState) => state.backgroundPanels)
+  const clearOpenTask = useTaskStore((state: TaskState) => state.clearOpenTask)
   const deletedTaskIds = useTaskStore((state: TaskState) => state.deletedTaskIds)
   const error = useTaskStore((state: TaskState) => state.error)
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
@@ -155,6 +156,8 @@ const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdap
   useEffect((): void => {
     void hydrateWorkspace(workspaceId)
   }, [hydrateWorkspace, workspaceId])
+  // ADR 0069：openTaskId 是一次性「打开并聚焦」命令，成功消费后即清除；
+  // 之后关闭或切换面板是有效终态，任务事件不再复活已关闭的面板。
   useEffect((): void => {
     if (!layout || !openTaskId) return
     const task = tasks.find((candidate): boolean => candidate.id === openTaskId)
@@ -164,7 +167,8 @@ const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdap
       task.name,
       openTaskAfterId ? `agent:${openTaskAfterId}` : undefined,
     )
-  }, [layout, openTaskAfterId, openTaskId, tasks])
+    clearOpenTask()
+  }, [clearOpenTask, layout, openTaskAfterId, openTaskId, tasks])
   useEffect((): void => {
     if (!layout) return
     let changed = false
