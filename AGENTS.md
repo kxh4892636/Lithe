@@ -43,12 +43,6 @@ Off the main flow entirely.
 
 <!-- LOOP KIT END -->
 
-<!-- SKILL RULES START -->
-
-- codin-d2c-cli: invoke `codin-d2c` for Figma design-to-code，d2c 静态资源统一使用 svg 格式；
-
-<!-- SKILL RULES END -->
-
 <!-- DOMAIN DOCS START -->
 
 This repository uses a single-context domain documentation layout. See `docs/agents/domain.md`.
@@ -57,3 +51,10 @@ This repository uses a single-context domain documentation layout. See `docs/age
 `CONTEXT.md` 行数 <= 610 行，`docs/adr/` 中的 adr 文档数量 <= 89 个, 每个 adr 文档的行数 <= 144 行；文件数量和行数超过限制时进行重构
 
 <!-- DOMAIN DOCS END -->
+
+<!-- PROJECT RULES START -->
+
+- codin-d2c-cli: invoke `codin-d2c` for Figma design-to-code，d2c 静态资源统一使用 svg 格式；
+- lithe-tool: invoke `lithe-tool` firstly；
+
+<!-- PROJECT RULES END -->

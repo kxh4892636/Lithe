@@ -151,7 +151,7 @@ export const AppSidebar = ({
       onMouseLeave={(): void => appearance.setIsSidebarHovered(false)}
     >
       <SidebarHeader className={appearance.platform === 'darwin' ? 'px-3 pt-12 pb-3' : 'p-3'}>
-        <div className="flex items-center gap-3 overflow-hidden rounded-xl px-2 py-2">
+        <div className="flex items-center gap-3 overflow-hidden rounded-xl">
           <div className="bg-primary text-primary-foreground grid size-8 shrink-0 place-items-center rounded-lg font-mono text-xs font-bold">
             LI
           </div>
@@ -161,9 +161,9 @@ export const AppSidebar = ({
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>
-        <div className="relative px-2 pb-2">
-          <SearchIcon className="text-muted-foreground absolute top-2 left-4 size-3" />
+      <SidebarContent className="gap-2">
+        <div className="relative px-2 py-1">
+          <SearchIcon className="text-muted-foreground absolute top-3 left-4 size-3" />
           <Input
             aria-label="搜索项目、工作区和任务"
             className="h-7 bg-sidebar-accent/50 pl-7 text-xs"

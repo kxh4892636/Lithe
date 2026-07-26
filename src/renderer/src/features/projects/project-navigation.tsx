@@ -332,8 +332,8 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
           />
         }
       >
-        <ChevronRightIcon className={isOpen ? 'rotate-90' : ''} />
         {t('projects.pinned')}
+        <ChevronRightIcon className={isOpen ? 'rotate-90' : ''} />
       </SidebarGroupLabel>
       {isOpen ? (
         <SidebarGroupContent>
@@ -394,8 +394,8 @@ const ProjectGroupHeader = (props: ProjectGroupHeaderProps): React.JSX.Element =
           />
         }
       >
-        <ChevronRightIcon className={props.isOpen ? 'rotate-90' : ''} />
         {t('projects.label')}
+        <ChevronRightIcon className={props.isOpen ? 'rotate-90' : ''} />
       </SidebarGroupLabel>
       {props.projectCount > 0 ? (
         <SidebarGroupAction
