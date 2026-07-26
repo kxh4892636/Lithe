@@ -36,7 +36,7 @@ import {
 } from './terminal/workspace-layout-persistence'
 import { createWorkspaceApproval } from './tool-control/native-approval'
 import { createToolControlRuntime, type ToolControlRuntime } from './tool-control/tool-control-runtime'
-import { resolveWindowOptions } from './window-state'
+import { resolveWindowFrameOptions, resolveWindowOptions } from './window-state'
 import { createWorkspaceLifecycle } from './workspaces/workspace-lifecycle'
 import { registerWorkspaceToolCommands } from './workspaces/workspace-tool-commands'
 
@@ -194,14 +194,9 @@ const createWindow = (): BrowserWindow => {
   const window = new BrowserWindow({
     ...resolveWindowOptions(savedState),
     autoHideMenuBar: true,
-    backgroundColor: '#00000000',
-    ...(process.platform === 'darwin'
-      ? { titleBarStyle: 'hiddenInset', vibrancy: 'under-window', visualEffectState: 'active' }
-      : { titleBarOverlay: { color: '#00000000', height: 56, symbolColor: '#64748b' }, titleBarStyle: 'hidden' }),
-    ...(process.platform === 'win32' ? { backgroundMaterial: 'mica' } : {}),
+    ...resolveWindowFrameOptions(),
     show: false,
     title: 'Lithe',
-    transparent: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

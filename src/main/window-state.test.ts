@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveWindowOptions } from './window-state'
+import { resolveWindowFrameOptions, resolveWindowOptions } from './window-state'
 
 describe('window state', (): void => {
   it('centers the first window at 61 percent of the display work area', (): void => {
@@ -20,6 +20,15 @@ describe('window state', (): void => {
       width: 800,
       x: 110,
       y: 90,
+    })
+  })
+
+  it('keeps native Windows controls compact without filling transparent corners', (): void => {
+    expect(resolveWindowFrameOptions('win32')).toEqual({
+      backgroundColor: '#00000000',
+      titleBarOverlay: { color: '#00000000', height: 32, symbolColor: '#64748b' },
+      titleBarStyle: 'hidden',
+      transparent: true,
     })
   })
 })

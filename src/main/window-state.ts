@@ -5,6 +5,16 @@ import type { WindowState } from '../shared/app-contract'
 
 const minimumVisibleSize = 80
 
+export const resolveWindowFrameOptions = (
+  platform: NodeJS.Platform = process.platform,
+): BrowserWindowConstructorOptions => ({
+  backgroundColor: '#00000000',
+  ...(platform === 'darwin'
+    ? { titleBarStyle: 'hiddenInset', vibrancy: 'under-window', visualEffectState: 'active' }
+    : { titleBarOverlay: { color: '#00000000', height: 32, symbolColor: '#64748b' }, titleBarStyle: 'hidden' }),
+  transparent: true,
+})
+
 const intersectsDisplay = (bounds: Rectangle, workArea: Rectangle): boolean => {
   const horizontal = Math.min(bounds.x + bounds.width, workArea.x + workArea.width) - Math.max(bounds.x, workArea.x)
   const vertical = Math.min(bounds.y + bounds.height, workArea.y + workArea.height) - Math.max(bounds.y, workArea.y)

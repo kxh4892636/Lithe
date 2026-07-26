@@ -62,10 +62,11 @@ export const AppShell = (): React.JSX.Element => {
 
   return (
     <div
+      data-slot="app-shell"
       className={
         isMaximized
           ? 'bg-background grid size-full grid-rows-[3rem_minmax(0,1fr)_1.5rem] overflow-hidden'
-          : 'bg-background grid size-full grid-rows-[3rem_minmax(0,1fr)_1.5rem] overflow-hidden rounded-xl border'
+          : 'bg-background border-foreground/20 grid size-full grid-rows-[3rem_minmax(0,1fr)_1.5rem] overflow-hidden rounded-xl border shadow-sm'
       }
     >
       <header
