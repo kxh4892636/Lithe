@@ -22,6 +22,7 @@ export interface PreferenceRepository {
   getDefaultShell: () => string | null
   getPinnedGroupOpen: () => boolean
   getProjectGroupOpen: () => boolean
+  getRowOpen: (key: string) => boolean
   getSidebarOpen: () => boolean
   getSidebarWidth: () => number
   getTheme: () => Theme
@@ -29,6 +30,7 @@ export interface PreferenceRepository {
   getNotificationsEnabled: () => boolean
   setPinnedGroupOpen: (isOpen: boolean) => void
   setProjectGroupOpen: (isOpen: boolean) => void
+  setRowOpen: (key: string, isOpen: boolean) => void
   setSidebarOpen: (isOpen: boolean) => void
   setSidebarWidth: (width: number) => void
   setTheme: (theme: Theme) => void
@@ -106,6 +108,7 @@ export const createPreferenceRepository = (database: Database): PreferenceReposi
     },
     getPinnedGroupOpen: (): boolean => getBoolean('pinned-group-open', true),
     getProjectGroupOpen: (): boolean => getBoolean('project-group-open', true),
+    getRowOpen: (key: string): boolean => getBoolean(key, true),
     getSidebarOpen: (): boolean => getBoolean('sidebar-open', true),
     getSidebarWidth: (): number => {
       const preference = database
@@ -128,6 +131,7 @@ export const createPreferenceRepository = (database: Database): PreferenceReposi
     getNotificationsEnabled: (): boolean => getBoolean('notifications-enabled', true),
     setPinnedGroupOpen: (isOpen: boolean): void => set('pinned-group-open', String(isOpen)),
     setProjectGroupOpen: (isOpen: boolean): void => set('project-group-open', String(isOpen)),
+    setRowOpen: (key: string, isOpen: boolean): void => set(key, String(isOpen)),
     setSidebarOpen: (isOpen: boolean): void => set('sidebar-open', String(isOpen)),
     setSidebarWidth: (width: number): void => set('sidebar-width', String(width)),
     setTheme: (theme: Theme): void => set('theme', theme),

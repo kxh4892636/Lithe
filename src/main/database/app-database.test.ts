@@ -54,6 +54,18 @@ describe('app database', (): void => {
     expect(database.preferences.getProjectGroupOpen()).toBe(false)
   })
 
+  it('persists navigation row collapse per row key', (): void => {
+    const database = createTestDatabase()
+
+    expect(database.preferences.getRowOpen('project-row-open:project-1')).toBe(true)
+    expect(database.preferences.getRowOpen('workspace-row-open:workspace-1')).toBe(true)
+    database.preferences.setRowOpen('workspace-row-open:workspace-1', false)
+
+    expect(database.preferences.getRowOpen('workspace-row-open:workspace-1')).toBe(false)
+    expect(database.preferences.getRowOpen('workspace-row-open:workspace-2')).toBe(true)
+    expect(database.preferences.getRowOpen('project-row-open:project-1')).toBe(true)
+  })
+
   it('persists the latest window state', (): void => {
     const database = createTestDatabase()
     const state = { x: 120, y: 80, width: 1100, height: 720, isMaximized: true }
