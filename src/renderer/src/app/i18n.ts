@@ -14,7 +14,6 @@ void i18n.use(initReactI18next).init({
         },
         appMenu: {
           about: '关于',
-          archive: '归档',
           user: '用户菜单',
         },
         home: {
@@ -40,6 +39,7 @@ void i18n.use(initReactI18next).init({
           pinned: '置顶',
         },
         settings: {
+          archive: '归档',
           dark: '深色',
           description: '主题会写入本地 SQLite，并在下次启动时恢复。',
           eyebrow: '个性化',

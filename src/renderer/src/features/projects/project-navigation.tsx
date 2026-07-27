@@ -91,7 +91,7 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
             {project.isValid ? (
               <Button
                 aria-label={`为 ${project.name} 创建工作区`}
-                className="hover:bg-transparent"
+
                 onClick={(): void => setOperation({ kind: 'create', project })}
                 size="icon-xs"
                 variant="ghost"
@@ -103,7 +103,7 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
             )}
             <Button
               aria-label={project.isValid ? `移除 ${project.name}` : `忘记 ${project.name}`}
-              className="hover:bg-transparent"
+
               onClick={(): void => setOperation(removeOperation)}
               size="icon-xs"
               variant="ghost"

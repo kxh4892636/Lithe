@@ -2,7 +2,6 @@ import { createHashHistory, createRootRoute, createRoute, createRouter } from '@
 
 import { HomePage } from '../features/home/home-page'
 import { SettingsPage } from '../features/settings/settings-page'
-import { ArchivePage } from '../features/tasks/archive-page'
 import { AppShell } from './app-shell'
 
 const rootRoute = createRootRoute({ component: AppShell })
@@ -12,12 +11,7 @@ const settingsRoute = createRoute({
   getParentRoute: (): typeof rootRoute => rootRoute,
   path: '/settings',
 })
-const archiveRoute = createRoute({
-  component: ArchivePage,
-  getParentRoute: (): typeof rootRoute => rootRoute,
-  path: '/archive',
-})
-const routeTree = rootRoute.addChildren([homeRoute, settingsRoute, archiveRoute])
+const routeTree = rootRoute.addChildren([homeRoute, settingsRoute])
 
 export const router = createRouter({ history: createHashHistory(), routeTree })
 

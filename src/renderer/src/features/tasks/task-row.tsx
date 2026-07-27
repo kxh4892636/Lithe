@@ -192,7 +192,7 @@ const TaskContextMenu = (props: TaskActionsProps): React.JSX.Element => {
   return (
     <ContextMenuContent className="[&_svg]:size-3">
       <ContextMenuItem onClick={onRename}>
-        <PencilIcon />
+        <PencilIcon className="size-3" />
         重命名
       </ContextMenuItem>
       <ContextMenuItem disabled={forkDisabledReason !== null} onClick={fork} title={forkDisabledReason ?? 'Fork'}>
@@ -237,11 +237,11 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
       <ContextMenu>
         <ContextMenuTrigger
           render={
-            <div className="group/task relative flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
+            <div className="group/task relative flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50 ml-3" />
           }
         >
           <button
-            className="text-muted-foreground hover:text-foreground flex min-w-0 flex-1 items-center gap-1 py-1 pl-5 text-left text-sm"
+            className="text-muted-foreground hover:text-foreground flex min-w-0 flex-1 items-center gap-1 py-1 pl-2 text-left text-sm"
             onClick={onOpen}
             type="button"
           >

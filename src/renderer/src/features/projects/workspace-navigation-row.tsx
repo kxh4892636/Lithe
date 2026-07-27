@@ -120,7 +120,7 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
               <>
                 <Button
                   aria-label={`在 ${workspace.name} 创建任务`}
-                  className="hover:bg-transparent"
+
                   onClick={(): void => props.openTaskDialog(workspace)}
                   size="icon-xs"
                   title="创建任务"
@@ -130,7 +130,7 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
                 </Button>
                 <Button
                   aria-label={workspace.pinnedAt ? '取消置顶此工作区' : '置顶此工作区'}
-                  className="hover:bg-transparent"
+
                   onClick={(): void => void props.setWorkspacePinned(workspace.id, !workspace.pinnedAt)}
                   size="icon-xs"
                   variant="ghost"

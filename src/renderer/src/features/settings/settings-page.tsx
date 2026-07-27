@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
+import { ArchivedTaskSettings } from '@/features/tasks/archived-task-settings'
 
 import type { Theme } from '../../../../shared/app-contract'
 import { AdapterSettings } from './adapter-settings'
@@ -94,6 +95,7 @@ export const SettingsPage = (): React.JSX.Element => {
       ) : null}
       {category === 'agents' ? <AdapterSettings /> : null}
       {category === 'terminal' ? <ShellSettings /> : null}
+      {category === 'archive' ? <ArchivedTaskSettings /> : null}
     </section>
   )
 }

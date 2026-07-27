@@ -10,7 +10,7 @@ import type { Task } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from './task-store'
 import { useAdaptersByVersion } from './use-adapters-by-version'
 
-export const ArchivePage = (): React.JSX.Element => {
+export const ArchivedTaskSettings = (): React.JSX.Element => {
   const archivedTasks = useTaskStore((state: TaskState) => state.archivedTasks)
   const deleteTask = useTaskStore((state: TaskState) => state.deleteTask)
   const hydrateArchived = useTaskStore((state: TaskState) => state.hydrateArchived)
@@ -27,10 +27,9 @@ export const ArchivePage = (): React.JSX.Element => {
   }, [hydrateArchived])
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8 lg:p-12">
+    <section className="flex flex-col gap-6">
       <header>
-        <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">任务组织</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">已归档任务</h1>
+        <h2 className="text-2xl font-semibold tracking-tight">已归档任务</h2>
         <p className="text-muted-foreground mt-2 text-sm">恢复只还原任务与布局，不会自动启动 Coding Agent。</p>
       </header>
       <div className="divide-y rounded-xl border">
@@ -44,12 +43,12 @@ export const ArchivePage = (): React.JSX.Element => {
               <ContextMenu key={task.id}>
                 <ContextMenuTrigger render={<article className="flex items-center gap-4 p-4" />}>
                   <div className="min-w-0 flex-1">
-                    <h2 className="flex items-center gap-1 truncate text-sm font-medium">
+                    <h3 className="flex items-center gap-1 truncate text-sm font-medium">
                       <Badge className="h-4 px-1 text-[9px]" variant="secondary">
                         {adapter?.name ?? 'agent'}
                       </Badge>
                       <span className="truncate">-{task.name}</span>
-                    </h2>
+                    </h3>
                     <p className="text-muted-foreground mt-1 truncate text-xs">
                       {workspace?.name ?? '无效工作区'}
                       {task.archivedAt ? ` · ${task.archivedAt.toLocaleString()}` : ''}

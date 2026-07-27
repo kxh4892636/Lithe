@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type SettingsCategory = 'general' | 'agents' | 'terminal'
+export type SettingsCategory = 'general' | 'agents' | 'terminal' | 'archive'
 
 interface SettingsNavigationState {
   category: SettingsCategory

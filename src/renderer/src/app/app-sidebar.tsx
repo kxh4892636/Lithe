@@ -24,7 +24,7 @@ import { useNavigationSearchStore } from './navigation-search-store'
 const AppSidebarFooter = (): React.JSX.Element => {
   const { t } = useTranslation()
   return (
-    <SidebarFooter className="flex-row items-center justify-between">
+    <SidebarFooter className="flex-row items-center">
       <Popover>
         <PopoverTrigger
           render={
@@ -51,14 +51,6 @@ const AppSidebarFooter = (): React.JSX.Element => {
           </button>
         </PopoverContent>
       </Popover>
-      <Link
-        className="hover:bg-sidebar-accent grid size-8 place-items-center rounded-md"
-        title={t('appMenu.archive')}
-        to="/archive"
-      >
-        <ArchiveIcon className="size-4" />
-        <span className="sr-only">{t('appMenu.archive')}</span>
-      </Link>
     </SidebarFooter>
   )
 }
@@ -76,6 +68,7 @@ const SidebarResizeHandle = ({ appearance }: { appearance: NavigationAppearance 
 }
 
 const SettingsSidebar = ({ appearance }: { appearance: NavigationAppearance }): React.JSX.Element => {
+  const { t } = useTranslation()
   const category = useSettingsNavigationStore((state) => state.category)
   const select = useSettingsNavigationStore((state) => state.select)
   const items: Array<{
@@ -86,6 +79,7 @@ const SettingsSidebar = ({ appearance }: { appearance: NavigationAppearance }): 
     { category: 'general', icon: SlidersHorizontalIcon, label: '通用' },
     { category: 'agents', icon: BotIcon, label: 'Coding Agent' },
     { category: 'terminal', icon: SquareTerminalIcon, label: '终端' },
+    { category: 'archive', icon: ArchiveIcon, label: t('settings.archive') },
   ]
   return (
     <Sidebar
@@ -98,21 +92,21 @@ const SettingsSidebar = ({ appearance }: { appearance: NavigationAppearance }): 
     >
       <SidebarHeader className="p-3">
         <Link
-          className="hover:bg-sidebar-accent flex h-8 items-center gap-2 rounded-md px-2 text-xs font-medium"
+          className="hover:bg-sidebar-accent flex h-8 items-center gap-2 rounded-md px-2 text-sm font-medium"
           to="/"
         >
           <ArrowLeftIcon className="size-4" />
           返回主界面
         </Link>
       </SidebarHeader>
-      <SidebarContent className="p-2">
+      <SidebarContent className="gap-1 p-2">
         {items.map(({ category: value, icon: Icon, label }) => (
           <button
             aria-current={value === category ? 'page' : undefined}
             className={
               value === category
-                ? 'bg-sidebar-accent flex h-8 items-center gap-2 rounded-md px-2 text-xs font-medium'
-                : 'hover:bg-sidebar-accent flex h-8 items-center gap-2 rounded-md px-2 text-xs'
+                ? 'bg-sidebar-accent flex h-8 items-center gap-2 rounded-md px-2 text-sm font-medium'
+                : 'hover:bg-sidebar-accent flex h-8 items-center gap-2 rounded-md px-2 text-sm'
             }
             key={value}
             onClick={(): void => select(value)}
