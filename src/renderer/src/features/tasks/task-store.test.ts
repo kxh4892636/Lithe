@@ -19,6 +19,9 @@ const restoredTask: Task = {
   shouldAutoRestore: false,
 }
 
+const mockMarkViewed = (): LitheBridge['tasks']['markViewed'] =>
+  vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask)
+
 describe('task store', (): void => {
   beforeEach((): void => {
     useTaskStore.setState({
@@ -111,7 +114,7 @@ describe('task store', (): void => {
     const start = vi.fn<LitheBridge['agents']['start']>().mockResolvedValue(launch)
     window.lithe = {
       agents: { start },
-      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+      tasks: { markViewed: mockMarkViewed() },
     } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [task] } })
 
@@ -136,7 +139,7 @@ describe('task store', (): void => {
     const resume = vi.fn<LitheBridge['agents']['resume']>().mockResolvedValue(launch)
     window.lithe = {
       agents: { resume },
-      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+      tasks: { markViewed: mockMarkViewed() },
     } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [restoredTask] } })
 
@@ -160,7 +163,7 @@ describe('task store', (): void => {
     const resume = vi.fn<LitheBridge['agents']['resume']>()
     window.lithe = {
       agents: { resume, start },
-      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+      tasks: { markViewed: mockMarkViewed() },
     } as unknown as LitheBridge
     useTaskStore.setState({
       launchesByTask: { [restoredTask.id]: launch },
@@ -180,7 +183,7 @@ describe('task store', (): void => {
     const resume = vi.fn<LitheBridge['agents']['resume']>()
     window.lithe = {
       agents: { resume, start },
-      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+      tasks: { markViewed: mockMarkViewed() },
     } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [runningTask] } })
 
@@ -195,7 +198,7 @@ describe('task store', (): void => {
     const runningTask = { ...restoredTask, agentStatus: 'running' as const }
     window.lithe = {
       agents: {},
-      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+      tasks: { markViewed: mockMarkViewed() },
     } as unknown as LitheBridge
     useTaskStore.setState({
       activationErrorsByTask: { [runningTask.id]: '工作区目录不存在' },
@@ -212,7 +215,7 @@ describe('task store', (): void => {
     const resume = vi.fn<LitheBridge['agents']['resume']>().mockRejectedValue(failure)
     window.lithe = {
       agents: { resume },
-      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+      tasks: { markViewed: mockMarkViewed() },
     } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [restoredTask] } })
 
@@ -239,7 +242,7 @@ describe('task store', (): void => {
         resume,
         shouldRestore: vi.fn<LitheBridge['agents']['shouldRestore']>().mockResolvedValue(true),
       },
-      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+      tasks: { markViewed: mockMarkViewed() },
     } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [restoredTask] } })
 
