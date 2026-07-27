@@ -107,51 +107,6 @@ export interface TerminalExitEvent {
   panelId: string
 }
 
-export interface FileTreeEntry {
-  children?: FileTreeEntry[]
-  externalSymlink: boolean
-  id: string
-  isDirectory: boolean
-  name: string
-  relativePath: string
-}
-
-export interface FileDocumentSnapshot {
-  content: string
-  fingerprint: string
-  relativePath: string
-}
-
-export interface FileDraft extends FileDocumentSnapshot {
-  workspaceId: string
-}
-
-export interface FileChangeEvent {
-  relativePath: string
-  type: 'add' | 'change' | 'unlink'
-  workspaceId: string
-}
-
-export type FileCloseResult = 'cancel' | 'discarded' | 'saved'
-
-export type GitChangeKind = 'staged' | 'unstaged' | 'untracked'
-
-export interface GitChangeEntry {
-  id: string
-  kind: GitChangeKind
-  relativePath: string
-}
-
-export interface GitChangeList {
-  changes: GitChangeEntry[]
-  isRepository: boolean
-}
-
-export interface GitDiffSnapshot extends GitChangeEntry {
-  modified: string
-  original: string
-}
-
 export interface LitheBridge {
   adapters: {
     create: (name: string, definition: AdapterDefinition) => Promise<AdapterSummary>
@@ -168,27 +123,6 @@ export interface LitheBridge {
     start: (taskId: string) => Promise<AgentLaunch>
     stop: (taskId: string) => Promise<Task>
     shouldRestore: () => Promise<boolean>
-  }
-  files: {
-    clearDraft: (workspaceId: string, relativePath: string) => Promise<void>
-    closeLastView: (workspaceId: string, relativePath: string) => Promise<FileCloseResult>
-    listDirectory: (workspaceId: string, relativeDirectory: string, showIgnored: boolean) => Promise<FileTreeEntry[]>
-    onChanged: (listener: (event: FileChangeEvent) => void) => () => void
-    read: (workspaceId: string, relativePath: string) => Promise<FileDocumentSnapshot>
-    save: (
-      workspaceId: string,
-      relativePath: string,
-      content: string,
-      expectedFingerprint: string,
-      force?: boolean,
-    ) => Promise<FileDocumentSnapshot>
-    setDraft: (draft: FileDraft) => Promise<void>
-    watch: (workspaceId: string) => Promise<void>
-  }
-  gitDiff: {
-    list: (workspaceId: string) => Promise<GitChangeList>
-    read: (workspaceId: string, kind: GitChangeKind, relativePath: string) => Promise<GitDiffSnapshot>
-    version: (workspaceId: string, relativePath?: string) => Promise<string | null>
   }
   preferences: {
     getPinnedGroupOpen: () => Promise<boolean>

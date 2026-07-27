@@ -16,9 +16,6 @@ import { registerAgentToolCommands } from './agents/agent-tool-commands'
 import { inspectAdapterAvailability, isAdapterAvailable } from './agents/command-availability'
 import type { AppDatabase } from './database/app-database'
 import { createAppDatabase } from './database/app-database'
-import { createFileService, type FileService } from './files/file-service'
-import { commitDiscardedDrafts, prepareDirtyFilesBeforeQuit } from './files/file-shutdown'
-import { registerWorkspaceContentIpc } from './files/workspace-content-ipc'
 import { registerIpcHandlers, removeIpcHandlers } from './ipc-handlers'
 import { resolveRuntimeProfile } from './runtime-profile'
 import { closeRendererWindow } from './shutdown-sequence'
@@ -74,7 +71,6 @@ if (runtimeProfile.userDataDirectory) {
 
 let appDatabase: AppDatabase | undefined
 let agentManager: AgentManager | undefined
-let fileService: FileService | undefined
 let mainWindow: BrowserWindow | undefined
 let ptyRuntime: PtyRuntime | undefined
 let workspaceLayoutPersistence: WorkspaceLayoutPersistence | undefined
@@ -85,7 +81,6 @@ let shutdownStarted = false
 let shutdownComplete = false
 let visibleTaskId: string | null = null
 let restoreAgentsThisLaunch = true
-let removeFileIpc = (): void => undefined
 const taskNotifications = new Map<string, Notification>()
 const scratchRoot = resolve(runtimeProfile.runtimeDirectory, 'scratch')
 const scratchTrashStagingRoot = resolve(runtimeProfile.runtimeDirectory, 'trash-staging')
@@ -250,9 +245,7 @@ const openMainWindow = async (): Promise<void> => {
   removeIpcHandlers()
   removeAgentIpc()
   removeTerminalIpc()
-  removeFileIpc()
   await ptyRuntime?.closeAll()
-  await fileService?.close()
   visibleTaskId = null
   mainWindow = createWindow()
   const workspaceLifecycle = createWorkspaceLifecycle({
@@ -265,15 +258,6 @@ const openMainWindow = async (): Promise<void> => {
   const { worktrees } = workspaceLifecycle
   workspaceLifecycle.refreshProjectValidity()
   mainWindow.on('focus', workspaceLifecycle.refreshProjectValidity)
-  fileService = createFileService({
-    changed: (event): void => mainWindow?.webContents.send(ipcChannels.fileChanged, event),
-    getWorkspace: appDatabase.projects.getWorkspace,
-  })
-  removeFileIpc = registerWorkspaceContentIpc({
-    fileService,
-    getWorkspace: appDatabase.projects.getWorkspace,
-    window: mainWindow,
-  })
   registerIpcHandlers({
     database: appDatabase,
     forgetInvalidProject: workspaceLifecycle.forgetInvalidProject,
@@ -530,7 +514,6 @@ if (!app.requestSingleInstanceLock()) {
     shutdownStarted = true
     void (async (): Promise<void> => {
       let exitCommitted = false
-      let commitFiles = (): void => undefined
       try {
         const runningTasks = appDatabase?.tasks.listRunning() ?? []
         if (runningTasks.length > 0) {
@@ -551,12 +534,6 @@ if (!app.requestSingleInstanceLock()) {
             return
           }
         }
-        const fileQuit = await prepareDirtyFilesBeforeQuit(fileService, mainWindow)
-        if (!fileQuit.proceed) {
-          shutdownStarted = false
-          return
-        }
-        commitFiles = (): void => commitDiscardedDrafts(fileService, fileQuit)
         await ptyRuntime?.closeAll()
         exitCommitted = true
         if (mainWindow) windowStatePersistence?.flush(mainWindow)
@@ -565,8 +542,6 @@ if (!app.requestSingleInstanceLock()) {
         removeIpcHandlers()
         removeAgentIpc()
         removeTerminalIpc()
-        removeFileIpc()
-        await fileService?.close()
         workspaceLayoutPersistence?.flushAll(false)
         try {
           await toolControlRuntime?.close()
@@ -575,8 +550,6 @@ if (!app.requestSingleInstanceLock()) {
           process.stderr.write(`Lithe tool control shutdown failed: ${message}\n`)
         } finally {
           toolControlRuntime = undefined
-          commitDiscardedDrafts(fileService, fileQuit)
-          fileService = undefined
           ptyRuntime = undefined
           agentManager = undefined
           taskStateService = undefined
@@ -597,7 +570,6 @@ if (!app.requestSingleInstanceLock()) {
         const message = error instanceof Error ? (error.stack ?? error.message) : String(error)
         process.stderr.write(`Lithe shutdown failed: ${message}\n`)
         if (exitCommitted) {
-          commitFiles()
           shutdownComplete = true
           app.quit()
           return

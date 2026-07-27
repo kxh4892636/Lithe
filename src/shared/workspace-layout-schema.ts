@@ -38,42 +38,7 @@ const agentTabSchema = z
   })
   .strict()
 
-const fileConfigSchema = z
-  .object({
-    panelId: identifier,
-    relativePath: z.string().min(1).max(4_096),
-  })
-  .strict()
-
-const fileTabSchema = z
-  .object({
-    component: z.literal('file'),
-    config: fileConfigSchema,
-    enableRenderOnDemand: z.boolean().optional(),
-    id: identifier,
-    name: z.string().min(1).max(128),
-    type: z.literal('tab'),
-  })
-  .strict()
-
-const diffTabSchema = z
-  .object({
-    component: z.literal('git-diff'),
-    config: z
-      .object({
-        kind: z.enum(['staged', 'unstaged', 'untracked']),
-        panelId: identifier,
-        relativePath: z.string().min(1).max(4_096),
-      })
-      .strict(),
-    enableRenderOnDemand: z.boolean().optional(),
-    id: identifier,
-    name: z.string().min(1).max(128),
-    type: z.literal('tab'),
-  })
-  .strict()
-
-const tabSchema = z.discriminatedUnion('component', [terminalTabSchema, agentTabSchema, fileTabSchema, diffTabSchema])
+const tabSchema = z.discriminatedUnion('component', [terminalTabSchema, agentTabSchema])
 
 const tabSetSchema = z
   .object({
@@ -163,9 +128,32 @@ const assertNodeLimits = (snapshot: WorkspaceLayoutSnapshot): void => {
   }
 }
 
+// 已移除的右侧面板（文件、Git Diff）可能仍存在于历史快照中，解析前静默丢弃。
+const removedTabComponents = new Set(['file', 'git-diff'])
+
+const stripRemovedTabs = (value: unknown): void => {
+  if (!value || typeof value !== 'object') return
+  const node = value as { children?: unknown; selected?: unknown; type?: unknown }
+  if (node.type === 'tabset' && Array.isArray(node.children)) {
+    const children: unknown[] = node.children.filter(
+      (child): boolean =>
+        !child ||
+        typeof child !== 'object' ||
+        !removedTabComponents.has(String((child as { component?: unknown }).component)),
+    )
+    if (children.length !== node.children.length) {
+      node.children = children
+      delete node.selected
+    }
+  }
+  for (const child of Object.values(value)) stripRemovedTabs(child)
+}
+
 export const parseWorkspaceLayoutSnapshot = (value: unknown): WorkspaceLayoutSnapshot => {
   assertBoundedInput(value)
-  const snapshot = snapshotSchema.parse(value)
+  const mutable = structuredClone(value)
+  stripRemovedTabs(mutable)
+  const snapshot = snapshotSchema.parse(mutable)
   assertNodeLimits(snapshot)
   if (JSON.stringify(snapshot).length > workspaceLayoutMaxLength) throw new TypeError('工作区布局过大')
   return snapshot
