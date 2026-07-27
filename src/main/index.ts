@@ -352,6 +352,7 @@ const openMainWindow = async (): Promise<void> => {
         if (mainWindow.isMinimized()) mainWindow.restore()
         mainWindow.show()
         mainWindow.focus()
+        taskStateService?.markViewed(task.id)
         mainWindow.webContents.send(ipcChannels.taskNavigate, task.id)
       })
       notification.on('close', (): void => {
@@ -433,7 +434,6 @@ const openMainWindow = async (): Promise<void> => {
       await deleteManagedTask(task)
       return true
     },
-    isTaskVisible,
     setVisibleTask: (taskId: string | null): void => {
       visibleTaskId = taskId
     },

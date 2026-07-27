@@ -1,4 +1,4 @@
-import { Layout, TabNode, TabSetNode } from 'flexlayout-react'
+import { Actions, Layout, TabNode, TabSetNode, type Action } from 'flexlayout-react'
 import { PlusIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -164,10 +164,18 @@ const selectedTaskId = (layout: WorkspaceLayoutAdapter): string | null => {
 const reportVisibleTask = (layout: WorkspaceLayoutAdapter): void => {
   const taskId = selectedTaskId(layout)
   useTaskStore.getState().setVisibleTaskId(taskId)
-  void window.lithe.tasks
-    .setVisible(taskId)
-    .then((): Promise<Task> | undefined => (taskId ? window.lithe.tasks.markViewed(taskId) : undefined))
-    .catch(globalThis.console.error)
+  void window.lithe.tasks.setVisible(taskId).catch(globalThis.console.error)
+}
+
+const markViewedOnTabSelect = (layout: WorkspaceLayoutAdapter, action: Action): Action => {
+  if (action.type === Actions.SELECT_TAB) {
+    const node = layout.getModel().getNodeById(action.data.tabNode as string)
+    if (node instanceof TabNode && node.getComponent() === 'agent') {
+      const config = node.getConfig() as AgentPanelConfig
+      void window.lithe.tasks.markViewed(config.taskId).catch(globalThis.console.error)
+    }
+  }
+  return action
 }
 
 const useVisibleTaskReporting = (layout: WorkspaceLayoutAdapter | undefined, visible: boolean): void => {
@@ -217,6 +225,7 @@ const WorkspaceLayoutBody = ({ layout, taskError, tasks, workspace }: WorkspaceL
           <Layout
             factory={createPanelFactory(layout, tasks, workspace.id)}
             model={layout.getModel()}
+            onAction={(action): Action => markViewedOnTabSelect(layout, action)}
             onModelChange={(): void => {
               reportVisibleTask(layout)
               void window.lithe.workspaceLayouts

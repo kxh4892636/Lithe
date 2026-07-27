@@ -22,14 +22,10 @@ const task = (overrides: Partial<Task> = {}): Task => ({
 })
 
 describe('task state service', () => {
-  it('records attention but immediately views a truly visible task', () => {
-    const recordAttention = vi.fn(() => task({ lastAttentionAt: new Date('2026-07-25T01:00:00Z'), isUnread: true }))
-    const markViewed = vi.fn(() =>
-      task({
-        lastAttentionAt: new Date('2026-07-25T01:00:00Z'),
-        lastViewedAt: new Date('2026-07-25T01:00:00Z'),
-      }),
-    )
+  it('keeps a truly visible task unread until the user explicitly selects it', () => {
+    const unread = task({ lastAttentionAt: new Date('2026-07-25T01:00:00Z'), isUnread: true })
+    const recordAttention = vi.fn(() => unread)
+    const markViewed = vi.fn()
     const notify = vi.fn()
     const service = createTaskStateService({
       archive: vi.fn(),
@@ -45,11 +41,32 @@ describe('task state service', () => {
       stopAgent: vi.fn(),
     })
 
-    service.markUnread('task-1', true)
+    expect(service.markUnread('task-1', true)).toEqual(unread)
 
     expect(recordAttention).toHaveBeenCalledWith('task-1', new Date('2026-07-25T01:00:00Z'))
-    expect(markViewed).toHaveBeenCalledWith('task-1', new Date('2026-07-25T01:00:00Z'))
+    expect(markViewed).not.toHaveBeenCalled()
     expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('marks the task viewed on explicit selection', () => {
+    const viewed = task({ lastViewedAt: new Date('2026-07-25T01:00:00Z') })
+    const markViewed = vi.fn(() => viewed)
+    const service = createTaskStateService({
+      archive: vi.fn(),
+      deleteTask: vi.fn(),
+      get: vi.fn(() => task({ isUnread: true, lastAttentionAt: new Date('2026-07-25T01:00:00Z') })),
+      markViewed,
+      notify: vi.fn(),
+      now: () => new Date('2026-07-25T01:00:00Z'),
+      recordAttention: vi.fn(),
+      removeTaskPanel: vi.fn(),
+      restore: vi.fn(),
+      setAgentStatus: vi.fn(),
+      stopAgent: vi.fn(),
+    })
+
+    expect(service.markViewed('task-1')).toEqual(viewed)
+    expect(markViewed).toHaveBeenCalledWith('task-1', new Date('2026-07-25T01:00:00Z'))
   })
 
   it('notifies once the attention event remains unread in the background', () => {

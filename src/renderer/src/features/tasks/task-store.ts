@@ -40,6 +40,18 @@ const upsertTask = (tasks: Task[], next: Task): Task[] =>
     ? tasks.map((task: Task): Task => (task.id === next.id ? next : task))
     : [...tasks, next]
 
+// 与主进程 list() 的 SQL 排序保持同一规则：COALESCE(lastAttentionAt, createdAt)
+// DESC，同值时 createdAt DESC，再以 id 保证稳定。
+const compareTasksByAttention = (left: Task, right: Task): number => {
+  const attentionDiff =
+    (right.lastAttentionAt ?? right.createdAt).getTime() - (left.lastAttentionAt ?? left.createdAt).getTime()
+  if (attentionDiff !== 0) return attentionDiff
+  const createdDiff = right.createdAt.getTime() - left.createdAt.getTime()
+  if (createdDiff !== 0) return createdDiff
+  if (left.id < right.id) return -1
+  return left.id > right.id ? 1 : 0
+}
+
 const pendingActivations = new Map<string, Promise<AgentLaunch | undefined>>()
 
 const launchAgentTask = (
@@ -107,6 +119,7 @@ const createActivationActions = (
 > => ({
   activateTask: async (taskId: string): Promise<AgentLaunch | undefined> => {
     set({ openTaskAfterId: null, openTaskId: taskId })
+    void window.lithe.tasks.markViewed(taskId).catch(globalThis.console.error)
     return launchAgentTask(taskId, set, get)
   },
   autoRestoreTask: async (taskId: string): Promise<AgentLaunch | undefined> => {
@@ -194,7 +207,7 @@ const createTaskChangeAction = (set: TaskStoreSet): Pick<TaskState, 'applyChange
             archivedTasks: state.archivedTasks.filter((task: Task): boolean => task.id !== event.id),
             tasksByWorkspace: {
               ...state.tasksByWorkspace,
-              [event.workspaceId]: upsertTask(workspaceTasks, event),
+              [event.workspaceId]: upsertTask(workspaceTasks, event).sort(compareTasksByAttention),
             },
           }
     })

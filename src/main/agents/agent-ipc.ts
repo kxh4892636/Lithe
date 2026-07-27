@@ -18,7 +18,6 @@ interface RegisterAgentIpcOptions {
   application: AgentApplication
   database: AppDatabase
   deleteTask: (task: Task) => Promise<boolean>
-  isTaskVisible: (taskId: string) => boolean
   setVisibleTask: (taskId: string | null) => void
   shouldRestoreAgents: () => boolean
   states: TaskStateService
@@ -46,7 +45,6 @@ export const registerAgentIpc = ({
   application,
   database,
   deleteTask,
-  isTaskVisible,
   setVisibleTask,
   shouldRestoreAgents,
   states,
@@ -132,8 +130,7 @@ export const registerAgentIpc = ({
   })
   ipcMain.handle(ipcChannels.taskViewed, (event: IpcMainInvokeEvent, taskId: unknown): Task => {
     assertTrustedSender(event, window)
-    const id = assertIdentifier(taskId)
-    return states.markViewed(id, isTaskVisible(id))
+    return states.markViewed(assertIdentifier(taskId))
   })
   ipcMain.handle(ipcChannels.taskSetVisible, (event: IpcMainInvokeEvent, taskId: unknown): void => {
     assertTrustedSender(event, window)

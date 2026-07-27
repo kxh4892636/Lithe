@@ -260,6 +260,106 @@ describe('app database', (): void => {
     expect(database.tasks.listRunning()).toEqual([])
   })
 
+  it('sorts active tasks by latest attention with creation time fallback', (): void => {
+    const database = createTestDatabase()
+    const project = {
+      id: 'project-order',
+      name: 'order',
+      rootPath: 'D:\\projects\\order',
+      isValid: true,
+      createdAt: new Date('2026-07-19T00:00:00.000Z'),
+    }
+    const workspace = {
+      id: 'workspace-order',
+      projectId: project.id,
+      name: '默认',
+      rootPath: project.rootPath,
+      gitBranch: 'main',
+      kind: 'default' as const,
+      createdAt: project.createdAt,
+    }
+    database.projects.add(project, workspace)
+    const adapter = database.adapters.listCurrent()[0]
+    if (!adapter) throw new Error('Expected a built-in Adapter')
+    const base = {
+      workspaceId: workspace.id,
+      adapterVersionId: adapter.id,
+      agentStatus: 'closed' as const,
+      agentSessionId: null,
+      archivedAt: null,
+      isUnread: false,
+      lastAttentionAt: null,
+      lastViewedAt: null,
+      lifecycle: 'active' as const,
+      shouldAutoRestore: true,
+    }
+    database.tasks.add({ ...base, id: 'task-older', name: 'Older', createdAt: new Date('2026-07-20T00:00:00.000Z') })
+    database.tasks.add({ ...base, id: 'task-newer', name: 'Newer', createdAt: new Date('2026-07-25T00:00:00.000Z') })
+    database.tasks.add({
+      ...base,
+      id: 'task-attended',
+      name: 'Attended',
+      createdAt: new Date('2026-07-21T00:00:00.000Z'),
+    })
+    database.tasks.recordAttention('task-attended', 'event-1', new Date('2026-07-24T00:00:00.000Z'))
+    database.tasks.recordAttention('task-attended', 'event-2', new Date('2026-07-26T00:00:00.000Z'))
+
+    expect(database.tasks.list(workspace.id).map((task): string => task.id)).toEqual([
+      'task-attended',
+      'task-newer',
+      'task-older',
+    ])
+  })
+
+  it('breaks attention ties by creation time and then id', (): void => {
+    const database = createTestDatabase()
+    const project = {
+      id: 'project-tie',
+      name: 'tie',
+      rootPath: 'D:\\projects\\tie',
+      isValid: true,
+      createdAt: new Date('2026-07-19T00:00:00.000Z'),
+    }
+    const workspace = {
+      id: 'workspace-tie',
+      projectId: project.id,
+      name: '默认',
+      rootPath: project.rootPath,
+      gitBranch: 'main',
+      kind: 'default' as const,
+      createdAt: project.createdAt,
+    }
+    database.projects.add(project, workspace)
+    const adapter = database.adapters.listCurrent()[0]
+    if (!adapter) throw new Error('Expected a built-in Adapter')
+    const base = {
+      workspaceId: workspace.id,
+      adapterVersionId: adapter.id,
+      agentStatus: 'closed' as const,
+      agentSessionId: null,
+      archivedAt: null,
+      isUnread: false,
+      lastAttentionAt: null,
+      lastViewedAt: null,
+      lifecycle: 'active' as const,
+      shouldAutoRestore: true,
+    }
+    const attentionAt = new Date('2026-07-26T00:00:00.000Z')
+    database.tasks.add({ ...base, id: 'task-a', name: 'A', createdAt: new Date('2026-07-20T00:00:00.000Z') })
+    database.tasks.add({ ...base, id: 'task-b', name: 'B', createdAt: new Date('2026-07-22T00:00:00.000Z') })
+    database.tasks.recordAttention('task-a', 'event-a', attentionAt)
+    database.tasks.recordAttention('task-b', 'event-b', attentionAt)
+    database.tasks.add({ ...base, id: 'task-d', name: 'D', createdAt: new Date('2026-07-23T00:00:00.000Z') })
+    database.tasks.add({ ...base, id: 'task-c', name: 'C', createdAt: new Date('2026-07-23T00:00:00.000Z') })
+
+    expect(database.tasks.list(workspace.id).map((task): string => task.id)).toEqual([
+      'task-b',
+      'task-a',
+      'task-c',
+      'task-d',
+    ])
+  })
+
   it('refreshes built-in Adapter names and definitions when the application reopens', (): void => {
     const directory = mkdtempSync(join(tmpdir(), 'lithe-database-'))
     const databasePath = join(directory, 'lithe.db')

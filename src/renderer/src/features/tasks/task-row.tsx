@@ -92,7 +92,6 @@ interface TaskToolbarProps extends TaskActionsProps {
 
 interface TaskTitleProps {
   actionsRef: RefObject<HTMLDivElement | null>
-  isUnread: boolean
   name: string
 }
 
@@ -105,7 +104,7 @@ const taskTitleGap = 32
 const taskTitleSpeed = 30
 
 const TaskTitle = (props: TaskTitleProps): React.JSX.Element => {
-  const { actionsRef, isUnread, name } = props
+  const { actionsRef, name } = props
   const textRef = useRef<HTMLSpanElement>(null)
   const viewportRef = useRef<HTMLSpanElement>(null)
   const [metrics, setMetrics] = useState<TaskTitleMetrics>({ distance: 0, overflow: false })
@@ -135,9 +134,7 @@ const TaskTitle = (props: TaskTitleProps): React.JSX.Element => {
   } as CSSProperties
   return (
     <span
-      className={
-        isUnread ? 'text-foreground min-w-0 flex-1 overflow-hidden font-medium' : 'min-w-0 flex-1 overflow-hidden'
-      }
+      className="min-w-0 flex-1 overflow-hidden"
       data-overflow={String(metrics.overflow)}
       data-slot="task-title"
       ref={viewportRef}
@@ -241,8 +238,8 @@ export const TaskRow = ({ adapter, onOpen, selected, task }: TaskRowProps): Reac
             <div
               className={
                 selected
-                  ? 'group/task relative flex items-center rounded-md bg-sidebar-accent/60 ml-3'
-                  : 'group/task relative flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50 ml-3'
+                  ? 'group/task relative flex items-center rounded-md bg-sidebar-accent/60 ml-3 mt-0.5'
+                  : 'group/task relative flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50 ml-3 mt-0.5'
               }
               data-selected={String(selected ?? false)}
             />
@@ -269,8 +266,8 @@ export const TaskRow = ({ adapter, onOpen, selected, task }: TaskRowProps): Reac
             <Badge className="h-4 shrink-0 px-1 text-xs" variant="secondary">
               {adapter?.name ?? 'agent'}
             </Badge>
-            <TaskTitle actionsRef={actionsRef} isUnread={Boolean(task.isUnread)} name={task.name} />
-            {task.isUnread ? <span className="bg-primary ml-auto size-1.5 rounded-full" aria-label="未读" /> : null}
+            <TaskTitle actionsRef={actionsRef} name={task.name} />
+            {task.isUnread ? <span className="bg-unread ml-auto size-1.5 rounded-full" aria-label="未读" /> : null}
           </button>
           <TaskToolbar
             archive={archive}

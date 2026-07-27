@@ -157,14 +157,40 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
       await bridge.tasks.setVisible(null)
       return source.id
     }, taskName)
+    const cliEnvironment: NodeJS.ProcessEnv = {
+      ...process.env,
+      LITHE_CONTROL_DISCOVERY_PATH: electronSession.controlDiscoveryPath,
+    }
+    delete cliEnvironment.LITHE_CAPABILITY
+    delete cliEnvironment.LITHE_CONTROL_ENDPOINT
+    delete cliEnvironment.LITHE_CONTROL_TOKEN
     const runTool = (...arguments_: string[]): ReturnType<typeof spawnSync> =>
       spawnSync(process.execPath, [cliPath, ...arguments_], {
         encoding: 'utf8',
-        env: {
-          ...process.env,
-          LITHE_CONTROL_DISCOVERY_PATH: electronSession.controlDiscoveryPath,
-        },
+        env: cliEnvironment,
       })
+
+    const isSourceUnread = async (): Promise<boolean> =>
+      page?.evaluate(async (taskId: string): Promise<boolean> => {
+        const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
+        const navigation = await bridge.projects.getNavigation()
+        if (!navigation.activeWorkspaceId) return false
+        return (await bridge.tasks.list(navigation.activeWorkspaceId)).some(
+          (task): boolean => task.id === taskId && Boolean(task.isUnread),
+        )
+      }, sourceTaskId) ?? false
+
+    expect(runTool('task', 'unread', '--task-id', sourceTaskId).status).toBe(0)
+    await expect.poll(isSourceUnread).toBe(true)
+
+    await page.getByLabel('未读').locator('..').click()
+    await expect.poll(isSourceUnread).toBe(false)
+
+    expect(runTool('task', 'unread', '--task-id', sourceTaskId).status).toBe(0)
+    await expect.poll(isSourceUnread).toBe(true)
+
+    await page.locator('.flexlayout__tab_button--selected', { hasText: taskName }).click()
+    await expect.poll(isSourceUnread).toBe(false)
 
     expect(runTool('task', 'create', '--name', 'Scratch review').status).toBe(0)
     await expect
@@ -178,21 +204,6 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
           return (await bridge.tasks.list(scratch.id)).some((task): boolean => task.name === 'Scratch review')
         })
       })
-      .toBe(true)
-
-    expect(runTool('task', 'unread', '--task-id', sourceTaskId).status).toBe(0)
-    await expect
-      .poll(
-        async (): Promise<boolean> =>
-          page?.evaluate(async (taskId: string): Promise<boolean> => {
-            const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
-            const navigation = await bridge.projects.getNavigation()
-            if (!navigation.activeWorkspaceId) return false
-            return (await bridge.tasks.list(navigation.activeWorkspaceId)).some(
-              (task): boolean => task.id === taskId && Boolean(task.isUnread),
-            )
-          }, sourceTaskId) ?? false,
-      )
       .toBe(true)
 
     expect(runTool('task', 'running').status).toBe(1)

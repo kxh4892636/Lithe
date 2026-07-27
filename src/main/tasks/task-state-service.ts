@@ -22,7 +22,7 @@ export interface TaskStateService {
   markIdle: (taskId: string) => Task
   markRunning: (taskId: string) => Task
   markUnread: (taskId: string, isTrulyVisible: boolean) => Task
-  markViewed: (taskId: string, isTrulyVisible: boolean) => Task
+  markViewed: (taskId: string) => Task
   restore: (taskId: string) => Task
 }
 
@@ -72,19 +72,13 @@ export const createTaskStateService = (options: TaskStateServiceOptions): TaskSt
       required(taskId)
       const occurredAt = options.now()
       const updated = options.recordAttention(taskId, occurredAt)
-      if (isTrulyVisible) {
-        const viewed = options.markViewed(taskId, occurredAt)
-        options.changed?.(viewed)
-        return viewed
-      }
-      options.notify(updated)
+      if (!isTrulyVisible) options.notify(updated)
       options.changed?.(updated)
       return updated
     },
-    markViewed: (taskId: string, isTrulyVisible: boolean): Task => {
-      const task = required(taskId)
-      if (!isTrulyVisible) return task
-      const viewed = options.markViewed(task.id, options.now())
+    markViewed: (taskId: string): Task => {
+      required(taskId)
+      const viewed = options.markViewed(taskId, options.now())
       options.changed?.(viewed)
       return viewed
     },

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-sqlite'
 
 import {
@@ -328,14 +328,18 @@ export const createTaskRepository = (database: Database): TaskRepository => ({
     const row = database.select().from(tasks).where(eq(tasks.id, taskId)).get()
     return row ? createTaskMapper(database)(row) : undefined
   },
-  list: (workspaceId: string): Task[] =>
-    database
+  list: (workspaceId: string): Task[] => {
+    // 侧栏任务按最新关注事件降序，无关注事件回退创建时间；与 renderer 的
+    // applyChange 增量排序（compareTasksByAttention）保持同一规则。
+    const lastAttentionAt = sql`(select max(${taskAttentionEvents.createdAt}) from ${taskAttentionEvents} where ${taskAttentionEvents.taskId} = ${tasks.id})`
+    return database
       .select()
       .from(tasks)
       .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.lifecycle, 'active')))
-      .orderBy(asc(tasks.createdAt))
+      .orderBy(desc(sql`coalesce(${lastAttentionAt}, ${tasks.createdAt})`), desc(tasks.createdAt), tasks.id)
       .all()
-      .map(createTaskMapper(database)),
+      .map(createTaskMapper(database))
+  },
   listAll: (workspaceId: string): Task[] =>
     database
       .select()

@@ -59,6 +59,16 @@ afterEach((): void => {
 })
 
 describe('task row', (): void => {
+  it('shows a yellow dot for an unread task without emboldening the title', (): void => {
+    window.lithe = {} as unknown as LitheBridge
+    useTaskStore.setState({ launchesByTask: {} })
+
+    render(<TaskRow onOpen={vi.fn<() => void>()} task={{ ...task, isUnread: true }} />)
+
+    expect(screen.getByLabelText('未读')).toHaveClass('bg-unread')
+    expect(screen.getByTitle('Review')).not.toHaveClass('font-medium')
+  })
+
   it('offers stop only from the context menu while the Agent is running', async (): Promise<void> => {
     const runningTask = { ...task, agentStatus: 'running' as const }
     const stop = vi.fn<LitheBridge['agents']['stop']>().mockResolvedValue({ ...task, agentStatus: 'closed' })

@@ -33,6 +33,38 @@ describe('task store', (): void => {
     })
   })
 
+  it('keeps workspace tasks sorted by latest attention when a change event arrives', (): void => {
+    const older = { ...restoredTask, id: 'task-older', createdAt: new Date(1000) }
+    const newer = { ...restoredTask, id: 'task-newer', createdAt: new Date(2000) }
+    useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [newer, older] } })
+
+    useTaskStore.getState().applyChange({ ...older, lastAttentionAt: new Date(3000) })
+
+    expect(useTaskStore.getState().tasksByWorkspace['workspace-1']?.map((task): string => task.id)).toEqual([
+      'task-older',
+      'task-newer',
+    ])
+  })
+
+  it('inserts a task from a change event by attention order with creation fallback', (): void => {
+    const attended = {
+      ...restoredTask,
+      id: 'task-attended',
+      createdAt: new Date(1000),
+      lastAttentionAt: new Date(5000),
+    }
+    const newer = { ...restoredTask, id: 'task-newer', createdAt: new Date(2000) }
+    useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [attended, newer] } })
+
+    useTaskStore.getState().applyChange({ ...restoredTask, id: 'task-fresh', createdAt: new Date(3000) })
+
+    expect(useTaskStore.getState().tasksByWorkspace['workspace-1']?.map((task): string => task.id)).toEqual([
+      'task-attended',
+      'task-fresh',
+      'task-newer',
+    ])
+  })
+
   it('tracks the task currently visible in the workspace layout', (): void => {
     useTaskStore.getState().setVisibleTaskId(restoredTask.id)
     expect(useTaskStore.getState().visibleTaskId).toBe(restoredTask.id)
@@ -53,6 +85,17 @@ describe('task store', (): void => {
     expect(useTaskStore.getState().tasksByWorkspace['workspace-1']).toEqual([restoredTask])
   })
 
+  it('marks the task viewed when the user selects it', async (): Promise<void> => {
+    const idleTask = { ...restoredTask, agentStatus: 'idle' as const }
+    const markViewed = vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(idleTask)
+    window.lithe = { tasks: { markViewed } } as unknown as LitheBridge
+    useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [idleTask] } })
+
+    await useTaskStore.getState().activateTask(restoredTask.id)
+
+    expect(markViewed).toHaveBeenCalledWith(restoredTask.id)
+  })
+
   it('opens and starts a task that has no Agent session', async (): Promise<void> => {
     const task = { ...restoredTask, agentSessionId: null }
     const idleTask = { ...task, agentStatus: 'idle' as const }
@@ -66,7 +109,10 @@ describe('task store', (): void => {
       task: idleTask,
     }
     const start = vi.fn<LitheBridge['agents']['start']>().mockResolvedValue(launch)
-    window.lithe = { agents: { start } } as unknown as LitheBridge
+    window.lithe = {
+      agents: { start },
+      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+    } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [task] } })
 
     await useTaskStore.getState().activateTask(task.id)
@@ -88,7 +134,10 @@ describe('task store', (): void => {
       task: idleTask,
     }
     const resume = vi.fn<LitheBridge['agents']['resume']>().mockResolvedValue(launch)
-    window.lithe = { agents: { resume } } as unknown as LitheBridge
+    window.lithe = {
+      agents: { resume },
+      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+    } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [restoredTask] } })
 
     await useTaskStore.getState().activateTask(restoredTask.id)
@@ -109,7 +158,10 @@ describe('task store', (): void => {
     }
     const start = vi.fn<LitheBridge['agents']['start']>()
     const resume = vi.fn<LitheBridge['agents']['resume']>()
-    window.lithe = { agents: { resume, start } } as unknown as LitheBridge
+    window.lithe = {
+      agents: { resume, start },
+      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+    } as unknown as LitheBridge
     useTaskStore.setState({
       launchesByTask: { [restoredTask.id]: launch },
       tasksByWorkspace: { 'workspace-1': [idleTask] },
@@ -126,7 +178,10 @@ describe('task store', (): void => {
     const runningTask = { ...restoredTask, agentStatus: 'running' as const }
     const start = vi.fn<LitheBridge['agents']['start']>()
     const resume = vi.fn<LitheBridge['agents']['resume']>()
-    window.lithe = { agents: { resume, start } } as unknown as LitheBridge
+    window.lithe = {
+      agents: { resume, start },
+      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+    } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [runningTask] } })
 
     await useTaskStore.getState().activateTask(runningTask.id)
@@ -138,7 +193,10 @@ describe('task store', (): void => {
 
   it('clears an old activation error when the Agent CLI reports the task running', async (): Promise<void> => {
     const runningTask = { ...restoredTask, agentStatus: 'running' as const }
-    window.lithe = { agents: {} } as unknown as LitheBridge
+    window.lithe = {
+      agents: {},
+      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+    } as unknown as LitheBridge
     useTaskStore.setState({
       activationErrorsByTask: { [runningTask.id]: '工作区目录不存在' },
       tasksByWorkspace: { 'workspace-1': [runningTask] },
@@ -152,7 +210,10 @@ describe('task store', (): void => {
   it('keeps an activation failure on the task panel instead of the workspace', async (): Promise<void> => {
     const failure = new Error('工作区目录不存在')
     const resume = vi.fn<LitheBridge['agents']['resume']>().mockRejectedValue(failure)
-    window.lithe = { agents: { resume } } as unknown as LitheBridge
+    window.lithe = {
+      agents: { resume },
+      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
+    } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [restoredTask] } })
 
     await expect(useTaskStore.getState().activateTask(restoredTask.id)).rejects.toThrow('工作区目录不存在')
@@ -178,6 +239,7 @@ describe('task store', (): void => {
         resume,
         shouldRestore: vi.fn<LitheBridge['agents']['shouldRestore']>().mockResolvedValue(true),
       },
+      tasks: { markViewed: vi.fn<LitheBridge['tasks']['markViewed']>().mockResolvedValue(restoredTask) },
     } as unknown as LitheBridge
     useTaskStore.setState({ tasksByWorkspace: { 'workspace-1': [restoredTask] } })
 
