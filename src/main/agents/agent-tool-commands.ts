@@ -145,32 +145,28 @@ export const registerAgentToolCommands = ({
       return operation(taskId, context, payload)
     }
 
-  const instanceId = (context: ToolCommandContext, payload: Record<string, unknown>): string => {
-    if (context.authorization.kind === 'agent') {
-      const binding = capabilities.resolve(context.authorization.capability)
-      if (!binding) throw new TypeError('Capability is invalid or expired')
-      return binding.instanceId
-    }
-    return identifier(payload, 'instanceId')
-  }
-
   commands.register(
     'task.unread',
     taskStateOperation((taskId: string): Task => states.markUnread(taskId, isTaskVisible(taskId))),
   )
+  const currentAgentStateOperation =
+    (operation: (taskId: string) => Task): ((payload: Record<string, unknown>, context: ToolCommandContext) => Task) =>
+    (payload: Record<string, unknown>, context: ToolCommandContext): Task => {
+      if (context.authorization.kind !== 'agent') {
+        throw new TypeError('Task Agent state requires an Agent capability')
+      }
+      if (Object.keys(payload).length > 0) throw new TypeError('Task Agent state commands do not accept parameters')
+      const binding = capabilities.resolve(context.authorization.capability)
+      if (!binding) throw new TypeError('Capability is invalid or expired')
+      return operation(binding.taskId)
+    }
   commands.register(
     'task.running',
-    taskStateOperation(
-      (taskId: string, context: ToolCommandContext, payload: Record<string, unknown>): Task =>
-        states.markRunning(taskId, instanceId(context, payload)),
-    ),
+    currentAgentStateOperation((taskId: string): Task => states.markRunning(taskId)),
   )
   commands.register(
     'task.idle',
-    taskStateOperation(
-      (taskId: string, context: ToolCommandContext, payload: Record<string, unknown>): Task =>
-        states.markIdle(taskId, instanceId(context, payload)),
-    ),
+    currentAgentStateOperation((taskId: string): Task => states.markIdle(taskId)),
   )
   commands.register(
     'task.archive',

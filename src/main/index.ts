@@ -167,7 +167,6 @@ const deleteManagedTask = async (task: Task): Promise<void> => {
   }
 
   agentManager?.stop(task.id)
-  appDatabase.tasks.clearRunMarks(task.id)
   mkdirSync(scratchTrashStagingRoot, { recursive: true })
   const originalPath = assertScratchPath(workspace.rootPath)
   const jobDirectory = assertStagedScratchPath(join(scratchTrashStagingRoot, randomUUID()))
@@ -296,8 +295,7 @@ const openMainWindow = async (): Promise<void> => {
     capabilities: toolControlRuntime.capabilities,
     controlDiscoveryPath,
     database: appDatabase,
-    onInstanceExit: appDatabase.tasks.clearInstanceRunMark,
-    onTaskBound: (task): void => mainWindow?.webContents.send(ipcChannels.taskChanged, task),
+    onTaskChanged: (task): void => mainWindow?.webContents.send(ipcChannels.taskChanged, task),
     runtime: ptyRuntime,
   })
   const taskService = createTaskService({
@@ -330,6 +328,10 @@ const openMainWindow = async (): Promise<void> => {
     database: appDatabase,
     inspectAvailability: inspectAdapterAvailability,
     manager: agentManager,
+    removeTaskPanel: (workspaceId: string, taskId: string): void => {
+      appDatabase?.workspaceLayouts.removeTaskPanel?.(workspaceId, taskId)
+      mainWindow?.webContents.send(ipcChannels.taskChanged, { panelRemovedTaskId: taskId, workspaceId })
+    },
     removeScratchWorkspace: (workspace): void => {
       removeScratchDirectory(workspace.rootPath)
       appDatabase?.projects.deleteWorkspace(workspace.id)
@@ -343,11 +345,8 @@ const openMainWindow = async (): Promise<void> => {
     changed: (event): void => {
       mainWindow?.webContents.send(ipcChannels.taskChanged, event)
     },
-    clearRunMarks: appDatabase.tasks.clearRunMarks,
     deleteTask: appDatabase.tasks.delete,
     get: appDatabase.tasks.get,
-    markIdle: appDatabase.tasks.markIdle,
-    markRunning: appDatabase.tasks.markRunning,
     markViewed: appDatabase.tasks.markViewed,
     notify: (task): void => {
       if (!appDatabase?.preferences.getNotificationsEnabled() || !Notification.isSupported()) return
@@ -386,6 +385,7 @@ const openMainWindow = async (): Promise<void> => {
       appDatabase?.workspaceLayouts.removeTaskPanel?.(workspaceId, taskId)
     },
     restore: appDatabase.tasks.restore,
+    setAgentStatus: appDatabase.tasks.setAgentStatus,
     stopAgent: agentManager.stop,
   })
   const requestDeleteApproval = createTaskDeleteApproval({
@@ -487,7 +487,7 @@ if (!app.requestSingleInstanceLock()) {
       })
       windowStatePersistence = createWindowStatePersistence(appDatabase.windowState.save)
       const previousExitWasClean = appDatabase.preferences.getLastExitClean()
-      if (!previousExitWasClean) appDatabase.tasks.clearAllRunMarks()
+      appDatabase.tasks.resetAgentStatuses()
       appDatabase.preferences.setLastExitClean(false)
       if (!previousExitWasClean) {
         const result = await dialog.showMessageBox({
@@ -559,9 +559,6 @@ if (!app.requestSingleInstanceLock()) {
         commitFiles = (): void => commitDiscardedDrafts(fileService, fileQuit)
         await ptyRuntime?.closeAll()
         exitCommitted = true
-        for (const task of runningTasks) {
-          appDatabase?.tasks.clearRunMarks(task.id)
-        }
         if (mainWindow) windowStatePersistence?.flush(mainWindow)
         else windowStatePersistence?.cancel()
         await closeRendererWindow(mainWindow)

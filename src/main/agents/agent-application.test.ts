@@ -11,10 +11,10 @@ const source: Task = {
   workspaceId: 'workspace-1',
   name: 'Review',
   adapterVersionId: 'adapter-v1',
+  agentStatus: 'idle',
   agentSessionId: 'provider-1',
   archivedAt: null,
   createdAt: new Date(0),
-  isRunning: false,
   isUnread: false,
   lifecycle: 'active',
   lastAttentionAt: null,
@@ -68,7 +68,7 @@ describe('Agent application', (): void => {
   })
 
   it('rejects Fork while the source task is running', async (): Promise<void> => {
-    const runningSource = { ...source, isRunning: true }
+    const runningSource = { ...source, agentStatus: 'running' as const }
     const application = createAgentApplication({
       database: {
         adapters: { getVersion: (): AdapterVersion => adapter },
@@ -83,5 +83,72 @@ describe('Agent application', (): void => {
     })
 
     await expect(application.fork(source.id)).rejects.toThrow('Running task cannot be forked')
+  })
+
+  it('removes an incomplete fork when its Code Agent cannot start', async (): Promise<void> => {
+    const forked = { ...source, id: 'task-2', agentStatus: 'closed' as const, agentSessionId: null }
+    const deleteTask = vi.fn<(taskId: string) => void>()
+    const application = createAgentApplication({
+      database: {
+        adapters: { getVersion: (): AdapterVersion => adapter },
+        tasks: { delete: deleteTask, get: (): Task => source },
+      } as unknown as AppDatabase,
+      inspectAvailability: async (): Promise<{ forkAvailable: boolean; resumeAvailable: boolean }> => ({
+        forkAvailable: true,
+        resumeAvailable: true,
+      }),
+      manager: {
+        launch: vi.fn<AgentManager['launch']>().mockReturnValue({
+          args: [],
+          cwd: 'D:\\projects\\lithe',
+          error: 'spawn failed',
+          executable: 'agent',
+          isOpen: false,
+          sessionId: 'agent:task-2',
+          task: forked,
+        }),
+      } as unknown as AgentManager,
+      tasks: {
+        createPinned: vi.fn<TaskService['createPinned']>().mockReturnValue(forked),
+      } as unknown as TaskService,
+    })
+
+    await expect(application.fork(source.id)).rejects.toThrow('spawn failed')
+    expect(deleteTask).toHaveBeenCalledWith(forked.id)
+  })
+
+  it('stops the Code Agent and removes its panel', (): void => {
+    const closed = { ...source, agentStatus: 'closed' as const }
+    const removeTaskPanel = vi.fn<(workspaceId: string, taskId: string) => void>()
+    const application = createAgentApplication({
+      database: { tasks: { get: (): Task => source } } as unknown as AppDatabase,
+      inspectAvailability: vi.fn<() => Promise<{ forkAvailable: boolean; resumeAvailable: boolean }>>(),
+      manager: {
+        stop: vi.fn<AgentManager['stop']>().mockReturnValue(closed),
+      } as unknown as AgentManager,
+      removeTaskPanel,
+      tasks: {} as TaskService,
+    })
+
+    expect(application.stop(source.id)).toEqual(closed)
+    expect(removeTaskPanel).toHaveBeenCalledWith(source.workspaceId, source.id)
+  })
+
+  it('keeps the panel when stopping the Code Agent fails', (): void => {
+    const removeTaskPanel = vi.fn<(workspaceId: string, taskId: string) => void>()
+    const application = createAgentApplication({
+      database: { tasks: { get: (): Task => source } } as unknown as AppDatabase,
+      inspectAvailability: vi.fn<() => Promise<{ forkAvailable: boolean; resumeAvailable: boolean }>>(),
+      manager: {
+        stop: vi.fn<AgentManager['stop']>().mockImplementation((): never => {
+          throw new Error('close failed')
+        }),
+      } as unknown as AgentManager,
+      removeTaskPanel,
+      tasks: {} as TaskService,
+    })
+
+    expect(() => application.stop(source.id)).toThrow('close failed')
+    expect(removeTaskPanel).not.toHaveBeenCalled()
   })
 })

@@ -10,10 +10,10 @@ interface AgentPanelProps {
   task: Task
 }
 
-const AgentTerminal = ({ config, isRunning }: { config: AgentPanelConfig; isRunning: boolean }): React.JSX.Element => {
+const AgentTerminal = ({ config, isOpen }: { config: AgentPanelConfig; isOpen: boolean }): React.JSX.Element => {
   return (
-    <div className="min-h-0 flex-1 bg-[#111318] p-1" data-agent-id={config.taskId} data-agent-ready={isRunning}>
-      <TerminalView exitLabel="Agent 已退出" interactive={isRunning} lifetime="task" panelId={config.panelId} />
+    <div className="min-h-0 flex-1 bg-[#111318] p-1" data-agent-id={config.taskId} data-agent-ready={isOpen}>
+      <TerminalView exitLabel="Agent 已退出" interactive={isOpen} lifetime="task" panelId={config.panelId} />
     </div>
   )
 }
@@ -23,7 +23,7 @@ export const AgentPanel = ({ config, task }: AgentPanelProps): React.JSX.Element
   const autoRestoreTask = useTaskStore((state: TaskState) => state.autoRestoreTask)
   const launch = useTaskStore((state: TaskState) => state.launchesByTask[task.id])
   const error = launch?.error ?? activationError
-  const isRunning = launch?.isRunning ?? task.isRunning ?? false
+  const isOpen = task.agentStatus !== 'closed'
   const restoreAttempted = useRef(false)
   useEffect((): void => {
     if (restoreAttempted.current || launch || task.lifecycle !== 'active' || !task.shouldAutoRestore) return
@@ -33,7 +33,7 @@ export const AgentPanel = ({ config, task }: AgentPanelProps): React.JSX.Element
 
   return (
     <div className="relative flex size-full min-h-0 flex-col overflow-hidden">
-      <AgentTerminal config={config} isRunning={isRunning} />
+      <AgentTerminal config={config} isOpen={isOpen} />
       {error ? (
         <div className="bg-destructive/10 text-destructive pointer-events-none absolute inset-x-3 top-3 rounded-md px-3 py-2 text-xs">
           {error}

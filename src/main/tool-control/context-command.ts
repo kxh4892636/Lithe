@@ -40,8 +40,8 @@ const mapContext = (
           gitBranch: workspace.gitBranch,
           kind: workspace.kind,
           tasks: listTasks(workspace.id).map((task: Task) => ({
+            agentStatus: task.agentStatus,
             id: task.id,
-            isRunning: task.isRunning ?? false,
             isUnread: task.isUnread ?? false,
             lifecycle: task.lifecycle ?? 'active',
             name: task.name,
@@ -58,8 +58,8 @@ const mapContext = (
       gitBranch: workspace.gitBranch,
       kind: workspace.kind,
       tasks: listTasks(workspace.id).map((task: Task) => ({
+        agentStatus: task.agentStatus,
         id: task.id,
-        isRunning: task.isRunning ?? false,
         isUnread: task.isUnread ?? false,
         lifecycle: task.lifecycle ?? 'active',
         name: task.name,

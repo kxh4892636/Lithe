@@ -76,6 +76,7 @@ interface TaskRowProps {
 
 interface TaskActionsProps {
   archive: () => void
+  canStop: boolean
   fork: () => void
   forkDisabledReason: string | null
   isRunning: boolean
@@ -158,13 +159,12 @@ const TaskToolbar = (props: TaskToolbarProps): React.JSX.Element => {
   const { archive, containerRef, fork, forkDisabledReason, isRunning, taskName } = props
   return (
     <div
-      className="invisible absolute top-1/2 right-1 z-10 flex -translate-y-1/2 items-center group-focus-within/task:visible group-hover/task:visible"
+      className="invisible absolute top-1/2 right-0 z-10 flex -translate-y-1/2 items-center group-focus-within/task:visible group-hover/task:visible"
       data-slot="task-actions"
       ref={containerRef}
     >
       <Button
         aria-label={`Fork ${taskName}`}
-        className="hover:bg-transparent"
         disabled={forkDisabledReason !== null}
         onClick={fork}
         size="icon-xs"
@@ -175,7 +175,6 @@ const TaskToolbar = (props: TaskToolbarProps): React.JSX.Element => {
       </Button>
       <Button
         aria-label={`归档 ${taskName}`}
-        className="hover:bg-transparent"
         disabled={isRunning}
         onClick={archive}
         size="icon-xs"
@@ -189,7 +188,7 @@ const TaskToolbar = (props: TaskToolbarProps): React.JSX.Element => {
 }
 
 const TaskContextMenu = (props: TaskActionsProps): React.JSX.Element => {
-  const { archive, fork, forkDisabledReason, isRunning, onRename, stop } = props
+  const { archive, canStop, fork, forkDisabledReason, isRunning, onRename, stop } = props
   return (
     <ContextMenuContent className="[&_svg]:size-3">
       <ContextMenuItem onClick={onRename}>
@@ -200,7 +199,7 @@ const TaskContextMenu = (props: TaskActionsProps): React.JSX.Element => {
         <GitForkIcon className="size-3" />
         Fork
       </ContextMenuItem>
-      {isRunning ? (
+      {canStop ? (
         <ContextMenuItem onClick={stop}>
           <SquareIcon className="size-3" />
           停止
@@ -218,11 +217,11 @@ const TaskContextMenu = (props: TaskActionsProps): React.JSX.Element => {
 export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Element => {
   const archiveTask = useTaskStore((state: TaskState) => state.archiveTask)
   const forkTask = useTaskStore((state: TaskState) => state.forkTask)
-  const launch = useTaskStore((state: TaskState) => state.launchesByTask[task.id])
   const stopTask = useTaskStore((state: TaskState) => state.stopTask)
   const actionsRef = useRef<HTMLDivElement>(null)
   const [renaming, setRenaming] = useState(false)
-  const isRunning = launch?.isRunning ?? task.isRunning
+  const isRunning = task.agentStatus === 'running'
+  const canStop = task.agentStatus !== 'closed'
   const forkDisabledReason = isRunning
     ? '请先停止任务'
     : !task.agentSessionId
@@ -246,10 +245,18 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
             onClick={onOpen}
             type="button"
           >
-            {isRunning ? (
-              <CircleIcon className="size-3 shrink-0 fill-emerald-500 text-emerald-500" />
+            {task.agentStatus === 'running' ? (
+              <span aria-label="运行中" title="运行中">
+                <CircleIcon aria-hidden className="size-3 shrink-0 fill-emerald-500 text-emerald-500" />
+              </span>
+            ) : task.agentStatus === 'idle' ? (
+              <span aria-label="空闲" title="空闲">
+                <CircleIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+              </span>
             ) : (
-              <BotIcon className="size-3 shrink-0" />
+              <span aria-label="关闭" title="关闭">
+                <BotIcon aria-hidden className="size-3 shrink-0" />
+              </span>
             )}
             <Badge className="h-4 shrink-0 px-1 text-xs" variant="secondary">
               {adapter?.name ?? 'agent'}
@@ -259,6 +266,7 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
           </button>
           <TaskToolbar
             archive={archive}
+            canStop={canStop}
             containerRef={actionsRef}
             fork={fork}
             forkDisabledReason={forkDisabledReason}
@@ -270,6 +278,7 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
         </ContextMenuTrigger>
         <TaskContextMenu
           archive={archive}
+          canStop={canStop}
           fork={fork}
           forkDisabledReason={forkDisabledReason}
           isRunning={isRunning}

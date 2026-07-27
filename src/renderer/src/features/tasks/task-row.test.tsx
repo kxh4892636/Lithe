@@ -10,10 +10,10 @@ const task: Task = {
   workspaceId: 'workspace-1',
   name: 'Review',
   adapterVersionId: 'adapter-v1',
+  agentStatus: 'closed',
   agentSessionId: 'session-1',
   archivedAt: null,
   createdAt: new Date(0),
-  isRunning: false,
   isUnread: false,
   lifecycle: 'active',
   lastAttentionAt: null,
@@ -26,7 +26,7 @@ const launch: AgentLaunch = {
   cwd: 'D:\\projects\\lithe',
   error: null,
   executable: 'agent',
-  isRunning: true,
+  isOpen: true,
   sessionId: 'agent:task-1',
   task,
 }
@@ -60,12 +60,14 @@ afterEach((): void => {
 
 describe('task row', (): void => {
   it('offers stop only from the context menu while the Agent is running', async (): Promise<void> => {
-    const stop = vi.fn<LitheBridge['agents']['stop']>().mockResolvedValue(undefined)
+    const runningTask = { ...task, agentStatus: 'running' as const }
+    const stop = vi.fn<LitheBridge['agents']['stop']>().mockResolvedValue({ ...task, agentStatus: 'closed' })
     window.lithe = { agents: { stop } } as unknown as LitheBridge
-    useTaskStore.setState({ launchesByTask: { [task.id]: launch } })
+    useTaskStore.setState({ launchesByTask: { [task.id]: { ...launch, task: runningTask } } })
 
-    render(<TaskRow adapter={adapter} onOpen={vi.fn<() => void>()} task={task} />)
+    render(<TaskRow adapter={adapter} onOpen={vi.fn<() => void>()} task={runningTask} />)
 
+    expect(screen.getByLabelText('运行中')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '停止' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Fork Review' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Fork Review' })).toHaveAttribute('title', '请先停止任务')
@@ -75,6 +77,35 @@ describe('task row', (): void => {
     fireEvent.click(await screen.findByRole('menuitem', { name: '停止' }))
 
     await waitFor((): void => expect(stop).toHaveBeenCalledWith(task.id))
+  })
+
+  it('shows idle separately and allows stop, Fork, and archive', async (): Promise<void> => {
+    const idleTask = { ...task, agentStatus: 'idle' as const }
+    window.lithe = { agents: { stop: vi.fn<LitheBridge['agents']['stop']>() } } as unknown as LitheBridge
+    useTaskStore.setState({ launchesByTask: {} })
+
+    render(<TaskRow adapter={adapter} onOpen={vi.fn<() => void>()} task={idleTask} />)
+
+    expect(screen.getByLabelText('空闲')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Fork Review' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '归档 Review' })).toBeEnabled()
+    const taskButton = screen.getByTitle('Review').closest('button')
+    if (!taskButton) throw new Error('任务按钮未渲染')
+    fireEvent.contextMenu(taskButton)
+    expect(await screen.findByRole('menuitem', { name: '停止' })).toBeInTheDocument()
+  })
+
+  it('uses the Bot icon for a closed task without a stop action', async (): Promise<void> => {
+    window.lithe = {} as unknown as LitheBridge
+    useTaskStore.setState({ launchesByTask: {} })
+
+    render(<TaskRow adapter={adapter} onOpen={vi.fn<() => void>()} task={task} />)
+
+    expect(screen.getByLabelText('关闭')).toBeInTheDocument()
+    const taskButton = screen.getByTitle('Review').closest('button')
+    if (!taskButton) throw new Error('任务按钮未渲染')
+    fireEvent.contextMenu(taskButton)
+    expect(screen.queryByRole('menuitem', { name: '停止' })).not.toBeInTheDocument()
   })
 
   it('keeps unsupported Fork visible with an actionable reason', (): void => {

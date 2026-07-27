@@ -7,9 +7,10 @@ import {
   parseAdapterDefinition,
   type AdapterDefinition,
   type AdapterVersion,
+  type AgentStatus,
   type Task,
 } from '../../shared/agent-contract'
-import { adapterVersions, adapters, appPreferences, taskAttentionEvents, taskRunMarkers, tasks } from './schema'
+import { adapterVersions, adapters, appPreferences, taskAttentionEvents, tasks } from './schema'
 
 type Database = ReturnType<typeof drizzle>
 
@@ -30,21 +31,18 @@ export interface TaskRepository {
   add: (task: Task) => void
   archive: (taskId: string, archivedAt: Date) => Task
   bindSession: (taskId: string, sessionId: string) => Task
-  clearInstanceRunMark: (instanceId: string) => void
-  clearAllRunMarks: () => void
-  clearRunMarks: (taskId: string) => void
   delete: (taskId: string) => void
   get: (taskId: string) => Task | undefined
   list: (workspaceId: string) => Task[]
   listAll: (workspaceId: string) => Task[]
   listArchived: () => Task[]
   listRunning: () => Task[]
-  markIdle: (taskId: string, instanceId: string) => Task
-  markRunning: (taskId: string, instanceId: string, createdAt: Date) => Task
   markViewed: (taskId: string, viewedAt: Date) => Task
   recordAttention: (taskId: string, eventId: string, createdAt: Date) => Task
   rename: (taskId: string, name: string) => Task
+  resetAgentStatuses: () => void
   restore: (taskId: string) => Task
+  setAgentStatus: (taskId: string, status: AgentStatus) => Task
   setAutoRestore?: (taskId: string, value: boolean) => void
 }
 
@@ -70,20 +68,15 @@ const createTaskMapper =
       .where(eq(taskAttentionEvents.taskId, row.id))
       .orderBy(desc(taskAttentionEvents.createdAt))
       .get()
-    const running = database
-      .select({ instanceId: taskRunMarkers.instanceId })
-      .from(taskRunMarkers)
-      .where(eq(taskRunMarkers.taskId, row.id))
-      .get()
     return {
       id: row.id,
       workspaceId: row.workspaceId,
       name: row.name,
       adapterVersionId: row.adapterVersionId,
+      agentStatus: row.agentStatus,
       agentSessionId: row.agentSessionId,
       archivedAt: row.archivedAt,
       createdAt: row.createdAt,
-      isRunning: Boolean(running),
       isUnread: Boolean(attention && (!row.lastViewedAt || attention.createdAt > row.lastViewedAt)),
       lifecycle: row.lifecycle,
       lastAttentionAt: attention?.createdAt ?? null,
@@ -290,6 +283,7 @@ export const createTaskRepository = (database: Database): TaskRepository => ({
         name: task.name,
         nameKey: task.name.trim().toLocaleLowerCase(),
         adapterVersionId: task.adapterVersionId,
+        agentStatus: task.agentStatus,
         agentSessionId: task.agentSessionId,
         lifecycle: task.lifecycle,
         archivedAt: task.archivedAt,
@@ -302,7 +296,7 @@ export const createTaskRepository = (database: Database): TaskRepository => ({
   archive: (taskId: string, archivedAt: Date): Task => {
     database
       .update(tasks)
-      .set({ lifecycle: 'archived', archivedAt, shouldAutoRestore: false })
+      .set({ agentStatus: 'closed', lifecycle: 'archived', archivedAt, shouldAutoRestore: false })
       .where(eq(tasks.id, taskId))
       .run()
     const row = database.select().from(tasks).where(eq(tasks.id, taskId)).get()
@@ -323,15 +317,6 @@ export const createTaskRepository = (database: Database): TaskRepository => ({
     const bound = database.select().from(tasks).where(eq(tasks.id, taskId)).get()
     if (!bound) throw new Error('Task binding was not persisted')
     return createTaskMapper(database)(bound)
-  },
-  clearInstanceRunMark: (instanceId: string): void => {
-    database.delete(taskRunMarkers).where(eq(taskRunMarkers.instanceId, instanceId)).run()
-  },
-  clearAllRunMarks: (): void => {
-    database.delete(taskRunMarkers).run()
-  },
-  clearRunMarks: (taskId: string): void => {
-    database.delete(taskRunMarkers).where(eq(taskRunMarkers.taskId, taskId)).run()
   },
   delete: (taskId: string): void => {
     database.delete(tasks).where(eq(tasks.id, taskId)).run()
@@ -364,38 +349,8 @@ export const createTaskRepository = (database: Database): TaskRepository => ({
       .orderBy(desc(tasks.archivedAt))
       .all()
       .map(createTaskMapper(database)),
-  listRunning: (): Task[] => {
-    const taskIds = new Set(
-      database
-        .select({ taskId: taskRunMarkers.taskId })
-        .from(taskRunMarkers)
-        .all()
-        .map((row) => row.taskId),
-    )
-    return database
-      .select()
-      .from(tasks)
-      .all()
-      .filter((row): boolean => taskIds.has(row.id))
-      .map(createTaskMapper(database))
-  },
-  markIdle: (taskId: string, instanceId: string): Task => {
-    database
-      .delete(taskRunMarkers)
-      .where(and(eq(taskRunMarkers.taskId, taskId), eq(taskRunMarkers.instanceId, instanceId)))
-      .run()
-    const row = database.select().from(tasks).where(eq(tasks.id, taskId)).get()
-    if (!row) throw new TypeError('Task does not exist')
-    return createTaskMapper(database)(row)
-  },
-  markRunning: (taskId: string, instanceId: string, createdAt: Date): Task => {
-    const existing = database.select().from(taskRunMarkers).where(eq(taskRunMarkers.instanceId, instanceId)).get()
-    if (existing && existing.taskId !== taskId) throw new TypeError('CLI instance is already bound to another task')
-    database.insert(taskRunMarkers).values({ instanceId, taskId, createdAt }).onConflictDoNothing().run()
-    const row = database.select().from(tasks).where(eq(tasks.id, taskId)).get()
-    if (!row) throw new TypeError('Task does not exist')
-    return createTaskMapper(database)(row)
-  },
+  listRunning: (): Task[] =>
+    database.select().from(tasks).where(eq(tasks.agentStatus, 'running')).all().map(createTaskMapper(database)),
   markViewed: (taskId: string, viewedAt: Date): Task => {
     database.update(tasks).set({ lastViewedAt: viewedAt }).where(eq(tasks.id, taskId)).run()
     const row = database.select().from(tasks).where(eq(tasks.id, taskId)).get()
@@ -414,8 +369,17 @@ export const createTaskRepository = (database: Database): TaskRepository => ({
     if (!renamed) throw new TypeError('Task does not exist')
     return createTaskMapper(database)(renamed)
   },
+  resetAgentStatuses: (): void => {
+    database.update(tasks).set({ agentStatus: 'closed' }).run()
+  },
   restore: (taskId: string): Task => {
     database.update(tasks).set({ lifecycle: 'active', archivedAt: null }).where(eq(tasks.id, taskId)).run()
+    const row = database.select().from(tasks).where(eq(tasks.id, taskId)).get()
+    if (!row) throw new TypeError('Task does not exist')
+    return createTaskMapper(database)(row)
+  },
+  setAgentStatus: (taskId: string, status: AgentStatus): Task => {
+    database.update(tasks).set({ agentStatus: status }).where(eq(tasks.id, taskId)).run()
     const row = database.select().from(tasks).where(eq(tasks.id, taskId)).get()
     if (!row) throw new TypeError('Task does not exist')
     return createTaskMapper(database)(row)

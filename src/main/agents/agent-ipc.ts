@@ -155,9 +155,9 @@ export const registerAgentIpc = ({
     assertTrustedSender(event, window)
     return application.resume(assertIdentifier(taskId))
   })
-  ipcMain.handle(ipcChannels.agentStop, (event: IpcMainInvokeEvent, taskId: unknown): void => {
+  ipcMain.handle(ipcChannels.agentStop, (event: IpcMainInvokeEvent, taskId: unknown): Task => {
     assertTrustedSender(event, window)
-    application.stop(assertIdentifier(taskId))
+    return application.stop(assertIdentifier(taskId))
   })
   ipcMain.handle(ipcChannels.agentFork, async (event: IpcMainInvokeEvent, taskId: unknown): Promise<AgentLaunch> => {
     assertTrustedSender(event, window)

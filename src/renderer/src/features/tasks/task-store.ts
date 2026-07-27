@@ -11,6 +11,7 @@ export interface TaskState {
   launchesByTask: Record<string, AgentLaunch>
   openTaskAfterId: string | null
   openTaskId: string | null
+  panelRemovals: Array<{ taskId: string; workspaceId: string }>
   tasksByWorkspace: Record<string, Task[]>
   activateTask: (taskId: string) => Promise<AgentLaunch | undefined>
   autoRestoreTask: (taskId: string) => Promise<AgentLaunch | undefined>
@@ -18,6 +19,7 @@ export interface TaskState {
   addBackgroundLaunch: (event: BackgroundAgentLaunch) => void
   applyChange: (event: TaskChangeEvent) => void
   clearOpenTask: () => void
+  consumePanelRemovals: (workspaceId: string) => void
   createTask: (workspaceId: string, name: string, adapterId?: string) => Promise<AgentLaunch>
   forkTask: (taskId: string) => Promise<AgentLaunch>
   archiveTask: (taskId: string) => Promise<void>
@@ -55,7 +57,7 @@ const launchAgentTask = (
       return undefined
     }
     const currentLaunch = state.launchesByTask[taskId]
-    if (currentLaunch?.isRunning || task.isRunning) {
+    if (task.agentStatus !== 'closed') {
       set(
         (current): Partial<TaskState> => ({
           activationErrorsByTask: { ...current.activationErrorsByTask, [taskId]: null },
@@ -97,7 +99,10 @@ type TaskStoreGet = StoreApi<TaskState>['getState']
 const createActivationActions = (
   set: TaskStoreSet,
   get: TaskStoreGet,
-): Pick<TaskState, 'activateTask' | 'addBackgroundLaunch' | 'addLaunch' | 'autoRestoreTask' | 'clearOpenTask'> => ({
+): Pick<
+  TaskState,
+  'activateTask' | 'addBackgroundLaunch' | 'addLaunch' | 'autoRestoreTask' | 'clearOpenTask' | 'consumePanelRemovals'
+> => ({
   activateTask: async (taskId: string): Promise<AgentLaunch | undefined> => {
     set({ openTaskAfterId: null, openTaskId: taskId })
     return launchAgentTask(taskId, set, get)
@@ -122,6 +127,13 @@ const createActivationActions = (
   },
   clearOpenTask: (): void => {
     set({ openTaskAfterId: null, openTaskId: null })
+  },
+  consumePanelRemovals: (workspaceId: string): void => {
+    set(
+      (state): Partial<TaskState> => ({
+        panelRemovals: state.panelRemovals.filter((removal): boolean => removal.workspaceId !== workspaceId),
+      }),
+    )
   },
   addBackgroundLaunch: (event: BackgroundAgentLaunch): void => {
     set((state): Partial<TaskState> => {
@@ -154,6 +166,17 @@ const createTaskChangeAction = (set: TaskStoreSet): Pick<TaskState, 'applyChange
               (task: Task): boolean => task.id !== event.deletedTaskId,
             ),
           },
+        }
+      }
+      if ('panelRemovedTaskId' in event) {
+        return {
+          panelRemovals: [
+            ...state.panelRemovals.filter(
+              (removal): boolean =>
+                removal.taskId !== event.panelRemovedTaskId || removal.workspaceId !== event.workspaceId,
+            ),
+            { taskId: event.panelRemovedTaskId, workspaceId: event.workspaceId },
+          ],
         }
       }
       const workspaceTasks = state.tasksByWorkspace[event.workspaceId] ?? []
@@ -221,14 +244,25 @@ const createAgentMutationActions = (set: TaskStoreSet): Pick<TaskState, 'createT
   },
   stopTask: async (taskId: string): Promise<void> => {
     try {
-      await window.lithe.agents.stop(taskId)
+      const stopped = await window.lithe.agents.stop(taskId)
       set((state): Partial<TaskState> => {
         const launch = state.launchesByTask[taskId]
+        const tasks = state.tasksByWorkspace[stopped.workspaceId] ?? []
         return {
           error: null,
           launchesByTask: launch
-            ? { ...state.launchesByTask, [taskId]: { ...launch, error: null, isRunning: false } }
+            ? { ...state.launchesByTask, [taskId]: { ...launch, error: null, isOpen: false, task: stopped } }
             : state.launchesByTask,
+          panelRemovals: [
+            ...state.panelRemovals.filter(
+              (removal): boolean => removal.taskId !== taskId || removal.workspaceId !== stopped.workspaceId,
+            ),
+            { taskId, workspaceId: stopped.workspaceId },
+          ],
+          tasksByWorkspace: {
+            ...state.tasksByWorkspace,
+            [stopped.workspaceId]: upsertTask(tasks, stopped),
+          },
         }
       })
     } catch (error: unknown) {
@@ -361,6 +395,7 @@ export const useTaskStore = create<TaskState>(
     launchesByTask: {},
     openTaskAfterId: null,
     openTaskId: null,
+    panelRemovals: [],
     tasksByWorkspace: {},
     ...createActivationActions(set, get),
     ...createTaskChangeAction(set),

@@ -9,6 +9,7 @@ interface AgentApplicationOptions {
   createScratchWorkspace?: () => Workspace
   inspectAvailability: (adapter: AdapterVersion) => Promise<{ forkAvailable: boolean; resumeAvailable: boolean }>
   manager: AgentManager
+  removeTaskPanel?: (workspaceId: string, taskId: string) => void
   removeScratchWorkspace?: (workspace: Workspace) => void
   tasks: TaskService
 }
@@ -19,7 +20,7 @@ export interface AgentApplication {
   renameTask: (taskId: string, name: string) => Task
   resume: (taskId: string) => Promise<AgentLaunch>
   start: (taskId: string) => AgentLaunch
-  stop: (taskId: string) => void
+  stop: (taskId: string) => Task
 }
 
 export const createAgentApplication = ({
@@ -29,6 +30,7 @@ export const createAgentApplication = ({
   },
   inspectAvailability,
   manager,
+  removeTaskPanel = (): void => undefined,
   removeScratchWorkspace = (): void => undefined,
   tasks,
 }: AgentApplicationOptions): AgentApplication => ({
@@ -45,7 +47,7 @@ export const createAgentApplication = ({
   fork: async (taskId: string): Promise<AgentLaunch> => {
     const source = database.tasks.get(taskId)
     if (!source) throw new TypeError('Task does not exist')
-    if (source.isRunning) throw new TypeError('Running task cannot be forked')
+    if (source.agentStatus === 'running') throw new TypeError('Running task cannot be forked')
     if (!source.agentSessionId) throw new TypeError('Task Agent session is not bound')
     const adapter = database.adapters.getVersion(source.adapterVersionId)
     if (!adapter?.definition.fork) throw new TypeError('Adapter does not support fork')
@@ -53,7 +55,10 @@ export const createAgentApplication = ({
       throw new TypeError('Installed Adapter version does not support fork')
     }
     const forked = tasks.createPinned({ workspaceId: source.workspaceId, name: source.name }, source.adapterVersionId)
-    return manager.launch(forked.id, 'fork', source.agentSessionId)
+    const launch = manager.launch(forked.id, 'fork', source.agentSessionId)
+    if (!launch.error) return launch
+    database.tasks.delete(forked.id)
+    throw new TypeError(launch.error)
   },
   renameTask: (taskId: string, name: string): Task => {
     const task = database.tasks.get(taskId)
@@ -70,5 +75,9 @@ export const createAgentApplication = ({
     return manager.launch(taskId, 'resume')
   },
   start: (taskId: string): AgentLaunch => manager.launch(taskId, 'start'),
-  stop: (taskId: string): void => manager.stop(taskId),
+  stop: (taskId: string): Task => {
+    const stopped = manager.stop(taskId)
+    removeTaskPanel(stopped.workspaceId, stopped.id)
+    return stopped
+  },
 })

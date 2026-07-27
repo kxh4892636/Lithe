@@ -45,7 +45,7 @@ export const createWorkspaceLifecycle = (options: WorkspaceLifecycleOptions): Wo
     hasRunningTasks: (workspaceId: string): boolean =>
       options.database.tasks
         .listAll(workspaceId)
-        .some((task): boolean => task.isRunning || options.getAgentManager()?.isRunning(task.id) === true),
+        .some((task): boolean => task.agentStatus !== 'closed' || options.getAgentManager()?.isOpen(task.id) === true),
     now: (): Date => new Date(),
     recovery: createWorkspaceRecoveryStore(worktreeRoot),
     removeProject: options.database.projects.remove,

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import type { AgentStatus } from './agent-contract'
+
 export const toolProtocolVersion = 1 as const
 export const toolMessageMaxBytes = 64 * 1024
 
@@ -38,8 +40,8 @@ export interface ToolContextWorkspace {
 }
 
 export interface ToolContextTask {
+  agentStatus: AgentStatus
   id: string
-  isRunning?: boolean
   isUnread?: boolean
   lifecycle?: 'active' | 'archived'
   name: string
@@ -97,8 +99,8 @@ const toolJsonSchema: z.ZodType<ToolJson> = z.lazy(() =>
 )
 const toolContextTaskSchema = z
   .object({
+    agentStatus: z.enum(['closed', 'idle', 'running']),
     id: z.string(),
-    isRunning: z.boolean().optional(),
     isUnread: z.boolean().optional(),
     lifecycle: z.enum(['active', 'archived']).optional(),
     name: z.string(),

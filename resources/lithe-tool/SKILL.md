@@ -30,8 +30,8 @@ Available task commands:
 - `lithe-tool task create --name <name>` (create a managed temporary workspace)
 - `lithe-tool task rename --task-id <id> --name <name>`
 - `lithe-tool task unread [--task-id <id>]`
-- `lithe-tool task running [--task-id <id>] [--instance-id <id>]`
-- `lithe-tool task idle [--task-id <id>] [--instance-id <id>]`
+- `lithe-tool task running`
+- `lithe-tool task idle`
 - `lithe-tool task archive [--task-id <id>]`
 - `lithe-tool task delete [--task-id <id>]`
 
@@ -52,11 +52,11 @@ eventually be paired with `idle`, including when work ends with an error or
 blocker. When yielding output that needs attention, report `unread` before
 `idle`.
 
-Inside a Lithe Agent, state commands target the current task and the running
-marker is isolated to the current Agent instance. A normal external terminal
-must supply `--task-id`; `running` and `idle` also require a stable
-`--instance-id`. Running tasks cannot be archived. Delete waits up to three
-minutes for explicit UI approval.
+Inside a Lithe Agent, `running` and `idle` target the task bound to the current
+Agent capability and accept no target arguments. A normal external terminal
+cannot report Agent state; other task commands require `--task-id` when there
+is no bound current task. Running tasks cannot be archived or forked. Delete
+waits up to three minutes for explicit UI approval.
 
 Available Agent commands:
 

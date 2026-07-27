@@ -169,8 +169,15 @@ export const createPtyRuntime = ({ adapter, onClose, onData, onExit }: CreatePty
     close: (sessionId: string): void => {
       const session = sessions.get(sessionId)
       if (!session) return
+      closing.set(sessionId, { finish: (): void => undefined, session })
+      try {
+        session.kill()
+      } catch (error: unknown) {
+        closing.delete(sessionId)
+        throw error
+      }
+      closing.delete(sessionId)
       removeLiveSession(sessionId, session, sessions, interactions)
-      session.kill()
       onClose?.(sessionId)
     },
     closeAll: async (): Promise<void> => {

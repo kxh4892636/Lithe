@@ -63,7 +63,7 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.agentResume, taskId) as Promise<AgentLaunch>,
     start: async (taskId: string): Promise<AgentLaunch> =>
       ipcRenderer.invoke(ipcChannels.agentStart, taskId) as Promise<AgentLaunch>,
-    stop: async (taskId: string): Promise<void> => ipcRenderer.invoke(ipcChannels.agentStop, taskId) as Promise<void>,
+    stop: async (taskId: string): Promise<Task> => ipcRenderer.invoke(ipcChannels.agentStop, taskId) as Promise<Task>,
     shouldRestore: async (): Promise<boolean> => ipcRenderer.invoke(ipcChannels.agentShouldRestore) as Promise<boolean>,
   },
   files: {

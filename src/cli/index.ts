@@ -137,14 +137,7 @@ for (const operation of ['unread', 'archive', 'delete'] as const) {
 }
 
 for (const operation of ['running', 'idle'] as const) {
-  task
-    .command(operation)
-    .option('--task-id <id>')
-    .option('--instance-id <id>')
-    .action(
-      (options: { instanceId?: string; taskId?: string }): Promise<void> =>
-        execute(`task.${operation}`, { instanceId: options.instanceId, taskId: options.taskId }),
-    )
+  task.command(operation).action((): Promise<void> => execute(`task.${operation}`))
 }
 
 const agent = program.command('agent').description('Manage coding Agent processes')

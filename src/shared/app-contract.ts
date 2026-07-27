@@ -166,7 +166,7 @@ export interface LitheBridge {
     onBackgroundLaunch: (listener: (event: BackgroundAgentLaunch) => void) => () => void
     resume: (taskId: string) => Promise<AgentLaunch>
     start: (taskId: string) => Promise<AgentLaunch>
-    stop: (taskId: string) => Promise<void>
+    stop: (taskId: string) => Promise<Task>
     shouldRestore: () => Promise<boolean>
   }
   files: {
@@ -264,7 +264,10 @@ export interface LitheBridge {
   }
 }
 
-export type TaskChangeEvent = Task | { deletedTaskId: string; workspaceId: string }
+export type TaskChangeEvent =
+  | Task
+  | { deletedTaskId: string; workspaceId: string }
+  | { panelRemovedTaskId: string; workspaceId: string }
 export interface BackgroundAgentLaunch {
   afterTaskId?: string
   launch: AgentLaunch

@@ -8,7 +8,7 @@ import type { CapabilityRegistry } from '../tool-control/capability-registry'
 import { renderAdapterCommand, type AdapterOperation } from './adapter-executor'
 import { resolveExecutablePath } from './command-availability'
 
-interface RunningAgent {
+interface OpenAgent {
   capability: string
   instanceId: string
   sessionId: string
@@ -21,8 +21,7 @@ interface AgentManagerOptions {
   createId?: () => string
   database: AppDatabase
   isDirectory?: (path: string) => boolean
-  onInstanceExit?: (instanceId: string) => void
-  onTaskBound?: (task: Task) => void
+  onTaskChanged?: (task: Task) => void
   resolveExecutable?: (executable: string) => string | null
   runtime: PtyRuntime
 }
@@ -30,9 +29,9 @@ interface AgentManagerOptions {
 export interface AgentManager {
   bind: (capability: string, providerSessionId: string) => Task
   handleExit: (sessionId: string) => void
-  isRunning: (taskId: string) => boolean
+  isOpen: (taskId: string) => boolean
   launch: (taskId: string, operation: AdapterOperation, sourceAgentSessionId?: string) => AgentLaunch
-  stop: (taskId: string) => void
+  stop: (taskId: string) => Task
 }
 
 interface AgentLauncherOptions {
@@ -41,8 +40,9 @@ interface AgentLauncherOptions {
   createId: () => string
   database: AppDatabase
   isDirectory: (path: string) => boolean
+  onTaskChanged?: (task: Task) => void
   resolveExecutable: (executable: string) => string | null
-  runningByTask: Map<string, RunningAgent>
+  openByTask: Map<string, OpenAgent>
   runtime: PtyRuntime
   taskBySession: Map<string, string>
 }
@@ -52,7 +52,7 @@ const createAgentLauncher =
   (taskId: string, operation: AdapterOperation, sourceAgentSessionId?: string): AgentLaunch => {
     const task = options.database.tasks.get(taskId)
     if (!task) throw new TypeError('Task does not exist')
-    if (options.runningByTask.has(taskId)) throw new TypeError('Task Agent is already running')
+    if (options.openByTask.has(taskId)) throw new TypeError('Task Agent is already open')
     if (operation === 'start' && task.agentSessionId) throw new TypeError('Task already has an Agent session')
     if (operation === 'resume' && !task.agentSessionId) throw new TypeError('Task Agent session is not bound')
     if (operation === 'fork' && !sourceAgentSessionId) throw new TypeError('Source Agent session is not bound')
@@ -76,11 +76,15 @@ const createAgentLauncher =
       sessionId,
       task,
     }
-    const failedLaunch = (error: unknown): AgentLaunch => ({
-      ...launch,
-      error: error instanceof Error ? error.message : String(error),
-      isRunning: false,
-    })
+    const failedLaunch = (error: unknown): AgentLaunch => {
+      const closed = options.database.tasks.setAgentStatus(taskId, 'closed')
+      return {
+        ...launch,
+        error: error instanceof Error ? error.message : String(error),
+        isOpen: false,
+        task: closed,
+      }
+    }
     if (!options.isDirectory(workspace.rootPath)) return failedLaunch('工作区目录不存在')
     options.database.tasks.setAutoRestore?.(taskId, true)
     const instanceId = options.createId()
@@ -108,9 +112,11 @@ const createAgentLauncher =
       options.capabilities.revokeInstance(instanceId)
       return failedLaunch(error)
     }
-    options.runningByTask.set(taskId, { capability, instanceId, sessionId, taskId })
+    options.openByTask.set(taskId, { capability, instanceId, sessionId, taskId })
     options.taskBySession.set(sessionId, taskId)
-    return { ...launch, error: null, isRunning: true }
+    const idle = options.database.tasks.setAgentStatus(taskId, 'idle')
+    options.onTaskChanged?.(idle)
+    return { ...launch, error: null, isOpen: true, task: idle }
   }
 
 export const createAgentManager = ({
@@ -119,12 +125,11 @@ export const createAgentManager = ({
   createId = randomUUID,
   database,
   isDirectory = isExistingDirectory,
-  onInstanceExit = (): void => undefined,
-  onTaskBound,
+  onTaskChanged,
   resolveExecutable = resolveExecutablePath,
   runtime,
 }: AgentManagerOptions): AgentManager => {
-  const runningByTask = new Map<string, RunningAgent>()
+  const openByTask = new Map<string, OpenAgent>()
   const taskBySession = new Map<string, string>()
   const launch = createAgentLauncher({
     capabilities,
@@ -132,37 +137,47 @@ export const createAgentManager = ({
     createId,
     database,
     isDirectory,
+    onTaskChanged,
+    openByTask,
     resolveExecutable,
-    runningByTask,
     runtime,
     taskBySession,
   })
 
-  const stop = (taskId: string): void => {
-    const running = runningByTask.get(taskId)
-    if (!running) return
-    runningByTask.delete(taskId)
-    taskBySession.delete(running.sessionId)
-    capabilities.revokeInstance(running.instanceId)
-    onInstanceExit(running.instanceId)
-    runtime.close(running.sessionId)
+  const stop = (taskId: string): Task => {
+    const open = openByTask.get(taskId)
+    if (open) {
+      openByTask.delete(taskId)
+      taskBySession.delete(open.sessionId)
+      try {
+        runtime.close(open.sessionId)
+      } catch (error: unknown) {
+        openByTask.set(taskId, open)
+        taskBySession.set(open.sessionId, taskId)
+        throw error
+      }
+      capabilities.revokeInstance(open.instanceId)
+    }
+    const closed = database.tasks.setAgentStatus(taskId, 'closed')
+    onTaskChanged?.(closed)
+    return closed
   }
 
   return {
     bind: (capability: string, providerSessionId: string): Task => {
       const binding = capabilities.resolve(capability)
       if (!binding) throw new TypeError('Capability is invalid or expired')
-      const running = runningByTask.get(binding.taskId)
-      if (!running || running.capability !== capability) throw new TypeError('Capability is not active for task')
+      const open = openByTask.get(binding.taskId)
+      if (!open || open.capability !== capability) throw new TypeError('Capability is not active for task')
       const task = database.tasks.bindSession(binding.taskId, providerSessionId)
-      onTaskBound?.(task)
+      onTaskChanged?.(task)
       return task
     },
     handleExit: (sessionId: string): void => {
       const taskId = taskBySession.get(sessionId)
       if (taskId) stop(taskId)
     },
-    isRunning: (taskId: string): boolean => runningByTask.has(taskId),
+    isOpen: (taskId: string): boolean => openByTask.has(taskId),
     launch,
     stop,
   }

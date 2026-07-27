@@ -179,10 +179,10 @@ describe('app database', (): void => {
       workspaceId: workspace.id,
       name: 'Review',
       adapterVersionId: codex.id,
+      agentStatus: 'closed' as const,
       agentSessionId: null,
       archivedAt: null,
       createdAt: project.createdAt,
-      isRunning: false,
       isUnread: false,
       lastAttentionAt: null,
       lastViewedAt: null,
@@ -199,6 +199,53 @@ describe('app database', (): void => {
     expect(() => database.tasks.bindSession(task.id, 'provider-2')).toThrow('already bound')
     database.tasks.add({ ...task, id: 'task-agent-2', name: 'Review 2' })
     expect(() => database.tasks.bindSession('task-agent-2', 'provider-1')).toThrow('another task')
+  })
+
+  it('persists one authoritative Agent status and resets it to closed', (): void => {
+    const database = createTestDatabase()
+    const project = {
+      id: 'project-status',
+      name: 'status',
+      rootPath: 'D:\\projects\\status',
+      isValid: true,
+      createdAt: new Date('2026-07-28T00:00:00.000Z'),
+    }
+    const workspace = {
+      id: 'workspace-status',
+      projectId: project.id,
+      name: '默认',
+      rootPath: project.rootPath,
+      gitBranch: 'main',
+      kind: 'default' as const,
+      createdAt: project.createdAt,
+    }
+    database.projects.add(project, workspace)
+    const adapter = database.adapters.listCurrent()[0]
+    if (!adapter) throw new Error('Expected a built-in Adapter')
+    database.tasks.add({
+      id: 'task-status',
+      workspaceId: workspace.id,
+      name: 'Status',
+      adapterVersionId: adapter.id,
+      agentStatus: 'closed',
+      agentSessionId: null,
+      archivedAt: null,
+      createdAt: project.createdAt,
+      isUnread: false,
+      lifecycle: 'active',
+      lastAttentionAt: null,
+      lastViewedAt: null,
+      shouldAutoRestore: true,
+    })
+
+    expect(database.tasks.setAgentStatus('task-status', 'idle').agentStatus).toBe('idle')
+    expect(database.tasks.setAgentStatus('task-status', 'running').agentStatus).toBe('running')
+    expect(database.tasks.listRunning().map((task): string => task.id)).toEqual(['task-status'])
+
+    database.tasks.resetAgentStatuses()
+
+    expect(database.tasks.get('task-status')?.agentStatus).toBe('closed')
+    expect(database.tasks.listRunning()).toEqual([])
   })
 
   it('refreshes built-in Adapter definitions when the application reopens', (): void => {

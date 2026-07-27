@@ -9,10 +9,10 @@ const task = (overrides: Partial<Task> = {}): Task => ({
   workspaceId: 'workspace-1',
   name: 'Review',
   adapterVersionId: 'adapter-1',
+  agentStatus: 'idle',
   agentSessionId: 'session-1',
   archivedAt: null,
   createdAt: new Date('2026-07-25T00:00:00Z'),
-  isRunning: false,
   isUnread: false,
   lifecycle: 'active',
   lastAttentionAt: null,
@@ -33,17 +33,15 @@ describe('task state service', () => {
     const notify = vi.fn()
     const service = createTaskStateService({
       archive: vi.fn(),
-      clearRunMarks: vi.fn(),
       deleteTask: vi.fn(),
       get: vi.fn(() => task()),
-      markIdle: vi.fn(),
-      markRunning: vi.fn(),
       markViewed,
       notify,
       now: () => new Date('2026-07-25T01:00:00Z'),
       recordAttention,
       removeTaskPanel: vi.fn(),
       restore: vi.fn(),
+      setAgentStatus: vi.fn(),
       stopAgent: vi.fn(),
     })
 
@@ -59,17 +57,15 @@ describe('task state service', () => {
     const notify = vi.fn()
     const service = createTaskStateService({
       archive: vi.fn(),
-      clearRunMarks: vi.fn(),
       deleteTask: vi.fn(),
       get: vi.fn(() => task()),
-      markIdle: vi.fn(),
-      markRunning: vi.fn(),
       markViewed: vi.fn(),
       notify,
       now: () => new Date('2026-07-25T01:00:00Z'),
       recordAttention: vi.fn(() => unread),
       removeTaskPanel: vi.fn(),
       restore: vi.fn(),
+      setAgentStatus: vi.fn(),
       stopAgent: vi.fn(),
     })
 
@@ -77,71 +73,66 @@ describe('task state service', () => {
     expect(notify).toHaveBeenCalledOnce()
   })
 
-  it('keeps running markers isolated by CLI instance', () => {
-    const markRunning = vi.fn((_taskId: string, instanceId: string) => task({ isRunning: instanceId === 'agent-b' }))
-    const markIdle = vi.fn(() => task({ isRunning: true }))
+  it('switches the current Code Agent between running and idle without instance markers', () => {
+    const setAgentStatus = vi.fn((_taskId: string, status: Task['agentStatus']) => task({ agentStatus: status }))
     const service = createTaskStateService({
       archive: vi.fn(),
-      clearRunMarks: vi.fn(),
       deleteTask: vi.fn(),
       get: vi.fn(() => task()),
-      markIdle,
-      markRunning,
       markViewed: vi.fn(),
       notify: vi.fn(),
       now: () => new Date(),
       recordAttention: vi.fn(),
       removeTaskPanel: vi.fn(),
       restore: vi.fn(),
+      setAgentStatus,
       stopAgent: vi.fn(),
     })
 
-    service.markRunning('task-1', 'agent-a')
-    service.markRunning('task-1', 'agent-b')
-    service.markIdle('task-1', 'agent-a')
+    expect(service.markRunning('task-1').agentStatus).toBe('running')
+    expect(service.markRunning('task-1').agentStatus).toBe('running')
+    expect(service.markIdle('task-1').agentStatus).toBe('idle')
+    expect(service.markIdle('task-1').agentStatus).toBe('idle')
 
-    expect(markRunning).toHaveBeenNthCalledWith(1, 'task-1', 'agent-a', expect.any(Date))
-    expect(markRunning).toHaveBeenNthCalledWith(2, 'task-1', 'agent-b', expect.any(Date))
-    expect(markIdle).toHaveBeenCalledWith('task-1', 'agent-a')
+    expect(setAgentStatus).toHaveBeenNthCalledWith(1, 'task-1', 'running')
+    expect(setAgentStatus).toHaveBeenNthCalledWith(2, 'task-1', 'running')
+    expect(setAgentStatus).toHaveBeenNthCalledWith(3, 'task-1', 'idle')
+    expect(setAgentStatus).toHaveBeenNthCalledWith(4, 'task-1', 'idle')
   })
 
   it('refuses to archive a running task', () => {
     const service = createTaskStateService({
       archive: vi.fn(),
-      clearRunMarks: vi.fn(),
       deleteTask: vi.fn(),
-      get: vi.fn(() => task({ isRunning: true })),
-      markIdle: vi.fn(),
-      markRunning: vi.fn(),
+      get: vi.fn(() => task({ agentStatus: 'running' })),
       markViewed: vi.fn(),
       notify: vi.fn(),
       now: () => new Date(),
       recordAttention: vi.fn(),
       removeTaskPanel: vi.fn(),
       restore: vi.fn(),
+      setAgentStatus: vi.fn(),
       stopAgent: vi.fn(),
     })
 
     expect(() => service.archive('task-1')).toThrow(/running/i)
   })
 
-  it('stops the Agent before archiving while retaining its panel layout', () => {
+  it('stops an idle Agent and removes its panel before archiving', () => {
     const stopAgent = vi.fn()
     const archive = vi.fn(() => task({ lifecycle: 'archived', archivedAt: new Date() }))
     const removeTaskPanel = vi.fn()
     const service = createTaskStateService({
       archive,
-      clearRunMarks: vi.fn(),
       deleteTask: vi.fn(),
       get: vi.fn(() => task()),
-      markIdle: vi.fn(),
-      markRunning: vi.fn(),
       markViewed: vi.fn(),
       notify: vi.fn(),
       now: () => new Date(),
       recordAttention: vi.fn(),
       removeTaskPanel,
       restore: vi.fn(),
+      setAgentStatus: vi.fn(),
       stopAgent,
     })
 
@@ -149,7 +140,7 @@ describe('task state service', () => {
 
     expect(stopAgent).toHaveBeenCalledWith('task-1')
     expect(archive).toHaveBeenCalled()
-    expect(removeTaskPanel).not.toHaveBeenCalled()
+    expect(removeTaskPanel).toHaveBeenCalledWith('workspace-1', 'task-1')
   })
 
   it('removes the Agent panel only when deleting the task', () => {
@@ -157,17 +148,15 @@ describe('task state service', () => {
     const deleteTask = vi.fn()
     const service = createTaskStateService({
       archive: vi.fn(),
-      clearRunMarks: vi.fn(),
       deleteTask,
       get: vi.fn(() => task({ lifecycle: 'archived', archivedAt: new Date() })),
-      markIdle: vi.fn(),
-      markRunning: vi.fn(),
       markViewed: vi.fn(),
       notify: vi.fn(),
       now: () => new Date(),
       recordAttention: vi.fn(),
       removeTaskPanel,
       restore: vi.fn(),
+      setAgentStatus: vi.fn(),
       stopAgent: vi.fn(),
     })
 
@@ -181,17 +170,15 @@ describe('task state service', () => {
     const deleteTask = vi.fn()
     const service = createTaskStateService({
       archive: vi.fn(),
-      clearRunMarks: vi.fn(),
       deleteTask,
       get: vi.fn(() => task()),
-      markIdle: vi.fn(),
-      markRunning: vi.fn(),
       markViewed: vi.fn(),
       notify: vi.fn(),
       now: () => new Date(),
       recordAttention: vi.fn(),
       removeTaskPanel: vi.fn(),
       restore: vi.fn(),
+      setAgentStatus: vi.fn(),
       stopAgent: vi.fn(),
     })
 

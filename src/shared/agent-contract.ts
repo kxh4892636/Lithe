@@ -57,15 +57,18 @@ export interface AdapterSummary {
   usageCount: number
 }
 
+export const agentStatuses = ['closed', 'idle', 'running'] as const
+export type AgentStatus = (typeof agentStatuses)[number]
+
 export interface Task {
   id: string
   workspaceId: string
   name: string
   adapterVersionId: string
+  agentStatus: AgentStatus
   agentSessionId: string | null
   archivedAt?: Date | null
   createdAt: Date
-  isRunning?: boolean
   isUnread?: boolean
   lifecycle?: 'active' | 'archived'
   lastAttentionAt?: Date | null
@@ -78,7 +81,7 @@ export interface AgentLaunch {
   cwd: string
   error: string | null
   executable: string
-  isRunning: boolean
+  isOpen: boolean
   sessionId: string
   task: Task
 }

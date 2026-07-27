@@ -1,19 +1,17 @@
-import type { Task } from '../../shared/agent-contract'
+import type { AgentStatus, Task } from '../../shared/agent-contract'
 
 interface TaskStateServiceOptions {
   archive: (taskId: string, archivedAt: Date) => Task
-  clearRunMarks: (taskId: string) => void
   changed?: (task: Task | { deletedTaskId: string; workspaceId: string }) => void
   deleteTask: (taskId: string) => void
   get: (taskId: string) => Task | undefined
-  markIdle: (taskId: string, instanceId: string) => Task
-  markRunning: (taskId: string, instanceId: string, createdAt: Date) => Task
   markViewed: (taskId: string, viewedAt: Date) => Task
   notify: (task: Task) => void
   now: () => Date
   recordAttention: (taskId: string, createdAt: Date) => Task
   removeTaskPanel: (workspaceId: string, taskId: string) => void
   restore: (taskId: string) => Task
+  setAgentStatus: (taskId: string, status: AgentStatus) => Task
   stopAgent: (taskId: string) => void
 }
 
@@ -21,8 +19,8 @@ export interface TaskStateService {
   archive: (taskId: string) => Task
   delete: (taskId: string) => void
   get: (taskId: string) => Task
-  markIdle: (taskId: string, instanceId: string) => Task
-  markRunning: (taskId: string, instanceId: string) => Task
+  markIdle: (taskId: string) => Task
+  markRunning: (taskId: string) => Task
   markUnread: (taskId: string, isTrulyVisible: boolean) => Task
   markViewed: (taskId: string, isTrulyVisible: boolean) => Task
   restore: (taskId: string) => Task
@@ -39,9 +37,10 @@ export const createTaskStateService = (options: TaskStateServiceOptions): TaskSt
     archive: (taskId: string): Task => {
       const task = required(taskId)
       if (task.lifecycle === 'archived') return task
-      if (task.isRunning) throw new TypeError('Running task cannot be archived')
+      if (task.agentStatus === 'running') throw new TypeError('Running task cannot be archived')
       options.stopAgent(taskId)
-      options.clearRunMarks(taskId)
+      options.setAgentStatus(taskId, 'closed')
+      options.removeTaskPanel(task.workspaceId, task.id)
       const archived = options.archive(taskId, options.now())
       options.changed?.(archived)
       return archived
@@ -50,22 +49,22 @@ export const createTaskStateService = (options: TaskStateServiceOptions): TaskSt
       const task = required(taskId)
       if (task.lifecycle !== 'archived') throw new TypeError('Task must be archived before deletion')
       options.stopAgent(taskId)
-      options.clearRunMarks(taskId)
       options.removeTaskPanel(task.workspaceId, task.id)
       options.deleteTask(taskId)
       options.changed?.({ deletedTaskId: task.id, workspaceId: task.workspaceId })
     },
     get: required,
-    markIdle: (taskId: string, instanceId: string): Task => {
-      required(taskId)
-      const updated = options.markIdle(taskId, instanceId)
+    markIdle: (taskId: string): Task => {
+      const task = required(taskId)
+      if (task.lifecycle === 'archived') throw new TypeError('Archived task cannot be marked idle')
+      const updated = options.setAgentStatus(taskId, 'idle')
       options.changed?.(updated)
       return updated
     },
-    markRunning: (taskId: string, instanceId: string): Task => {
+    markRunning: (taskId: string): Task => {
       const task = required(taskId)
       if (task.lifecycle === 'archived') throw new TypeError('Archived task cannot be marked running')
-      const updated = options.markRunning(taskId, instanceId, options.now())
+      const updated = options.setAgentStatus(taskId, 'running')
       options.changed?.(updated)
       return updated
     },

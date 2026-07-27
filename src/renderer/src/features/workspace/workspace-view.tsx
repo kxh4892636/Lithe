@@ -150,11 +150,13 @@ const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdap
   const archivedTasks = useTaskStore((state: TaskState) => state.archivedTasks)
   const backgroundPanels = useTaskStore((state: TaskState) => state.backgroundPanels)
   const clearOpenTask = useTaskStore((state: TaskState) => state.clearOpenTask)
+  const consumePanelRemovals = useTaskStore((state: TaskState) => state.consumePanelRemovals)
   const deletedTaskIds = useTaskStore((state: TaskState) => state.deletedTaskIds)
   const error = useTaskStore((state: TaskState) => state.error)
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
   const openTaskId = useTaskStore((state: TaskState) => state.openTaskId)
   const openTaskAfterId = useTaskStore((state: TaskState) => state.openTaskAfterId)
+  const panelRemovals = useTaskStore((state: TaskState) => state.panelRemovals)
   const tasks = useTaskStore((state: TaskState) => state.tasksByWorkspace[workspaceId] ?? noTasks)
   useEffect((): void => {
     void hydrateWorkspace(workspaceId)
@@ -192,10 +194,36 @@ const useWorkspaceTaskPanels = (workspaceId: string, layout: WorkspaceLayoutAdap
     }
   }, [backgroundPanels, layout, workspaceId])
   useEffect((): void => {
+    if (!layout) return
+    let changed = false
     for (const task of archivedTasks) {
-      if (task.workspaceId === workspaceId) disposeTerminalView(`agent:${task.id}`)
+      if (task.workspaceId !== workspaceId) continue
+      const panelId = `agent:${task.id}`
+      disposeTerminalView(panelId)
+      if (!layout.listPanelIds().includes(panelId)) continue
+      layout.removePanel(panelId)
+      changed = true
     }
-  }, [archivedTasks, workspaceId])
+    if (changed) {
+      void window.lithe.workspaceLayouts.save(workspaceId, layout.serialize()).catch(globalThis.console.error)
+    }
+  }, [archivedTasks, layout, workspaceId])
+  useEffect((): void => {
+    if (!layout) return
+    const removals = panelRemovals.filter((removal): boolean => removal.workspaceId === workspaceId)
+    if (removals.length === 0) return
+    let changed = false
+    for (const removal of removals) {
+      const panelId = `agent:${removal.taskId}`
+      if (!layout.listPanelIds().includes(panelId)) continue
+      layout.removePanel(panelId)
+      changed = true
+    }
+    if (changed) {
+      void window.lithe.workspaceLayouts.save(workspaceId, layout.serialize()).catch(globalThis.console.error)
+    }
+    consumePanelRemovals(workspaceId)
+  }, [consumePanelRemovals, layout, panelRemovals, workspaceId])
   useEffect((): void => {
     if (!layout) return
     let changed = false

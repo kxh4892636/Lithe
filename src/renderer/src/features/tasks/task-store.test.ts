@@ -11,7 +11,7 @@ const restoredTask: Task = {
   agentSessionId: 'session-1',
   archivedAt: null,
   createdAt: new Date(0),
-  isRunning: false,
+  agentStatus: 'closed',
   isUnread: false,
   lifecycle: 'active',
   lastAttentionAt: null,
@@ -27,6 +27,7 @@ describe('task store', (): void => {
       error: null,
       launchesByTask: {},
       openTaskId: null,
+      panelRemovals: [],
       tasksByWorkspace: { 'workspace-1': [] },
     })
   })
@@ -45,14 +46,15 @@ describe('task store', (): void => {
 
   it('opens and starts a task that has no Agent session', async (): Promise<void> => {
     const task = { ...restoredTask, agentSessionId: null }
+    const idleTask = { ...task, agentStatus: 'idle' as const }
     const launch = {
       args: [],
       cwd: 'D:\\projects\\lithe',
       error: null,
       executable: 'agent',
-      isRunning: true,
+      isOpen: true,
       sessionId: 'agent:task-1',
-      task,
+      task: idleTask,
     }
     const start = vi.fn<LitheBridge['agents']['start']>().mockResolvedValue(launch)
     window.lithe = { agents: { start } } as unknown as LitheBridge
@@ -66,14 +68,15 @@ describe('task store', (): void => {
   })
 
   it('resumes a stopped task that already has an Agent session', async (): Promise<void> => {
+    const idleTask = { ...restoredTask, agentStatus: 'idle' as const }
     const launch = {
       args: [],
       cwd: 'D:\\projects\\lithe',
       error: null,
       executable: 'agent',
-      isRunning: true,
+      isOpen: true,
       sessionId: 'agent:task-1',
-      task: restoredTask,
+      task: idleTask,
     }
     const resume = vi.fn<LitheBridge['agents']['resume']>().mockResolvedValue(launch)
     window.lithe = { agents: { resume } } as unknown as LitheBridge
@@ -84,22 +87,23 @@ describe('task store', (): void => {
     expect(resume).toHaveBeenCalledWith(restoredTask.id)
   })
 
-  it('only focuses a task whose Agent launch is still running', async (): Promise<void> => {
+  it('only focuses an idle task whose Agent is already open', async (): Promise<void> => {
+    const idleTask = { ...restoredTask, agentStatus: 'idle' as const }
     const launch = {
       args: [],
       cwd: 'D:\\projects\\lithe',
       error: null,
       executable: 'agent',
-      isRunning: true,
+      isOpen: true,
       sessionId: 'agent:task-1',
-      task: restoredTask,
+      task: idleTask,
     }
     const start = vi.fn<LitheBridge['agents']['start']>()
     const resume = vi.fn<LitheBridge['agents']['resume']>()
     window.lithe = { agents: { resume, start } } as unknown as LitheBridge
     useTaskStore.setState({
       launchesByTask: { [restoredTask.id]: launch },
-      tasksByWorkspace: { 'workspace-1': [restoredTask] },
+      tasksByWorkspace: { 'workspace-1': [idleTask] },
     })
 
     await useTaskStore.getState().activateTask(restoredTask.id)
@@ -110,7 +114,7 @@ describe('task store', (): void => {
   })
 
   it('only focuses a task marked running by the Agent CLI', async (): Promise<void> => {
-    const runningTask = { ...restoredTask, isRunning: true }
+    const runningTask = { ...restoredTask, agentStatus: 'running' as const }
     const start = vi.fn<LitheBridge['agents']['start']>()
     const resume = vi.fn<LitheBridge['agents']['resume']>()
     window.lithe = { agents: { resume, start } } as unknown as LitheBridge
@@ -124,7 +128,7 @@ describe('task store', (): void => {
   })
 
   it('clears an old activation error when the Agent CLI reports the task running', async (): Promise<void> => {
-    const runningTask = { ...restoredTask, isRunning: true }
+    const runningTask = { ...restoredTask, agentStatus: 'running' as const }
     window.lithe = { agents: {} } as unknown as LitheBridge
     useTaskStore.setState({
       activationErrorsByTask: { [runningTask.id]: '工作区目录不存在' },
@@ -149,14 +153,15 @@ describe('task store', (): void => {
   })
 
   it('deduplicates click activation and automatic restoration', async (): Promise<void> => {
+    const idleTask = { ...restoredTask, agentStatus: 'idle' as const }
     const launch = {
       args: [],
       cwd: 'D:\\projects\\lithe',
       error: null,
       executable: 'agent',
-      isRunning: true,
+      isOpen: true,
       sessionId: 'agent:task-1',
-      task: restoredTask,
+      task: idleTask,
     }
     const resume = vi.fn<LitheBridge['agents']['resume']>().mockResolvedValue(launch)
     window.lithe = {
@@ -176,25 +181,29 @@ describe('task store', (): void => {
   })
 
   it('stops the running Agent and updates the visible launch state', async (): Promise<void> => {
+    const runningTask = { ...restoredTask, agentStatus: 'running' as const }
+    const stoppedTask = { ...restoredTask, agentStatus: 'closed' as const }
     const launch = {
       args: [],
       cwd: 'D:\\projects\\lithe',
       error: null,
       executable: 'agent',
-      isRunning: true,
+      isOpen: true,
       sessionId: 'agent:task-1',
-      task: restoredTask,
+      task: runningTask,
     }
-    const stop = vi.fn<LitheBridge['agents']['stop']>().mockResolvedValue(undefined)
+    const stop = vi.fn<LitheBridge['agents']['stop']>().mockResolvedValue(stoppedTask)
     window.lithe = { agents: { stop } } as unknown as LitheBridge
     useTaskStore.setState({
       launchesByTask: { [restoredTask.id]: launch },
-      tasksByWorkspace: { 'workspace-1': [restoredTask] },
+      tasksByWorkspace: { 'workspace-1': [runningTask] },
     })
 
     await useTaskStore.getState().stopTask(restoredTask.id)
 
     expect(stop).toHaveBeenCalledWith(restoredTask.id)
-    expect(useTaskStore.getState().launchesByTask[restoredTask.id]?.isRunning).toBe(false)
+    expect(useTaskStore.getState().launchesByTask[restoredTask.id]?.isOpen).toBe(false)
+    expect(useTaskStore.getState().tasksByWorkspace['workspace-1']).toEqual([stoppedTask])
+    expect(useTaskStore.getState().panelRemovals).toEqual([{ taskId: restoredTask.id, workspaceId: 'workspace-1' }])
   })
 })

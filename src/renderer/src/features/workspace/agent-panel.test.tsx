@@ -38,7 +38,7 @@ const task: Task = {
   agentSessionId: 'session-1',
   archivedAt: null,
   createdAt: new Date(0),
-  isRunning: false,
+  agentStatus: 'idle',
   isUnread: false,
   lifecycle: 'active',
   lastAttentionAt: null,
@@ -51,7 +51,7 @@ const launch: AgentLaunch = {
   cwd: 'D:\\projects\\lithe',
   error: null,
   executable: 'agent',
-  isRunning: true,
+  isOpen: true,
   sessionId: 'agent:task-1',
   task,
 }
@@ -111,14 +111,14 @@ describe('agent panel', (): void => {
     })
 
     const { container } = render(
-      <AgentPanel config={{ panelId: 'agent:task-1', taskId: task.id }} task={{ ...task, isRunning: true }} />,
+      <AgentPanel config={{ panelId: 'agent:task-1', taskId: task.id }} task={{ ...task, agentStatus: 'running' }} />,
     )
 
     expect(container.querySelector('[data-agent-ready="true"]')).toBeInTheDocument()
     expect(screen.getByText('工作区目录不存在')).toBeInTheDocument()
   })
 
-  it('keeps the same terminal view when the Agent running state changes', (): void => {
+  it('keeps the same terminal view when the Agent status changes while open', (): void => {
     globalThis.ResizeObserver = class {
       disconnect = vi.fn<() => void>()
       observe = vi.fn<() => void>()
@@ -136,10 +136,7 @@ describe('agent panel', (): void => {
     const config = { panelId: 'agent:task-1', taskId: task.id }
     const { rerender } = render(<AgentPanel config={config} task={task} />)
 
-    useTaskStore.setState({
-      launchesByTask: { [task.id]: { ...launch, isRunning: false } },
-    })
-    rerender(<AgentPanel config={config} task={task} />)
+    rerender(<AgentPanel config={config} task={{ ...task, agentStatus: 'running' }} />)
 
     expect(terminalInstances).toHaveLength(1)
     expect(window.lithe.terminals.onData).toHaveBeenCalledOnce()

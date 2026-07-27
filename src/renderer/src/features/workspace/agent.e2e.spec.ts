@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 
@@ -12,6 +12,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
   electronSession,
 }: ElectronTestFixtures): Promise<void> => {
   const projectDirectory = mkdtempSync(join(tmpdir(), 'lithe-agent-project-'))
+  const stateControlPath = join(projectDirectory, '.agent-state')
   const cliPath = resolve('packages/lithe-tool/dist/index.cjs')
   const taskName = 'Review this deliberately long agent task title beneath its floating actions'
   let page: Page | undefined
@@ -25,23 +26,31 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await page.getByRole('button', { name: '创建项目' }).click()
 
     await page.evaluate(
-      async ({ executable, toolPath }): Promise<void> => {
+      async ({ executable, statePath, toolPath }): Promise<void> => {
         const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
+        const stateWatcher = [
+          "const fs=require('node:fs')",
+          'let lastState=""',
+          `setInterval(()=>{let state;try{state=fs.readFileSync(${JSON.stringify(statePath)},'utf8').trim()}catch{return}if(state===lastState)return;lastState=state;if(state==='running'||state==='idle'){const result=spawnSync(process.execPath,[${JSON.stringify(toolPath)},'task',state],{stdio:'inherit'});console.log('LITHE_AGENT_STATE '+state+' '+result.status)}},100)`,
+        ].join(';')
         const bindScript = [
           "const {spawnSync}=require('node:child_process')",
           `spawnSync(process.execPath,[${JSON.stringify(toolPath)},'agent','bind','--session-id','fake-session-1'],{stdio:'inherit'})`,
+          stateWatcher,
           "setTimeout(()=>console.log('LITHE_AGENT_READY'),300)",
           'setInterval(()=>{},1000)',
         ].join(';')
         const resumeScript = [
           "const {spawnSync}=require('node:child_process')",
           `spawnSync(process.execPath,[${JSON.stringify(toolPath)},'agent','bind','--session-id',process.argv[1]],{stdio:'inherit'})`,
+          stateWatcher,
           "setTimeout(()=>console.log('LITHE_AGENT_RESUMED '+process.argv[1]),300)",
           'setInterval(()=>{},1000)',
         ].join(';')
         const forkScript = [
           "const {spawnSync}=require('node:child_process')",
           `spawnSync(process.execPath,[${JSON.stringify(toolPath)},'agent','bind','--session-id','fake-session-fork-1'],{stdio:'inherit'})`,
+          stateWatcher,
           "setTimeout(()=>console.log('LITHE_AGENT_FORKED'),300)",
           'setInterval(()=>{},1000)',
         ].join(';')
@@ -54,7 +63,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
         const adapter = await bridge.adapters.create('Deterministic Agent', definition)
         await bridge.adapters.setDefault(adapter.currentVersion.id)
       },
-      { executable: process.execPath, toolPath: cliPath },
+      { executable: process.execPath, statePath: stateControlPath, toolPath: cliPath },
     )
 
     await expect(page.getByRole('button', { name: basename(projectDirectory), exact: true })).toBeVisible()
@@ -89,6 +98,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     const sourceTaskTitle = page.getByTitle(taskName, { exact: true })
     const sourceTaskButton = sourceTaskTitle.locator('..')
     const sourceTaskRow = sourceTaskButton.locator('..')
+    await expect(sourceTaskButton.getByLabel('空闲')).toBeVisible()
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     await sourceTaskButton.hover()
     await expect(sourceTaskTitle).toHaveAttribute('data-overflow', 'true')
@@ -100,12 +110,25 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await expect(page.getByRole('button', { name: '停止' })).toHaveCount(0)
     await sourceTaskButton.click({ button: 'right' })
     await page.getByRole('menuitem', { name: '停止' }).click()
+    await expect(page.locator('[data-agent-id]')).toHaveCount(0)
+    await expect(sourceTaskButton.getByLabel('关闭')).toBeVisible()
     await sourceTaskButton.click()
+    await expect(page.locator('[data-agent-id]')).toHaveCount(1)
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_RESUMED fake-session-1')
     await expect(page.locator('[data-view-identity="source-agent-terminal"]')).toHaveCount(1)
+    await expect(sourceTaskButton.getByLabel('空闲')).toBeVisible()
+
+    writeFileSync(stateControlPath, 'running')
+    await expect(sourceTaskButton.getByLabel('运行中')).toBeVisible()
+    await sourceTaskButton.hover()
+    await expect(page.getByRole('button', { name: `Fork ${taskName}` })).toBeDisabled()
+    await expect(page.getByRole('button', { name: `归档 ${taskName}` })).toBeDisabled()
+    writeFileSync(stateControlPath, 'idle')
+    await expect(sourceTaskButton.getByLabel('空闲')).toBeVisible()
 
     await sourceTaskButton.click({ button: 'right' })
     await page.getByRole('menuitem', { name: '停止' }).click()
+    await expect(page.locator('[data-agent-id]')).toHaveCount(0)
     await sourceTaskButton.hover()
     await page.getByRole('button', { name: `Fork ${taskName}` }).click()
     await expect(page.getByTitle(taskName, { exact: true })).toHaveCount(2)
@@ -171,9 +194,8 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
       )
       .toBe(true)
 
-    expect(runTool('task', 'running', '--task-id', sourceTaskId, '--instance-id', 'e2e-external-agent').status).toBe(0)
-    expect(runTool('task', 'archive', '--task-id', sourceTaskId).status).toBe(1)
-    expect(runTool('task', 'idle', '--task-id', sourceTaskId, '--instance-id', 'e2e-external-agent').status).toBe(0)
+    expect(runTool('task', 'running').status).toBe(1)
+    expect(runTool('task', 'idle').status).toBe(1)
     expect(runTool('task', 'archive', '--task-id', sourceTaskId).status).toBe(0)
     await expect
       .poll(async (): Promise<boolean> => {

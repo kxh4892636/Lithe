@@ -194,6 +194,34 @@ describe('PTY runtime', (): void => {
     expect(onClose).toHaveBeenCalledWith('agent:task-1')
   })
 
+  it('keeps a session reachable and retryable when intentional close fails', (): void => {
+    const process = createFakeProcess()
+    process.kill = vi
+      .fn<() => void>()
+      .mockImplementationOnce((): never => {
+        throw new Error('native close failed')
+      })
+      .mockImplementationOnce((): void => undefined)
+    const onClose = vi.fn<(sessionId: string) => void>()
+    const runtime = createPtyRuntime({
+      adapter: { spawn: (): PtyProcess => process },
+      onClose,
+      onData: (): void => undefined,
+      onExit: (): void => undefined,
+    })
+    runtime.create({ columns: 80, cwd: '.', rows: 24, sessionId: 'agent:task-1', shell: 'agent' })
+
+    expect(() => runtime.close('agent:task-1')).toThrow('native close failed')
+    expect(() => runtime.write('agent:task-1', 'still reachable')).not.toThrow()
+    expect(onClose).not.toHaveBeenCalled()
+
+    runtime.close('agent:task-1')
+
+    expect(process.kill).toHaveBeenCalledTimes(2)
+    expect(onClose).toHaveBeenCalledWith('agent:task-1')
+    expect(() => runtime.write('agent:task-1', 'closed')).toThrow('终端会话不存在')
+  })
+
   it('removes all sessions before close callbacks can reenter the runtime', async (): Promise<void> => {
     const process = createFakeProcess()
     let runtime: ReturnType<typeof createPtyRuntime>

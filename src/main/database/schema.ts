@@ -85,6 +85,9 @@ export const tasks = sqliteTable(
     adapterVersionId: text('adapter_version_id')
       .notNull()
       .references(() => adapterVersions.id),
+    agentStatus: text('agent_status', { enum: ['closed', 'idle', 'running'] })
+      .notNull()
+      .default('closed'),
     agentSessionId: text('agent_session_id'),
     lifecycle: text('lifecycle', { enum: ['active', 'archived'] })
       .notNull()
@@ -110,16 +113,4 @@ export const taskAttentionEvents = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [index('task_attention_events_task_created_idx').on(table.taskId, table.createdAt)],
-)
-
-export const taskRunMarkers = sqliteTable(
-  'task_run_markers',
-  {
-    instanceId: text('instance_id').primaryKey(),
-    taskId: text('task_id')
-      .notNull()
-      .references(() => tasks.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  },
-  (table) => [index('task_run_markers_task_idx').on(table.taskId)],
 )
