@@ -250,7 +250,12 @@ describe('app database', (): void => {
       shouldAutoRestore: true,
     })
 
-    expect(database.tasks.setAgentStatus('task-status', 'idle').agentStatus).toBe('idle')
+    database.tasks.recordAttention('task-status', 'event-status', new Date('2026-07-28T01:00:00.000Z'))
+
+    expect(database.tasks.setAgentStatus('task-status', 'idle')).toMatchObject({
+      agentStatus: 'idle',
+      isUnread: true,
+    })
     expect(database.tasks.setAgentStatus('task-status', 'running').agentStatus).toBe('running')
     expect(database.tasks.listRunning().map((task): string => task.id)).toEqual(['task-status'])
 

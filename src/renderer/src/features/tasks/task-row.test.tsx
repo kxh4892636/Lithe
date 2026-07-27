@@ -63,10 +63,10 @@ describe('task row', (): void => {
     window.lithe = {} as unknown as LitheBridge
     useTaskStore.setState({ launchesByTask: {} })
 
-    render(<TaskRow onOpen={vi.fn<() => void>()} task={{ ...task, isUnread: true }} />)
+    render(<TaskRow onOpen={vi.fn<() => void>()} task={{ ...task, agentStatus: 'idle', isUnread: true }} />)
 
     expect(screen.getByLabelText('未读').querySelector('svg')).toHaveClass('fill-unread', 'text-unread')
-    expect(screen.queryByLabelText('关闭')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('空闲')).not.toBeInTheDocument()
     expect(screen.getByTitle('Review')).not.toHaveClass('font-medium')
   })
 
