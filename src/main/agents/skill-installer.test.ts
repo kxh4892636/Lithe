@@ -25,8 +25,13 @@ describe('Lithe Tool Skill installer', (): void => {
     const second = installLitheToolSkill(home, 'version two')
 
     expect(first.installed).toHaveLength(3)
+    expect(first.status).toBe('installed')
     expect(second.conflicts).toEqual([])
+    expect(second.status).toBe('updated')
     expect(readFileSync(join(home, '.agents', 'skills', 'lithe-tool', 'SKILL.md'), 'utf8')).toBe('version two')
+
+    const third = installLitheToolSkill(home, 'version two')
+    expect(third.status).toBe('unchanged')
   })
 
   it('does not overwrite an unmanaged skill directory', (): void => {
@@ -38,6 +43,7 @@ describe('Lithe Tool Skill installer', (): void => {
     const result = installLitheToolSkill(home, 'managed content')
 
     expect(result.conflicts).toContain(target)
+    expect(result.status).toBe('conflict')
     expect(readFileSync(join(target, 'SKILL.md'), 'utf8')).toBe('user content')
   })
 

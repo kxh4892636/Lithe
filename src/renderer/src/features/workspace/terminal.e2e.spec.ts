@@ -25,6 +25,8 @@ const addProject = async (application: ElectronApplication, page: Page, director
     })
   }, directory)
   await page.getByRole('button', { name: '添加项目' }).click()
+  await page.getByRole('button', { name: '选择已有文件夹' }).click()
+  await page.getByRole('button', { name: '创建项目' }).click()
   await expect(page.getByRole('button', { exact: true, name: basename(directory) })).toBeVisible()
 }
 
@@ -46,6 +48,8 @@ test('E2E-LITHE-006 runs a local PTY and restores tabbed panels without output',
     }, projectDirectory)
     page = await electronSession.application.firstWindow()
     await page.getByRole('button', { name: '添加项目' }).click()
+    await page.getByRole('button', { name: '选择已有文件夹' }).click()
+    await page.getByRole('button', { name: '创建项目' }).click()
     await page.getByRole('button', { name: '在此标签组新建终端' }).click()
     const terminals = page.locator('.xterm')
     await expect(terminals).toHaveCount(1)
@@ -197,6 +201,8 @@ test('E2E-LITHE-017 closes the ordinary terminal process tree with its tab', asy
     )
     page = await electronSession.application.firstWindow()
     await page.getByRole('button', { name: '添加项目' }).click()
+    await page.getByRole('button', { name: '选择已有文件夹' }).click()
+    await page.getByRole('button', { name: '创建项目' }).click()
     await page.getByRole('button', { name: '在此标签组新建终端' }).click()
     const terminalPanel = page.locator('[data-terminal-id]').first()
     await expect(terminalPanel).toHaveAttribute('data-terminal-ready', 'true')

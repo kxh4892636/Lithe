@@ -14,6 +14,7 @@ import type {
   GitChangeList,
   GitDiffSnapshot,
   LitheBridge,
+  ProjectCreateInput,
   ProjectRemovalPreview,
   ProjectWithWorkspaces,
   RuntimeInfo,
@@ -141,8 +142,8 @@ const bridge: LitheBridge = {
     getInfo: async (): Promise<RuntimeInfo> => ipcRenderer.invoke(ipcChannels.getRuntimeInfo) as Promise<RuntimeInfo>,
   },
   projects: {
-    addDirectory: async (): Promise<ProjectWithWorkspaces | null> =>
-      ipcRenderer.invoke(ipcChannels.addProjectDirectory) as Promise<ProjectWithWorkspaces | null>,
+    create: async (input: ProjectCreateInput): Promise<ProjectWithWorkspaces> =>
+      ipcRenderer.invoke(ipcChannels.createProject, input) as Promise<ProjectWithWorkspaces>,
     getNavigation: async (): Promise<WorkspaceNavigation> =>
       ipcRenderer.invoke(ipcChannels.getWorkspaceNavigation) as Promise<WorkspaceNavigation>,
     onNavigationChanged: (listener: () => void): (() => void) => {
@@ -152,6 +153,8 @@ const bridge: LitheBridge = {
         ipcRenderer.removeListener(ipcChannels.workspaceNavigationChanged, wrapped)
       }
     },
+    pickSourceFolder: async (): Promise<string | null> =>
+      ipcRenderer.invoke(ipcChannels.pickProjectSourceFolder) as Promise<string | null>,
     previewRemove: async (projectId: string): Promise<ProjectRemovalPreview> =>
       ipcRenderer.invoke(ipcChannels.previewProjectRemoval, projectId) as Promise<ProjectRemovalPreview>,
     remove: async (projectId: string, branchConfirmations?: Record<string, string>): Promise<boolean> =>

@@ -31,4 +31,21 @@ export const builtinAdapterVersions: AdapterVersion[] = [
     },
     createdAt,
   },
+  {
+    id: 'builtin-kimi-code-v1',
+    adapterId: 'builtin-kimi-code',
+    name: 'Kimi Code',
+    kind: 'builtin',
+    version: 1,
+    definition: {
+      executable: 'kimi',
+      start: [],
+      resume: ['--session', '{{agentSessionId}}'],
+      fork: ['--session', '{{agentSessionId}}'],
+      interactions: {
+        fork: [{ input: '/fork\r', timeoutMs: 30_000, waitFor: '›' }],
+      },
+    },
+    createdAt,
+  },
 ]

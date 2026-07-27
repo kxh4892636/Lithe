@@ -36,6 +36,23 @@ describe('Git branch detection', (): void => {
     await expect(detectGitBranch(rootPath, vi.fn<(message: string, error: unknown) => void>())).resolves.toBe('ws01')
   })
 
+  it('uses HEAD@shortSHA while the repository is detached', async (): Promise<void> => {
+    const rootPath = createDirectory()
+    execFileSync('git', ['init', '--initial-branch=main', rootPath], { windowsHide: true })
+    execFileSync('git', ['-C', rootPath, 'config', 'user.email', 'lithe@example.test'], { windowsHide: true })
+    execFileSync('git', ['-C', rootPath, 'config', 'user.name', 'Lithe Test'], { windowsHide: true })
+    execFileSync('git', ['-C', rootPath, 'commit', '--allow-empty', '-m', 'initial'], { windowsHide: true })
+    const shortSha = execFileSync('git', ['-C', rootPath, 'rev-parse', '--short', 'HEAD'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    }).trim()
+    execFileSync('git', ['-C', rootPath, 'checkout', '--detach'], { windowsHide: true })
+
+    await expect(detectGitBranch(rootPath, vi.fn<(message: string, error: unknown) => void>())).resolves.toBe(
+      `HEAD@${shortSha}`,
+    )
+  })
+
   it('logs and rethrows malformed Git metadata errors', async (): Promise<void> => {
     const rootPath = createDirectory()
     mkdirSync(join(rootPath, '.git'))

@@ -160,7 +160,7 @@ describe('project IPC', (): void => {
     const window = { snapped: true, webContents } as unknown as BrowserWindow
     const event = { sender: webContents, senderFrame: webContents.mainFrame } as unknown as IpcMainInvokeEvent
 
-    registerIpcHandlers({ database, window })
+    registerIpcHandlers({ database, managedProjectsRoot: join(userDataDirectory, 'projects'), window })
 
     const getWindowSnapped = electronMocks.handlers.get(ipcChannels.getWindowSnapped)
     expect(getWindowSnapped?.(event)).toBe(true)
@@ -182,7 +182,7 @@ describe('project IPC', (): void => {
     } as unknown as BrowserWindow
     const event = { sender: webContents, senderFrame: webContents.mainFrame } as unknown as IpcMainInvokeEvent
 
-    registerIpcHandlers({ database, window })
+    registerIpcHandlers({ database, managedProjectsRoot: join(userDataDirectory, 'projects'), window })
 
     const toggleWindowMaximized = electronMocks.handlers.get(ipcChannels.toggleWindowMaximized)
     expect(toggleWindowMaximized?.(event)).toBe(true)
@@ -200,23 +200,32 @@ describe('project IPC', (): void => {
     const window = { webContents } as unknown as BrowserWindow
     const event = { sender: webContents, senderFrame: webContents.mainFrame } as unknown as IpcMainInvokeEvent
     electronMocks.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [projectDirectory] })
-    registerIpcHandlers({ database, window })
+    registerIpcHandlers({ database, managedProjectsRoot: join(userDataDirectory, 'projects'), window })
 
-    const addProject = electronMocks.handlers.get(ipcChannels.addProjectDirectory)
+    const pickSourceFolder = electronMocks.handlers.get(ipcChannels.pickProjectSourceFolder)
+    const createProject = electronMocks.handlers.get(ipcChannels.createProject)
     const getNavigation = electronMocks.handlers.get(ipcChannels.getWorkspaceNavigation)
-    expect(addProject).toBeDefined()
+    expect(pickSourceFolder).toBeDefined()
+    expect(createProject).toBeDefined()
     expect(getNavigation).toBeDefined()
 
-    await addProject?.(event)
+    await expect(pickSourceFolder?.(event)).resolves.toBe(projectDirectory)
+    await createProject?.(event, { name: 'Selected project', sourcePath: projectDirectory })
     const navigation = await getNavigation?.(event)
 
     expect(electronMocks.showOpenDialog).toHaveBeenCalledWith(
       window,
-      expect.objectContaining({ properties: expect.arrayContaining(['openDirectory', 'createDirectory']) }),
+      expect.objectContaining({ properties: ['openDirectory'] }),
     )
     expect(navigation).toMatchObject({
       activeWorkspaceId: expect.any(String),
-      projects: [{ rootPath: projectDirectory, workspaces: [{ name: '默认', rootPath: projectDirectory }] }],
+      projects: [
+        {
+          name: 'Selected project',
+          rootPath: projectDirectory,
+          workspaces: [{ name: '默认', rootPath: projectDirectory }],
+        },
+      ],
     })
   })
 
@@ -226,7 +235,11 @@ describe('project IPC', (): void => {
     const database = createAppDatabase({ databasePath: join(userDataDirectory, 'lithe.db') })
     openDatabases.push(database)
     const webContents = { mainFrame: {} }
-    registerIpcHandlers({ database, window: { webContents } as unknown as BrowserWindow })
+    registerIpcHandlers({
+      database,
+      managedProjectsRoot: join(userDataDirectory, 'projects'),
+      window: { webContents } as unknown as BrowserWindow,
+    })
     const getNavigation = electronMocks.handlers.get(ipcChannels.getWorkspaceNavigation)
     const event = { sender: {}, senderFrame: {} } as unknown as IpcMainInvokeEvent
 

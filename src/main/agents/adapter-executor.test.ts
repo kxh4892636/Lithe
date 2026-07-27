@@ -11,6 +11,9 @@ describe('declarative Adapter executor', (): void => {
       start: ['--cwd', '{{workspacePath}}', '--name={{taskName}}'],
       resume: ['resume', '{{agentSessionId}}'],
       fork: null,
+      interactions: {
+        start: [{ input: 'continue\r', timeoutMs: 5_000, waitFor: 'Ready' }],
+      },
     })
 
     expect(
@@ -21,6 +24,7 @@ describe('declarative Adapter executor', (): void => {
     ).toEqual({
       executable: 'agent-wrapper',
       args: ['--cwd', 'D:\\work space', '--name=review & publish'],
+      interactions: [{ input: 'continue\r', timeoutMs: 5_000, waitFor: 'Ready' }],
     })
   })
 
@@ -43,9 +47,15 @@ describe('declarative Adapter executor', (): void => {
     ).toThrow('resume must reference agentSessionId')
   })
 
-  it('defines Codex and Claude Code through the same immutable model', (): void => {
-    expect(builtinAdapterVersions.map((adapter) => adapter.name)).toEqual(['Codex', 'Claude Code'])
+  it('defines Codex, Claude Code, and Kimi Code through the same immutable model', (): void => {
+    expect(builtinAdapterVersions.map((adapter) => adapter.name)).toEqual(['Codex', 'Claude Code', 'Kimi Code'])
     expect(builtinAdapterVersions[0]?.definition.fork).toEqual(['fork', '{{agentSessionId}}'])
     expect(builtinAdapterVersions[1]?.definition.fork).toEqual(['--resume', '{{agentSessionId}}', '--fork-session'])
+    expect(builtinAdapterVersions[2]?.definition).toMatchObject({
+      executable: 'kimi',
+      resume: ['--session', '{{agentSessionId}}'],
+      fork: ['--session', '{{agentSessionId}}'],
+      interactions: { fork: [{ input: '/fork\r' }] },
+    })
   })
 })

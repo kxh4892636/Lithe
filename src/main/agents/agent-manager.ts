@@ -99,6 +99,7 @@ const createAgentLauncher =
           LITHE_CAPABILITY: capability,
           ...(options.controlDiscoveryPath ? { LITHE_CONTROL_DISCOVERY_PATH: options.controlDiscoveryPath } : {}),
         },
+        interactions: command.interactions,
         rows: 24,
         sessionId,
         shell: options.resolveExecutable(command.executable) ?? command.executable,

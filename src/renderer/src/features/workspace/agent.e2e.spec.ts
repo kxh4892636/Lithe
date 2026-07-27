@@ -20,6 +20,8 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     }, projectDirectory)
     page = await electronSession.application.firstWindow()
     await page.getByRole('button', { name: '添加项目' }).click()
+    await page.getByRole('button', { name: '选择已有文件夹' }).click()
+    await page.getByRole('button', { name: '创建项目' }).click()
 
     await page.evaluate(
       async ({ executable, toolPath }): Promise<void> => {
@@ -91,9 +93,11 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_RESUMED fake-session-1')
     await expect(page.locator('[data-view-identity="source-agent-terminal"]')).toHaveCount(1)
 
+    await sourceTaskButton.click({ button: 'right' })
+    await page.getByRole('menuitem', { name: '停止' }).click()
     await sourceTaskButton.hover()
     await page.getByRole('button', { name: 'Fork Review' }).click()
-    await expect(page.getByRole('button', { name: /Review-1/ })).toBeVisible()
+    await expect(page.getByText('-Review', { exact: true })).toHaveCount(2)
     await expect
       .poll(async (): Promise<string | null> => {
         if (!page) return null
@@ -102,7 +106,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
           const navigation = await bridge.projects.getNavigation()
           if (!navigation.activeWorkspaceId) return null
           const tasks = await bridge.tasks.list(navigation.activeWorkspaceId)
-          return tasks.find((task): boolean => task.name === 'Review-1')?.agentSessionId ?? null
+          return tasks.find((task): boolean => task.agentSessionId === 'fake-session-fork-1')?.agentSessionId ?? null
         })
       })
       .toBe('fake-session-fork-1')

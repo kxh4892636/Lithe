@@ -1,4 +1,4 @@
-import { GitBranchIcon, GitForkIcon, PencilIcon, PinIcon, SquarePenIcon, Trash2Icon } from 'lucide-react'
+import { GitForkIcon, PencilIcon, PinIcon, SquarePenIcon, Trash2Icon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -26,6 +26,9 @@ interface WorkspaceRowProps {
   tasks: Task[]
   workspace: Workspace
 }
+
+export const workspaceNavigationTitle = (workspace: Workspace): string =>
+  workspace.gitBranch ? `${workspace.gitBranch} - ${workspace.name}` : workspace.name
 
 const WorkspaceContextItems = ({
   openTaskDialog,
@@ -74,30 +77,40 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
   return (
     <SidebarMenuSubItem className="group/workspace">
       <ContextMenu>
-        <ContextMenuTrigger render={<div className="flex min-w-0 items-center" />}>
+        <ContextMenuTrigger
+          render={
+            <div
+              className={
+                workspace.id === activeWorkspaceId
+                  ? 'flex min-w-0 items-center rounded-md bg-sidebar-accent/60'
+                  : 'flex min-w-0 items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50'
+              }
+            />
+          }
+        >
           <SidebarMenuSubButton
-            className={workspace.isValid === false ? 'text-destructive min-w-0 flex-1' : 'min-w-0 flex-1'}
-            isActive={workspace.id === activeWorkspaceId}
+            className={
+              workspace.isValid === false
+                ? 'text-destructive min-w-0 flex-1 hover:bg-transparent'
+                : 'min-w-0 flex-1 hover:bg-transparent'
+            }
             onClick={(): void => void selectWorkspace(workspace.id)}
-            render={<button aria-label={workspace.name} type="button" />}
+            render={
+              <button
+                aria-label={workspaceNavigationTitle(workspace)}
+                title={workspace.isValid === false ? '工作区目录不存在' : workspaceNavigationTitle(workspace)}
+                type="button"
+              />
+            }
           >
-            <span className="flex min-w-0 flex-col items-start py-1">
-              <span className="truncate">{workspace.name}</span>
-              {workspace.isValid === false ? (
-                <span className="text-destructive text-[10px]">工作区目录不存在</span>
-              ) : workspace.gitBranch ? (
-                <span className="text-muted-foreground flex max-w-full items-center gap-1 truncate text-[10px]">
-                  <GitBranchIcon className="size-2.5" />
-                  {workspace.gitBranch}
-                </span>
-              ) : null}
-            </span>
+            <span className="truncate">{workspaceNavigationTitle(workspace)}</span>
           </SidebarMenuSubButton>
           <div className="invisible flex shrink-0 items-center group-focus-within/workspace:visible group-hover/workspace:visible">
             {workspace.isValid !== false ? (
               <>
                 <Button
                   aria-label={`在 ${workspace.name} 创建任务`}
+                  className="hover:bg-transparent"
                   onClick={(): void => props.openTaskDialog(workspace)}
                   size="icon-xs"
                   title="创建任务"
@@ -107,6 +120,7 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
                 </Button>
                 <Button
                   aria-label={workspace.pinnedAt ? '取消置顶此工作区' : '置顶此工作区'}
+                  className="hover:bg-transparent"
                   onClick={(): void => void props.setWorkspacePinned(workspace.id, !workspace.pinnedAt)}
                   size="icon-xs"
                   variant="ghost"
@@ -117,7 +131,7 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
             ) : null}
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent className="[&_svg]:size-3">
           <WorkspaceContextItems {...props} />
         </ContextMenuContent>
       </ContextMenu>

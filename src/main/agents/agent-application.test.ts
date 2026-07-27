@@ -33,7 +33,7 @@ const adapter: AdapterVersion = {
 
 describe('Agent application', (): void => {
   it('forks into a sibling task pinned to the source Adapter version', async (): Promise<void> => {
-    const forked = { ...source, id: 'task-2', name: 'Review-1', agentSessionId: null }
+    const forked = { ...source, id: 'task-2', agentSessionId: null }
     const launch = { sessionId: 'agent:task-2', task: forked } as AgentLaunch
     const manager = {
       launch: vi
@@ -44,7 +44,6 @@ describe('Agent application', (): void => {
       createPinned: vi
         .fn<(input: { workspaceId: string; name: string }, versionId: string) => Task>()
         .mockReturnValue(forked),
-      nextForkName: vi.fn<(task: Task) => string>().mockReturnValue('Review-1'),
     } as unknown as TaskService
     const database = {
       adapters: { getVersion: (): AdapterVersion => adapter },
@@ -62,9 +61,27 @@ describe('Agent application', (): void => {
 
     await expect(application.fork(source.id)).resolves.toBe(launch)
     expect(tasks.createPinned).toHaveBeenCalledWith(
-      { workspaceId: source.workspaceId, name: 'Review-1' },
+      { workspaceId: source.workspaceId, name: source.name },
       source.adapterVersionId,
     )
     expect(manager.launch).toHaveBeenCalledWith(forked.id, 'fork', source.agentSessionId)
+  })
+
+  it('rejects Fork while the source task is running', async (): Promise<void> => {
+    const runningSource = { ...source, isRunning: true }
+    const application = createAgentApplication({
+      database: {
+        adapters: { getVersion: (): AdapterVersion => adapter },
+        tasks: { get: (): Task => runningSource },
+      } as unknown as AppDatabase,
+      inspectAvailability: async (): Promise<{ forkAvailable: boolean; resumeAvailable: boolean }> => ({
+        forkAvailable: true,
+        resumeAvailable: true,
+      }),
+      manager: { launch: vi.fn<AgentManager['launch']>() } as unknown as AgentManager,
+      tasks: { createPinned: vi.fn<TaskService['createPinned']>() } as unknown as TaskService,
+    })
+
+    await expect(application.fork(source.id)).rejects.toThrow('Running task cannot be forked')
   })
 })

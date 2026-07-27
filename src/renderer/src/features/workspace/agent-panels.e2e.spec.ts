@@ -14,6 +14,8 @@ const addProject = async (application: ElectronApplication, page: Page, projectD
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedDirectory] })
   }, projectDirectory)
   await page.getByRole('button', { name: '添加项目' }).click()
+  await page.getByRole('button', { name: '选择已有文件夹' }).click()
+  await page.getByRole('button', { name: '创建项目' }).click()
   await expect(page.getByRole('button', { name: basename(projectDirectory), exact: true })).toBeVisible()
 }
 

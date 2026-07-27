@@ -318,7 +318,7 @@ const WorkspaceLayoutBody = ({ layout, taskError, tasks, workspace }: WorkspaceL
             }}
             onRenderTabSet={(node, renderValues): void => {
               if (!(node instanceof TabSetNode)) return
-              renderValues.buttons.push(
+              renderValues.stickyButtons.push(
                 <Button
                   aria-label="在此标签组新建终端"
                   key={`terminal:${node.getId()}`}

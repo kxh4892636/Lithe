@@ -7,7 +7,7 @@ Lithe 是以项目工作目录为边界，组织工作区、任务、终端与 C
 
 **项目**：
 用户选择或由 Lithe 创建的根目录，是组织工作区的长期容器；项目名称是独立于
-根目录 basename 的显示文本。
+根目录 basename 的可重复显示文本，稳定项目 ID 与规范化根目录承担身份识别。
 
 **无 Git 项目**：
 未使用 Git 管理的项目，只具有默认工作区。
@@ -70,8 +70,8 @@ Lithe 为一个 CLI 实例随机签发、限定其项目、工作区和任务上
 `lithe-tool`，但不增加新的工具入口。
 
 **Agent 集成安装**：
-由 `lithe-tool install` 在本机安装 Lithe Tool Skill、会话绑定助手与 Coding
-Agent CLI Hook 配置的离线过程，不依赖正在运行的 Lithe 或任务 capability。
+由 `lithe-tool install` 在本机安装 Lithe Tool Skill 与 Coding Agent CLI Hook
+配置的离线过程，不依赖正在运行的 Lithe 或任务 capability。
 
 ## 终端运行
 

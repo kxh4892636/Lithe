@@ -3,13 +3,17 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { Command } from 'commander'
+import which from 'which'
 
+import litheToolSkillContent from '../../resources/lithe-tool/SKILL.md'
 import {
   readControlDiscovery,
   resolveControlDiscoveryPath,
   type ControlDiscovery,
 } from '../main/tool-control/control-discovery'
 import type { ToolRequest } from '../shared/tool-protocol'
+import { parseSessionStartHookInput } from './hook-input'
+import { installAgentIntegrations } from './integration-installer'
 import { requestTool, responseToStdout } from './tool-client'
 
 const resolveDiscovery = (): ControlDiscovery | undefined => {
@@ -52,11 +56,50 @@ const execute = async (command: string, payload?: Record<string, unknown>): Prom
   process.exitCode = response.ok ? 0 : 1
 }
 
+const readStdin = async (): Promise<string> => {
+  const chunks: Buffer[] = []
+  for await (const chunk of process.stdin) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+const executeHookBind = async (): Promise<void> => {
+  const capability = process.env.LITHE_CAPABILITY
+  if (!capability) return
+  try {
+    const sessionId = parseSessionStartHookInput(await readStdin())
+    const discovery = resolveDiscovery()
+    if (!discovery) throw new TypeError('Lithe is not running')
+    const response = await requestTool({
+      authorization: { kind: 'agent', capability },
+      command: 'agent.bind',
+      endpoint: discovery.endpoint,
+      payload: { sessionId },
+    })
+    if (!response.ok) throw new TypeError(response.error.message)
+  } catch (error: unknown) {
+    process.stderr.write(`lithe-tool hook bind failed: ${error instanceof Error ? error.message : String(error)}\n`)
+    process.exitCode = 1
+  }
+}
+
 const program = new Command()
   .name('lithe-tool')
-  .description('Control a running Lithe instance')
+  .description('Manage Lithe and its Coding Agent integrations')
   .version('1.0.0')
   .exitOverride()
+
+program
+  .command('install')
+  .description('Install the Lithe Tool Skill and detected Coding Agent hooks')
+  .action((): void => {
+    const result = installAgentIntegrations({
+      homeDirectory: homedir(),
+      isCommandAvailable: (command: string): boolean => which.sync(command, { nothrow: true }) !== null,
+      skillContent: litheToolSkillContent,
+    })
+    process.stdout.write(`${JSON.stringify({ id: null, ...result })}\n`)
+    process.exitCode = result.ok ? 0 : 1
+  })
 
 program
   .command('context')
@@ -107,8 +150,20 @@ for (const operation of ['running', 'idle'] as const) {
 const agent = program.command('agent').description('Manage coding Agent processes')
 agent
   .command('bind')
-  .requiredOption('--session-id <id>')
-  .action((options: { sessionId: string }): Promise<void> => execute('agent.bind', { sessionId: options.sessionId }))
+  .option('--session-id <id>')
+  .option('--hook-input')
+  .action((options: { hookInput?: boolean; sessionId?: string }): Promise<void> => {
+    if (options.hookInput && !options.sessionId) return executeHookBind()
+    if (options.sessionId && !options.hookInput) return execute('agent.bind', { sessionId: options.sessionId })
+    throw new TypeError('Choose exactly one Agent binding input')
+  })
+
+for (const operation of ['start', 'resume', 'stop', 'fork'] as const) {
+  agent
+    .command(operation)
+    .requiredOption('--task-id <id>')
+    .action((options: { taskId: string }): Promise<void> => execute(`agent.${operation}`, options))
+}
 
 const workspace = program.command('workspace').description('Manage Lithe Git workspaces')
 workspace

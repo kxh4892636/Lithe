@@ -14,7 +14,6 @@ import { registerAgentIpc, removeAgentIpc } from './agents/agent-ipc'
 import { createAgentManager, type AgentManager } from './agents/agent-manager'
 import { registerAgentToolCommands } from './agents/agent-tool-commands'
 import { inspectAdapterAvailability, isAdapterAvailable } from './agents/command-availability'
-import { installLitheToolSkill, readLitheToolSkill } from './agents/skill-installer'
 import type { AppDatabase } from './database/app-database'
 import { createAppDatabase } from './database/app-database'
 import { createFileService, type FileService } from './files/file-service'
@@ -84,7 +83,6 @@ let toolControlRuntime: ToolControlRuntime | undefined
 let taskStateService: TaskStateService | undefined
 let shutdownStarted = false
 let shutdownComplete = false
-let skillConflicts: string[] = []
 let visibleTaskId: string | null = null
 let restoreAgentsThisLaunch = true
 let removeFileIpc = (): void => undefined
@@ -204,16 +202,6 @@ const deleteManagedTask = async (task: Task): Promise<void> => {
 const resolveMigrationsFolder = (): string =>
   is.dev ? join(app.getAppPath(), 'drizzle') : join(process.resourcesPath, 'drizzle')
 
-const installAgentSkill = (): string[] => {
-  if (runtimeProfile.isDevelopment && !process.env.LITHE_SKILL_HOME) return []
-  const resourcePath = is.dev ? join(app.getAppPath(), 'resources') : process.resourcesPath
-  const result = installLitheToolSkill(process.env.LITHE_SKILL_HOME ?? homedir(), readLitheToolSkill(resourcePath))
-  for (const conflict of result.conflicts) {
-    process.stderr.write(`Lithe Tool Skill conflict: ${conflict}\n`)
-  }
-  return result.conflicts
-}
-
 const createWindow = (): BrowserWindow => {
   if (!appDatabase) throw new Error('数据库尚未初始化')
   if (!windowStatePersistence) throw new Error('窗口状态持久化尚未初始化')
@@ -268,15 +256,6 @@ const openMainWindow = async (): Promise<void> => {
   await fileService?.close()
   visibleTaskId = null
   mainWindow = createWindow()
-  if (skillConflicts.length > 0) {
-    void dialog.showMessageBox(mainWindow, {
-      type: 'warning',
-      title: 'Lithe Tool Skill 未安装',
-      message: '检测到同名的用户 Skill，Lithe 未覆盖任何现有文件。',
-      detail: skillConflicts.join('\n'),
-    })
-    skillConflicts = []
-  }
   const workspaceLifecycle = createWorkspaceLifecycle({
     database: appDatabase,
     getAgentManager: (): AgentManager | undefined => agentManager,
@@ -299,6 +278,7 @@ const openMainWindow = async (): Promise<void> => {
   registerIpcHandlers({
     database: appDatabase,
     forgetInvalidProject: workspaceLifecycle.forgetInvalidProject,
+    managedProjectsRoot: join(runtimeProfile.runtimeDirectory, 'projects'),
     window: mainWindow,
     worktrees,
   })
@@ -328,7 +308,6 @@ const openMainWindow = async (): Promise<void> => {
     getWorkspace: appDatabase.projects.getWorkspace,
     incrementAdapterUsage: appDatabase.adapters.incrementUsage,
     isAdapterAvailable,
-    listTasks: appDatabase.tasks.list,
     now: (): Date => new Date(),
     saveTask: appDatabase.tasks.add,
     updateTask: appDatabase.tasks.rename,
@@ -523,7 +502,6 @@ if (!app.requestSingleInstanceLock()) {
         restoreAgentsThisLaunch = result.response === 1
       }
       await retryStagedScratchCleanup(appDatabase)
-      skillConflicts = installAgentSkill()
       toolControlRuntime = createToolControlRuntime(appDatabase, {
         discoveryPath: controlDiscoveryPath,
         runtimeDirectory: runtimeProfile.runtimeDirectory,

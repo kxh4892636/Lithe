@@ -37,7 +37,7 @@ describe('settings page', (): void => {
         setTheme,
       },
       projects: {
-        addDirectory: vi.fn<LitheBridge['projects']['addDirectory']>().mockResolvedValue(null),
+        create: vi.fn<LitheBridge['projects']['create']>(),
         getNavigation: vi
           .fn<LitheBridge['projects']['getNavigation']>()
           .mockResolvedValue({ activeWorkspaceId: null, projects: [], scratchWorkspaces: [] }),

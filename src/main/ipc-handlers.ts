@@ -1,8 +1,17 @@
 import { randomUUID } from 'node:crypto'
+import { realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import { app, type BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 
-import type { ProjectWithWorkspaces, RuntimeInfo, Theme, Workspace, WorkspaceNavigation } from '../shared/app-contract'
+import type {
+  ProjectCreateInput,
+  ProjectWithWorkspaces,
+  RuntimeInfo,
+  Theme,
+  Workspace,
+  WorkspaceNavigation,
+} from '../shared/app-contract'
 import { themeValues } from '../shared/app-contract'
 import { ipcChannels } from '../shared/ipc-channels'
 import type { AppDatabase } from './database/app-database'
@@ -14,6 +23,7 @@ import type { WorktreeService } from './workspaces/worktree-service'
 interface RegisterIpcHandlersOptions {
   database: AppDatabase
   forgetInvalidProject?: (projectId: string, confirmation: string) => Promise<boolean>
+  managedProjectsRoot: string
   window: BrowserWindow
   worktrees?: WorktreeService
 }
@@ -49,9 +59,30 @@ const logBoundaryError = (message: string, error: unknown): void => {
   process.stderr.write(`Lithe ${message}: ${detail}\n`)
 }
 
+const assertProjectCreateInput = (value: unknown): ProjectCreateInput => {
+  if (!value || typeof value !== 'object') throw new TypeError('无效的项目参数')
+  const { name, sourcePath } = value as { name?: unknown; sourcePath?: unknown }
+  if (typeof name !== 'string' || name.length > 255) throw new TypeError('无效的项目名称')
+  if (sourcePath !== undefined && (typeof sourcePath !== 'string' || sourcePath.length > 32_768)) {
+    throw new TypeError('无效的 Source folder')
+  }
+  return { name, ...(sourcePath === undefined ? {} : { sourcePath }) }
+}
+
+const normalizedRealPath = (path: string): string => {
+  let realPath: string
+  try {
+    realPath = realpathSync.native(resolve(path))
+  } catch {
+    realPath = resolve(path)
+  }
+  return process.platform === 'win32' ? realPath.toLocaleLowerCase() : realPath
+}
+
 export const registerIpcHandlers = ({
   database,
   forgetInvalidProject = async (): Promise<boolean> => false,
+  managedProjectsRoot,
   window,
   worktrees,
 }: RegisterIpcHandlersOptions): void => {
@@ -63,8 +94,15 @@ export const registerIpcHandlers = ({
     },
     createId: randomUUID,
     detectGitBranch: async (rootPath): Promise<string | null> => detectGitBranch(rootPath, logBoundaryError),
+    findProjectByRoot: (rootPath): ProjectWithWorkspaces | undefined =>
+      database.projects
+        .list()
+        .find((project): boolean => normalizedRealPath(project.rootPath) === normalizedRealPath(rootPath)),
     logError: logBoundaryError,
+    managedProjectsRoot,
     now: (): Date => new Date(),
+    platform: process.platform,
+    selectWorkspace: database.navigation.setActiveWorkspace,
   })
 
   ipcMain.handle(ipcChannels.getRuntimeInfo, (event): RuntimeInfo => {
@@ -142,16 +180,20 @@ export const registerIpcHandlers = ({
     assertTrustedSender(event, window)
     database.preferences.setProjectGroupOpen(assertBoolean(value))
   })
-  ipcMain.handle(ipcChannels.addProjectDirectory, async (event): Promise<ProjectWithWorkspaces | null> => {
+  ipcMain.handle(ipcChannels.pickProjectSourceFolder, async (event): Promise<string | null> => {
     assertTrustedSender(event, window)
     const selection = await dialog.showOpenDialog(window, {
-      buttonLabel: '添加项目',
-      properties: ['openDirectory', 'createDirectory'],
-      title: '选择项目文件夹',
+      buttonLabel: '选择文件夹',
+      properties: ['openDirectory'],
+      title: '选择 Source folder',
     })
     const [rootPath] = selection.filePaths
     if (selection.canceled || !rootPath) return null
-    return await projectService.addDirectory(rootPath)
+    return rootPath
+  })
+  ipcMain.handle(ipcChannels.createProject, async (event, input: unknown): Promise<ProjectWithWorkspaces> => {
+    assertTrustedSender(event, window)
+    return await projectService.create(assertProjectCreateInput(input))
   })
   ipcMain.handle(ipcChannels.getWorkspaceNavigation, (event): WorkspaceNavigation => {
     assertTrustedSender(event, window)
@@ -190,7 +232,8 @@ export const removeIpcHandlers = (): void => {
   ipcMain.removeHandler(ipcChannels.setPinnedGroupOpen)
   ipcMain.removeHandler(ipcChannels.setNotificationsEnabled)
   ipcMain.removeHandler(ipcChannels.setProjectGroupOpen)
-  ipcMain.removeHandler(ipcChannels.addProjectDirectory)
+  ipcMain.removeHandler(ipcChannels.createProject)
+  ipcMain.removeHandler(ipcChannels.pickProjectSourceFolder)
   ipcMain.removeHandler(ipcChannels.getWorkspaceNavigation)
   ipcMain.removeHandler(ipcChannels.selectWorkspace)
   ipcMain.removeHandler(ipcChannels.setWorkspacePinned)

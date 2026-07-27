@@ -95,7 +95,7 @@ export const tasks = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
-    uniqueIndex('tasks_workspace_name_unique').on(table.workspaceId, table.nameKey),
+    index('tasks_workspace_name_index').on(table.workspaceId, table.nameKey),
     uniqueIndex('tasks_agent_session_unique').on(table.agentSessionId),
   ],
 )

@@ -1,4 +1,4 @@
-import type { AdapterDefinition } from '../../shared/agent-contract'
+import type { AdapterDefinition, PtyInteractionStep } from '../../shared/agent-contract'
 
 export interface AdapterTemplateContext {
   agentSessionId?: string
@@ -11,6 +11,7 @@ export type AdapterOperation = 'fork' | 'resume' | 'start'
 export interface AdapterCommand {
   args: string[]
   executable: string
+  interactions: PtyInteractionStep[]
 }
 
 const replaceVariables = (argument: string, context: AdapterTemplateContext): string =>
@@ -33,5 +34,6 @@ export const renderAdapterCommand = (
   return {
     executable: definition.executable,
     args: template.map((argument: string): string => replaceVariables(argument, context)),
+    interactions: definition.interactions?.[operation] ?? [],
   }
 }

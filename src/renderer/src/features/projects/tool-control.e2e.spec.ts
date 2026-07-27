@@ -69,6 +69,8 @@ test('E2E-LITHE-007 queries the running app through the built global CLI entry',
     }, projectDirectory)
     const window = await electronSession.application.firstWindow()
     await window.getByRole('button', { name: '添加项目' }).click()
+    await window.getByRole('button', { name: '选择已有文件夹' }).click()
+    await window.getByRole('button', { name: '创建项目' }).click()
 
     const cliBinDirectory = process.platform === 'win32' ? cliInstallDirectory : join(cliInstallDirectory, 'bin')
     const cliEnvironment = {

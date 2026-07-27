@@ -19,6 +19,8 @@ test('E2E-LITHE-010 opens duplicate shared file views and explicitly saves the e
     }, projectDirectory)
     const window = await electronSession.application.firstWindow()
     await window.getByRole('button', { name: '添加项目' }).click()
+    await window.getByRole('button', { name: '选择已有文件夹' }).click()
+    await window.getByRole('button', { name: '创建项目' }).click()
     await expect(window.getByRole('button', { name: basename(projectDirectory), exact: true })).toBeVisible()
     workspaceId = await window.evaluate(async (): Promise<string | undefined> => {
       const browserWindow = globalThis.window as unknown as Window & { lithe: LitheBridge }
@@ -89,6 +91,8 @@ test('E2E-LITHE-011 saves dirty documents through the application exit confirmat
     }, projectDirectory)
     const window = await electronSession.application.firstWindow()
     await window.getByRole('button', { name: '添加项目' }).click()
+    await window.getByRole('button', { name: '选择已有文件夹' }).click()
+    await window.getByRole('button', { name: '创建项目' }).click()
     await window.getByRole('button', { name: 'exit.txt', exact: true }).click()
     const editor = window.locator('.monaco-editor')
     await editor.click()

@@ -93,6 +93,9 @@ importers:
       simple-git:
         specifier: ^3.36.0
         version: 3.36.0(supports-color@7.2.0)
+      smol-toml:
+        specifier: ^1.7.1
+        version: 1.7.1
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
@@ -4279,6 +4282,10 @@ packages:
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
+
+  smol-toml@1.7.1:
+    resolution: {integrity: sha512-PPlsspAZ4jbMBu5DMFhfUGDQLu/vrL4SyBROVS37x8ynnVmFIs1VPBz1Co8Xks3TvpIaZXmU85y4DrQ+UyVFoQ==}
+    engines: {node: '>= 18'}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -8607,6 +8614,8 @@ snapshots:
       semver: 7.8.5
 
   sisteransi@1.0.5: {}
+
+  smol-toml@1.7.1: {}
 
   source-map-js@1.2.1: {}
 

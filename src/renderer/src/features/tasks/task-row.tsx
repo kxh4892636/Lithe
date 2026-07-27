@@ -81,16 +81,26 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
   const stopTask = useTaskStore((state: TaskState) => state.stopTask)
   const [renaming, setRenaming] = useState(false)
   const isRunning = launch?.isRunning ?? task.isRunning
-  const canFork = Boolean(task.agentSessionId && adapter?.forkAvailable)
+  const forkDisabledReason = isRunning
+    ? '请先停止任务'
+    : !task.agentSessionId
+      ? '任务尚未绑定 Agent 会话'
+      : !adapter?.forkAvailable
+        ? '当前 Adapter 不支持 Fork'
+        : null
   const fork = (): void => reportTaskAction(forkTask(task.id))
   const archive = (): void => reportTaskAction(archiveTask(task.id))
   const stop = (): void => reportTaskAction(stopTask(task.id))
   return (
     <>
       <ContextMenu>
-        <ContextMenuTrigger render={<div className="group/task flex items-center hover:bg-sidebar-accent/50" />}>
+        <ContextMenuTrigger
+          render={
+            <div className="group/task flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
+          }
+        >
           <button
-            className="text-muted-foreground hover:text-foreground flex min-w-0 flex-1 items-center gap-1 py-1 pl-7 text-left text-xs"
+            className="text-muted-foreground hover:text-foreground flex min-w-0 flex-1 items-center gap-1 py-1 pl-5 text-left text-xs"
             onClick={onOpen}
             type="button"
           >
@@ -106,14 +116,21 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
             {task.isUnread ? <span className="bg-primary ml-auto size-1.5 rounded-full" aria-label="未读" /> : null}
           </button>
           <div className="invisible flex items-center pr-1 group-focus-within/task:visible group-hover/task:visible">
-            {canFork ? (
-              <Button aria-label={`Fork ${task.name}`} onClick={fork} size="icon-xs" title="Fork" variant="ghost">
-                <GitForkIcon />
-              </Button>
-            ) : null}
+            <Button
+              aria-label={`Fork ${task.name}`}
+              className="hover:bg-transparent"
+              disabled={forkDisabledReason !== null}
+              onClick={fork}
+              size="icon-xs"
+              title={forkDisabledReason ?? 'Fork'}
+              variant="ghost"
+            >
+              <GitForkIcon />
+            </Button>
             <Button
               aria-label={`归档 ${task.name}`}
               disabled={isRunning}
+              className="hover:bg-transparent"
               onClick={archive}
               size="icon-xs"
               title={isRunning ? '运行中任务不能归档' : '归档'}
@@ -123,26 +140,24 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
             </Button>
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent className="[&_svg]:size-3">
           <ContextMenuItem onClick={(): void => setRenaming(true)}>
             <PencilIcon />
             重命名
           </ContextMenuItem>
-          {canFork ? (
-            <ContextMenuItem onClick={fork}>
-              <GitForkIcon />
-              Fork
-            </ContextMenuItem>
-          ) : null}
+          <ContextMenuItem disabled={forkDisabledReason !== null} onClick={fork} title={forkDisabledReason ?? 'Fork'}>
+            <GitForkIcon className="size-3" />
+            Fork
+          </ContextMenuItem>
           {isRunning ? (
             <ContextMenuItem onClick={stop}>
-              <SquareIcon />
+              <SquareIcon className="size-3" />
               停止
             </ContextMenuItem>
           ) : null}
           <ContextMenuSeparator />
           <ContextMenuItem disabled={isRunning} onClick={archive}>
-            <ArchiveIcon />
+            <ArchiveIcon className="size-3" />
             归档
           </ContextMenuItem>
         </ContextMenuContent>

@@ -14,7 +14,6 @@ interface TaskServiceOptions {
   getWorkspace: (workspaceId: string) => Workspace | undefined
   incrementAdapterUsage: (adapterId: string) => void
   isAdapterAvailable: (adapter: AdapterVersion) => Promise<boolean>
-  listTasks: (workspaceId: string) => Task[]
   now: () => Date
   saveTask: (task: Task) => void
   updateTask: (taskId: string, name: string) => Task
@@ -23,20 +22,12 @@ interface TaskServiceOptions {
 export interface TaskService {
   create: (input: CreateTaskInput) => Promise<Task>
   createPinned: (input: CreateTaskInput, adapterVersionId: string) => Task
-  nextForkName: (source: Task) => string
   rename: (task: Task, name: string) => Task
 }
 
-const normalizeName = (name: string): string => name.trim().toLocaleLowerCase()
-
 export const createTaskService = (options: TaskServiceOptions): TaskService => {
-  const assertUnique = (workspaceId: string, name: string, exceptTaskId?: string): string => {
-    const normalized = normalizeName(name)
-    if (!normalized) throw new TypeError('Task name is required')
-    const duplicate = options
-      .listTasks(workspaceId)
-      .some((task: Task): boolean => task.id !== exceptTaskId && normalizeName(task.name) === normalized)
-    if (duplicate) throw new TypeError('Task name already exists')
+  const normalizeName = (name: string): string => {
+    if (!name.trim()) throw new TypeError('Task name is required')
     return name.trim()
   }
   const createPinned = (input: CreateTaskInput, adapterVersionId: string): Task => {
@@ -44,7 +35,7 @@ export const createTaskService = (options: TaskServiceOptions): TaskService => {
     const task: Task = {
       id: options.createId(),
       workspaceId: input.workspaceId,
-      name: assertUnique(input.workspaceId, input.name),
+      name: normalizeName(input.name),
       adapterVersionId,
       agentSessionId: null,
       archivedAt: null,
@@ -76,17 +67,6 @@ export const createTaskService = (options: TaskServiceOptions): TaskService => {
       return task
     },
     createPinned,
-    nextForkName: (source: Task): string => {
-      const occupied = new Set(
-        options.listTasks(source.workspaceId).map((task: Task): string => normalizeName(task.name)),
-      )
-      for (let suffix = 1; suffix < Number.MAX_SAFE_INTEGER; suffix += 1) {
-        const candidate = `${source.name}-${suffix}`
-        if (!occupied.has(normalizeName(candidate))) return candidate
-      }
-      throw new TypeError('Unable to allocate fork task name')
-    },
-    rename: (task: Task, name: string): Task =>
-      options.updateTask(task.id, assertUnique(task.workspaceId, name, task.id)),
+    rename: (task: Task, name: string): Task => options.updateTask(task.id, normalizeName(name)),
   }
 }

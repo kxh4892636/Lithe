@@ -168,3 +168,58 @@
   overflow: hidden;
   padding: 0;
 }
+
+.flexlayout__tabset_tabbar_outer {
+  height: 24px;
+  min-height: 24px;
+  background: var(--background);
+}
+
+.flexlayout__tabset_tabbar_outer_top {
+  padding: 0 2px;
+}
+
+.flexlayout__tabset_tabbar_inner,
+.flexlayout__tabset_tabbar_inner_tab_container {
+  height: 23px;
+  min-height: 23px;
+}
+
+.flexlayout__tabset_tabbar_inner_tab_container {
+  gap: 2px;
+  padding: 0;
+  border: 0;
+}
+
+.flexlayout__tab_button {
+  height: 22px;
+  gap: 4px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 11px;
+  box-shadow: none;
+}
+
+.flexlayout__tab_button--selected {
+  background: var(--muted);
+}
+
+.flexlayout__tab_button_leading svg,
+.flexlayout__tab_button_trailing svg,
+.flexlayout__tab_toolbar svg {
+  width: 12px;
+  height: 12px;
+}
+
+.flexlayout__tab_toolbar {
+  height: 23px;
+  gap: 0;
+  padding-left: 2px;
+}
+
+.flexlayout__tab_toolbar_sticky_buttons_container {
+  gap: 0;
+  padding-left: 2px;
+}

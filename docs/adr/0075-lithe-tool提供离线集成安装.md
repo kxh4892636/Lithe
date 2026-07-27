@@ -1,10 +1,9 @@
 # lithe-tool 提供离线集成安装
 
-`lithe-tool` 新增 `install`，用于在本机安装 Lithe Tool Skill、统一会话绑定助手，
-以及 Codex、Claude Code、Kimi Code 的 `SessionStart` Hook 配置。该命令直接操作
-当前用户的集成文件，不经过本地控制通道，不要求 Lithe 应用正在运行，也不要求
-项目、工作区、任务或 Agent capability；安装完成后新启动的 Coding Agent 才加载
-这些资源。
+`lithe-tool` 新增 `install`，用于在本机安装 Lithe Tool Skill，以及 Codex、
+Claude Code、Kimi Code 的 `SessionStart` Hook 配置。该命令直接操作当前用户的
+集成文件，不经过本地控制通道，不要求 Lithe 应用正在运行，也不要求项目、工作区、
+任务或 Agent capability；安装完成后新启动的 Coding Agent 才加载这些资源。
 
 安装与更新只由用户显式执行 `lithe-tool install` 触发。Lithe 应用启动和升级不
 自动修改 Coding Agent 的用户配置；应用版本更新后，用户重新执行该命令才更新
@@ -17,10 +16,11 @@
 并返回非零退出码。手工与 Agent 继续使用
 `lithe-tool agent bind --session-id <id>` 及原有 JSON 输出。
 
-`install` 始终安装通用 Lithe Tool Skill 与会话绑定助手，并自动检测当前用户环境
-中可执行的 Codex、Claude Code、Kimi Code。它只为检测到的 CLI 写入 Hook 配置；
-未检测到的提供方返回 `skipped`，用户以后安装对应 CLI 后重新执行即可。命令不
-进入交互式提供方选择，以便脚本化和重复执行。
+`install` 始终安装通用 Lithe Tool Skill，并自动检测当前用户环境中可执行的
+Codex、Claude Code、Kimi Code。它只为检测到的 CLI 写入直接调用
+`lithe-tool agent bind --hook-input` 的 Hook 配置；未检测到的提供方返回
+`skipped`，用户以后安装对应 CLI 后重新执行即可。命令不进入交互式提供方选择，
+以便脚本化和重复执行。
 
 安装过程按提供方隔离且可重复执行：它解析并保留用户现有配置，只追加带 Lithe
 标记的 Hook；同版本受管资源返回 `unchanged`，升级只更新能够确认由 Lithe 管理

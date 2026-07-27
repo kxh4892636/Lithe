@@ -55,6 +55,68 @@ describe('PTY runtime', (): void => {
     expect(() => runtime.write('missing', 'data')).toThrow('终端会话不存在')
   })
 
+  it('sends ordered simulated input only after matching ANSI-stripped output', (): void => {
+    let data: ((value: string) => void) | undefined
+    const process = createFakeProcess()
+    process.onData = (listener): void => {
+      data = listener
+    }
+    const runtime = createPtyRuntime({
+      adapter: { spawn: (): PtyProcess => process },
+      onData: (): void => undefined,
+      onExit: (): void => undefined,
+    })
+
+    runtime.create({
+      columns: 80,
+      cwd: '.',
+      interactions: [
+        { input: 'first\r', timeoutMs: 5_000, waitFor: 'Ready' },
+        { input: 'second\r', timeoutMs: 5_000, waitFor: 'Continue' },
+      ],
+      rows: 24,
+      sessionId: 'agent:task-1',
+      shell: 'agent',
+    })
+    data?.('\u001B[32mRe')
+    expect(process.write).not.toHaveBeenCalled()
+    data?.('ady\u001B[0m')
+    expect(process.write).toHaveBeenNthCalledWith(1, 'first\r')
+    data?.('Continue')
+    expect(process.write).toHaveBeenNthCalledWith(2, 'second\r')
+  })
+
+  it('reports and terminates an interaction that times out', async (): Promise<void> => {
+    vi.useFakeTimers()
+    try {
+      const process = createFakeProcess()
+      const onData = vi.fn<(sessionId: string, data: string) => void>()
+      const onClose = vi.fn<(sessionId: string) => void>()
+      const runtime = createPtyRuntime({
+        adapter: { spawn: (): PtyProcess => process },
+        onClose,
+        onData,
+        onExit: (): void => undefined,
+      })
+
+      runtime.create({
+        columns: 80,
+        cwd: '.',
+        interactions: [{ input: '/fork\r', timeoutMs: 1_000, waitFor: 'Ready' }],
+        rows: 24,
+        sessionId: 'agent:task-1',
+        shell: 'agent',
+      })
+      await vi.advanceTimersByTimeAsync(1_000)
+
+      expect(onData).toHaveBeenCalledWith('agent:task-1', expect.stringContaining('interaction step 1 timed out'))
+      expect(process.kill).toHaveBeenCalledOnce()
+      expect(onClose).toHaveBeenCalledWith('agent:task-1')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('ignores a stale exit after the same panel identity is reopened', (): void => {
     let firstExit: ((exitCode: number) => void) | undefined
     const first = createFakeProcess()

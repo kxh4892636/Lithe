@@ -22,6 +22,8 @@ test('E2E-LITHE-003 adds a directory and restores its default workspace', async 
     let window = await electronSession.application.firstWindow()
 
     await window.getByRole('button', { name: '添加项目' }).click()
+    await window.getByRole('button', { name: '选择已有文件夹' }).click()
+    await window.getByRole('button', { name: '创建项目' }).click()
     await expect(window.getByRole('button', { name: basename(projectDirectory), exact: true })).toBeVisible()
     await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()
     await expect(window.getByRole('button', { name: '默认' })).toBeVisible()
@@ -52,6 +54,8 @@ test('E2E-LITHE-004 adds a newly created directory from the system picker', asyn
     const window = await electronSession.application.firstWindow()
 
     await window.getByRole('button', { name: '添加项目' }).click()
+    await window.getByRole('button', { name: '选择已有文件夹' }).click()
+    await window.getByRole('button', { name: '创建项目' }).click()
 
     await expect(window.getByRole('button', { name: 'new-project', exact: true })).toBeVisible()
     await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()
@@ -130,11 +134,14 @@ test('E2E-LITHE-009 creates and deletes a managed Git workspace from project nav
     const window = await electronSession.application.firstWindow()
 
     await window.getByRole('button', { name: '添加项目' }).click()
+    await window.getByRole('button', { name: '选择已有文件夹' }).click()
+    await window.getByRole('button', { name: '创建项目' }).click()
+    await window.getByRole('button', { name: basename(projectDirectory), exact: true }).hover()
     await window.getByRole('button', { name: `为 ${basename(projectDirectory)} 创建工作区` }).click()
     await window.getByRole('textbox', { name: '分支名称' }).fill('feature/e2e')
     await window.getByRole('textbox', { name: '工作区名称' }).fill('Review')
     await window.getByRole('button', { name: '创建工作区', exact: true }).click()
-    await expect(window.getByRole('button', { name: 'Review', exact: true })).toBeVisible()
+    await expect(window.getByRole('button', { name: 'feature/e2e - Review', exact: true })).toBeVisible()
 
     const managedPath = await window.evaluate(async (): Promise<string> => {
       const browserWindow = globalThis.window as unknown as Window & { lithe: LitheBridge }
@@ -145,10 +152,10 @@ test('E2E-LITHE-009 creates and deletes a managed Git workspace from project nav
       if (!derived) throw new Error('Derived workspace is missing')
       return derived.rootPath
     })
-    await window.getByRole('button', { name: 'Review', exact: true }).click({ button: 'right' })
+    await window.getByRole('button', { name: 'feature/e2e - Review', exact: true }).click({ button: 'right' })
     await window.getByRole('menuitem', { name: '删除', exact: true }).click()
     await window.getByRole('button', { name: '确认操作' }).click()
-    await expect(window.getByRole('button', { name: 'Review', exact: true })).toHaveCount(0)
+    await expect(window.getByRole('button', { name: 'feature/e2e - Review', exact: true })).toHaveCount(0)
     await expect.poll((): boolean => existsSync(managedPath)).toBe(false)
   } finally {
     await electronSession.application.close()

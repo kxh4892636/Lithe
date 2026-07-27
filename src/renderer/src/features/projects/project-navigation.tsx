@@ -37,11 +37,12 @@ import { TaskCreateDialog } from '../tasks/task-create-dialog'
 import { TaskRow } from '../tasks/task-row'
 import { useTaskStore, type TaskState } from '../tasks/task-store'
 import { useAdaptersByVersion } from '../tasks/use-adapters-by-version'
+import { ProjectCreateDialog } from './project-create-dialog'
 import { filterProjects } from './project-navigation-filter'
 import { ProjectOperationDialog, type ProjectOperation } from './project-operation-dialog'
 import { useProjectStore } from './project-store'
 import { ScratchTaskRows } from './scratch-task-rows'
-import { WorkspaceNavigationRow } from './workspace-navigation-row'
+import { WorkspaceNavigationRow, workspaceNavigationTitle } from './workspace-navigation-row'
 
 interface NavigationGroupProps {
   isOpen: boolean
@@ -70,15 +71,26 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
   return (
     <SidebarMenuItem className="group/project">
       <ContextMenu>
-        <ContextMenuTrigger render={<div className="flex min-w-0 items-center" />}>
-          <SidebarMenuButton className={project.isValid ? 'min-w-0 flex-1' : 'text-destructive min-w-0 flex-1'}>
-            <FolderIcon />
+        <ContextMenuTrigger
+          render={
+            <div className="flex min-w-0 items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
+          }
+        >
+          <SidebarMenuButton
+            className={
+              project.isValid
+                ? 'min-w-0 flex-1 hover:bg-transparent [&_svg]:size-3'
+                : 'text-destructive min-w-0 flex-1 hover:bg-transparent [&_svg]:size-3'
+            }
+          >
+            <FolderIcon className="size-3" />
             <span>{project.name}</span>
           </SidebarMenuButton>
           <div className="invisible flex shrink-0 items-center group-focus-within/project:visible group-hover/project:visible">
             {project.isValid ? (
               <Button
                 aria-label={`为 ${project.name} 创建工作区`}
+                className="hover:bg-transparent"
                 onClick={(): void => setOperation({ kind: 'create', project })}
                 size="icon-xs"
                 variant="ghost"
@@ -90,6 +102,7 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
             )}
             <Button
               aria-label={project.isValid ? `移除 ${project.name}` : `忘记 ${project.name}`}
+              className="hover:bg-transparent"
               onClick={(): void => setOperation(removeOperation)}
               size="icon-xs"
               variant="ghost"
@@ -98,7 +111,7 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
             </Button>
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent className="[&_svg]:size-3">
           {project.isValid ? (
             <ContextMenuItem onClick={(): void => setOperation({ kind: 'create', project })}>
               <PlusIcon />
@@ -111,7 +124,7 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-      <SidebarMenuSub>
+      <SidebarMenuSub className="mx-3 translate-x-0 px-0">
         {project.workspaces.map((workspace) => (
           <WorkspaceNavigationRow
             {...props}
@@ -213,9 +226,13 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
   const { activateTask, adapterByVersion, entry, selectWorkspace, setWorkspacePinned, tasks } = props
   const { workspace } = entry
   return (
-    <div className={props.active ? 'group/pinned bg-sidebar-accent/60 rounded-md' : 'group/pinned'}>
+    <div className={props.active ? 'group/pinned rounded-md bg-sidebar-accent/60' : 'group/pinned'}>
       <ContextMenu>
-        <ContextMenuTrigger render={<div className="flex items-center px-2 py-1 text-xs" />}>
+        <ContextMenuTrigger
+          render={
+            <div className="flex items-center rounded-md px-2 py-1 text-xs hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
+          }
+        >
           <button
             className={
               workspace.isValid === false
@@ -225,12 +242,12 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
             onClick={(): void => void selectWorkspace(workspace.id)}
             type="button"
           >
-            {workspace.name}
+            {workspaceNavigationTitle(workspace)}
           </button>
           {workspace.isValid !== false ? (
             <Button
               aria-label={`在 ${workspace.name} 创建任务`}
-              className="invisible group-focus-within/pinned:visible group-hover/pinned:visible"
+              className="invisible hover:bg-transparent group-focus-within/pinned:visible group-hover/pinned:visible"
               onClick={(): void => props.onTaskCreate(workspace)}
               size="icon-xs"
               variant="ghost"
@@ -240,7 +257,7 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
           ) : null}
           <Button
             aria-label="取消置顶此工作区"
-            className="invisible group-focus-within/pinned:visible group-hover/pinned:visible"
+            className="invisible hover:bg-transparent group-focus-within/pinned:visible group-hover/pinned:visible"
             onClick={(): void => void setWorkspacePinned(workspace.id, false)}
             size="icon-xs"
             variant="ghost"
@@ -248,7 +265,7 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
             <PinIcon className="fill-current" />
           </Button>
         </ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent className="[&_svg]:size-3">
           <PinnedContextItems {...props} />
         </ContextMenuContent>
       </ContextMenu>
@@ -375,7 +392,7 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
 }
 
 interface ProjectGroupHeaderProps extends NavigationGroupProps {
-  addDirectory: () => Promise<void>
+  onAdd: () => void
   isLoading: boolean
   projectCount: number
 }
@@ -400,8 +417,9 @@ const ProjectGroupHeader = (props: ProjectGroupHeaderProps): React.JSX.Element =
       {props.projectCount > 0 ? (
         <SidebarGroupAction
           aria-label={t('projects.add')}
+          className="right-2 size-6 [&>svg]:size-3"
           disabled={props.isLoading}
-          onClick={(): void => void props.addDirectory()}
+          onClick={props.onAdd}
           title={t('projects.add')}
         >
           <FolderPlusIcon />
@@ -414,7 +432,6 @@ const ProjectGroupHeader = (props: ProjectGroupHeaderProps): React.JSX.Element =
 export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps): React.JSX.Element => {
   const { t } = useTranslation()
   const activeWorkspaceId = useProjectStore((state) => state.activeWorkspaceId)
-  const addDirectory = useProjectStore((state) => state.addDirectory)
   const error = useProjectStore((state) => state.error)
   const isLoading = useProjectStore((state) => state.isLoading)
   const projects = useProjectStore((state) => state.projects)
@@ -425,6 +442,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
   const tasksByWorkspace = useTaskStore((state: TaskState) => state.tasksByWorkspace)
   const [operation, setOperation] = useState<ProjectOperation | null>(null)
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const [taskWorkspace, setTaskWorkspace] = useState<Workspace | null>(null)
   const normalizedQuery = useNavigationSearchStore((state) => state.query.trim().toLocaleLowerCase())
   const adaptersByVersion = useAdaptersByVersion(
@@ -444,9 +462,9 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
   return (
     <SidebarGroup>
       <ProjectGroupHeader
-        addDirectory={addDirectory}
         isLoading={isLoading}
         isOpen={isOpen}
+        onAdd={(): void => setProjectDialogOpen(true)}
         onOpenChange={onOpenChange}
         projectCount={projects.length}
       />
@@ -456,12 +474,10 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
             <button
               className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs"
               disabled={isLoading}
-              onClick={(): void => {
-                void addDirectory()
-              }}
+              onClick={(): void => setProjectDialogOpen(true)}
               type="button"
             >
-              <FolderPlusIcon className="size-4" />
+              <FolderPlusIcon className="size-3" />
               <span>{t('projects.add')}</span>
             </button>
           ) : (
@@ -492,6 +508,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
             open={taskWorkspace !== null}
             workspace={taskWorkspace}
           />
+          <ProjectCreateDialog onOpenChange={setProjectDialogOpen} open={projectDialogOpen} />
         </SidebarGroupContent>
       ) : null}
     </SidebarGroup>

@@ -44,7 +44,6 @@ const setup = (
       usage.push(adapterId)
     },
     isAdapterAvailable: async (): Promise<boolean> => overrides.available ?? true,
-    listTasks: (): Task[] => tasks,
     now: (): Date => new Date('2026-07-25T00:00:00.000Z'),
     saveTask: (task: Task): void => {
       tasks.push(task)
@@ -76,16 +75,15 @@ describe('task service', (): void => {
     expect(unavailable.tasks).toEqual([])
   })
 
-  it('creates a normalized-unique task pinned to an immutable Adapter version', async (): Promise<void> => {
-    const { service, usage } = setup({ defaultAdapter: adapter })
-    const task = await service.create({ workspaceId: workspace.id, name: '  Review  ' })
+  it('creates ID-identified tasks with repeatable display names', async (): Promise<void> => {
+    const { service, tasks, usage } = setup({ defaultAdapter: adapter })
+    const first = await service.create({ workspaceId: workspace.id, name: '  Review  ' })
+    const second = await service.create({ workspaceId: workspace.id, name: 'Review' })
 
-    expect(task).toMatchObject({ name: 'Review', adapterVersionId: 'adapter-v1', agentSessionId: null })
-    expect(usage).toEqual(['adapter'])
-    await expect(service.create({ workspaceId: workspace.id, name: 'review' })).rejects.toThrow(
-      'Task name already exists',
-    )
-    expect(usage).toEqual(['adapter'])
+    expect(first).toMatchObject({ id: 'task-1', name: 'Review', adapterVersionId: 'adapter-v1' })
+    expect(second).toMatchObject({ id: 'task-2', name: 'Review', adapterVersionId: 'adapter-v1' })
+    expect(tasks).toHaveLength(2)
+    expect(usage).toEqual(['adapter', 'adapter'])
   })
 
   it('uses an explicitly selected available Adapter instead of the global default', async (): Promise<void> => {
@@ -102,12 +100,11 @@ describe('task service', (): void => {
     expect(usage).toEqual([selected.adapterId])
   })
 
-  it('allocates fork names from the complete current source name', async (): Promise<void> => {
+  it('renames tasks without treating another task name as identity', async (): Promise<void> => {
     const { service } = setup({ defaultAdapter: adapter })
-    const source = await service.create({ workspaceId: workspace.id, name: 'research' })
-    await service.create({ workspaceId: workspace.id, name: 'research-1' })
+    const first = await service.create({ workspaceId: workspace.id, name: 'research' })
+    const second = await service.create({ workspaceId: workspace.id, name: 'review' })
 
-    expect(service.nextForkName(source)).toBe('research-2')
-    expect(service.nextForkName({ ...source, name: 'research-1' })).toBe('research-1-1')
+    expect(service.rename(second, first.name)).toMatchObject({ id: second.id, name: 'research' })
   })
 })

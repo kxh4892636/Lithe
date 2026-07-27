@@ -24,6 +24,8 @@ test('E2E-LITHE-012 reviews staged and unstaged views as distinct read-only pane
     }, root)
     const window = await electronSession.application.firstWindow()
     await window.getByRole('button', { name: '添加项目' }).click()
+    await window.getByRole('button', { name: '选择已有文件夹' }).click()
+    await window.getByRole('button', { name: '创建项目' }).click()
     await expect(window.getByText(basename(root), { exact: true }).first()).toBeVisible()
 
     writeFileSync(join(root, 'shared.txt'), 'staged\n')
@@ -98,6 +100,8 @@ test('E2E-LITHE-013 hides the Changes tab outside a Git repository', async ({
     }, root)
     const window = await electronSession.application.firstWindow()
     await window.getByRole('button', { name: '添加项目' }).click()
+    await window.getByRole('button', { name: '选择已有文件夹' }).click()
+    await window.getByRole('button', { name: '创建项目' }).click()
     await expect(window.getByText(basename(root), { exact: true }).first()).toBeVisible()
     await expect(window.getByRole('complementary', { name: '工作区文件导航' })).toHaveAttribute(
       'data-git-repository',

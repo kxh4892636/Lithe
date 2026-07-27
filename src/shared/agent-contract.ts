@@ -5,6 +5,14 @@ export type AdapterTemplateVariable = (typeof adapterTemplateVariables)[number]
 
 const argumentSchema = z.string().max(2048)
 const commandTemplateSchema = z.array(argumentSchema).max(64)
+const ptyInteractionStepSchema = z
+  .object({
+    input: z.string().max(8192),
+    timeoutMs: z.number().int().min(100).max(120_000),
+    waitFor: z.string().min(1).max(2048),
+  })
+  .strict()
+const ptyInteractionStepsSchema = z.array(ptyInteractionStepSchema).max(16)
 
 export const adapterDefinitionSchema = z
   .object({
@@ -12,10 +20,19 @@ export const adapterDefinitionSchema = z
     start: commandTemplateSchema,
     resume: commandTemplateSchema.nullable(),
     fork: commandTemplateSchema.nullable(),
+    interactions: z
+      .object({
+        fork: ptyInteractionStepsSchema.optional(),
+        resume: ptyInteractionStepsSchema.optional(),
+        start: ptyInteractionStepsSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
 
 export type AdapterDefinition = z.infer<typeof adapterDefinitionSchema>
+export type PtyInteractionStep = z.infer<typeof ptyInteractionStepSchema>
 
 export interface AdapterVersion {
   id: string

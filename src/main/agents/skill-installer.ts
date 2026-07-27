@@ -7,6 +7,7 @@ const markerName = '.lithe-managed.json'
 export interface SkillInstallResult {
   conflicts: string[]
   installed: string[]
+  status: 'conflict' | 'installed' | 'unchanged' | 'updated'
 }
 
 interface ManagedMarker {
@@ -31,13 +32,15 @@ const isManagedCopy = (directory: string): boolean => {
   }
 }
 
-const installCopy = (directory: string, content: string): 'conflict' | 'installed' => {
+const installCopy = (directory: string, content: string): 'conflict' | 'installed' | 'unchanged' | 'updated' => {
   const markerPath = join(directory, markerName)
   if (existsSync(directory) && !isManagedCopy(directory)) return 'conflict'
+  if (existsSync(directory) && readFileSync(join(directory, 'SKILL.md'), 'utf8') === content) return 'unchanged'
+  const status = existsSync(directory) ? 'updated' : 'installed'
   mkdirSync(directory, { recursive: true })
   writeFileSync(join(directory, 'SKILL.md'), content, 'utf8')
   writeFileSync(markerPath, `${JSON.stringify(marker(content), null, 2)}\n`, 'utf8')
-  return 'installed'
+  return status
 }
 
 export const installLitheToolSkill = (homeDirectory: string, content: string): SkillInstallResult => {
@@ -47,13 +50,25 @@ export const installLitheToolSkill = (homeDirectory: string, content: string): S
     join(homeDirectory, '.agents', 'skills', 'lithe-tool'),
     join(homeDirectory, '.claude', 'skills', 'lithe-tool'),
   ]
-  const result: SkillInstallResult = { conflicts: [], installed: [] }
+  const result: SkillInstallResult = { conflicts: [], installed: [], status: 'unchanged' }
   result.conflicts = targets.filter((target: string): boolean => existsSync(target) && !isManagedCopy(target))
-  if (result.conflicts.length > 0) return result
+  if (result.conflicts.length > 0) return { ...result, status: 'conflict' }
+  const statuses: Array<'conflict' | 'installed' | 'unchanged' | 'updated'> = []
   for (const target of targets) {
-    if (installCopy(target, content) === 'installed') result.installed.push(target)
+    const status = installCopy(target, content)
+    statuses.push(status)
+    if (status !== 'unchanged') result.installed.push(target)
   }
-  return result
+  return {
+    ...result,
+    status: statuses.includes('conflict')
+      ? 'conflict'
+      : statuses.includes('installed')
+        ? 'installed'
+        : statuses.includes('updated')
+          ? 'updated'
+          : 'unchanged',
+  }
 }
 
 export const readLitheToolSkill = (resourcePath: string): string =>

@@ -45,16 +45,14 @@ export const createAgentApplication = ({
   fork: async (taskId: string): Promise<AgentLaunch> => {
     const source = database.tasks.get(taskId)
     if (!source) throw new TypeError('Task does not exist')
+    if (source.isRunning) throw new TypeError('Running task cannot be forked')
     if (!source.agentSessionId) throw new TypeError('Task Agent session is not bound')
     const adapter = database.adapters.getVersion(source.adapterVersionId)
     if (!adapter?.definition.fork) throw new TypeError('Adapter does not support fork')
     if (!(await inspectAvailability(adapter)).forkAvailable) {
       throw new TypeError('Installed Adapter version does not support fork')
     }
-    const forked = tasks.createPinned(
-      { workspaceId: source.workspaceId, name: tasks.nextForkName(source) },
-      source.adapterVersionId,
-    )
+    const forked = tasks.createPinned({ workspaceId: source.workspaceId, name: source.name }, source.adapterVersionId)
     return manager.launch(forked.id, 'fork', source.agentSessionId)
   },
   renameTask: (taskId: string, name: string): Task => {

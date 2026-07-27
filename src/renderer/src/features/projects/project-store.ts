@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import type {
+  ProjectCreateInput,
   ProjectWithWorkspaces,
   Workspace,
   WorkspaceCreateInput,
@@ -10,7 +11,7 @@ import type {
 interface ProjectState extends WorkspaceNavigation {
   error: string | null
   isLoading: boolean
-  addDirectory: () => Promise<void>
+  createProject: (input: ProjectCreateInput) => Promise<void>
   createWorkspace: (input: WorkspaceCreateInput, confirmedDirtyFingerprint?: string) => Promise<void>
   deleteWorkspace: (workspaceId: string, branchConfirmation?: string) => Promise<void>
   forgetInvalidProject: (projectId: string, confirmation: string) => Promise<void>
@@ -34,25 +35,15 @@ export const useProjectStore = create<ProjectState>(
     scratchWorkspaces: [],
     error: null,
     isLoading: false,
-    addDirectory: async (): Promise<void> => {
+    createProject: async (input: ProjectCreateInput): Promise<void> => {
       set({ error: null, isLoading: true })
       try {
-        const project = await window.lithe.projects.addDirectory()
-        if (!project) {
-          set({ isLoading: false })
-          return
-        }
-        const [workspace] = project.workspaces
-        set(
-          (state): Partial<ProjectState> => ({
-            activeWorkspaceId: workspace?.id ?? state.activeWorkspaceId,
-            isLoading: false,
-            projects: [...state.projects, project],
-          }),
-        )
+        await window.lithe.projects.create(input)
+        await useProjectStore.getState().hydrate()
       } catch (error: unknown) {
-        recordBoundaryError('project directory addition', error)
+        recordBoundaryError('project creation', error)
         set({ error: errorMessage(error), isLoading: false })
+        throw error
       }
     },
     createWorkspace: async (input: WorkspaceCreateInput, confirmedDirtyFingerprint?: string): Promise<void> => {

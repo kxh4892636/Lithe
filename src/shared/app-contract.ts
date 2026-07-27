@@ -52,6 +52,11 @@ export interface ProjectWithWorkspaces extends Project {
   workspaces: Workspace[]
 }
 
+export interface ProjectCreateInput {
+  name: string
+  sourcePath?: string
+}
+
 export interface WorkspaceNavigation {
   activeWorkspaceId: string | null
   projects: ProjectWithWorkspaces[]
@@ -210,9 +215,10 @@ export interface LitheBridge {
     toggleMaximized: () => Promise<boolean>
   }
   projects: {
-    addDirectory: () => Promise<ProjectWithWorkspaces | null>
+    create: (input: ProjectCreateInput) => Promise<ProjectWithWorkspaces>
     getNavigation: () => Promise<WorkspaceNavigation>
     onNavigationChanged: (listener: () => void) => () => void
+    pickSourceFolder: () => Promise<string | null>
     selectWorkspace: (workspaceId: string) => Promise<void>
     setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<Workspace>
     previewRemove: (projectId: string) => Promise<ProjectRemovalPreview>

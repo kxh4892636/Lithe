@@ -23,7 +23,15 @@ export const detectGitBranch = async (
       timeout: 5_000,
       windowsHide: true,
     })
-    return stdout.trim() || null
+    const branchName = stdout.trim()
+    if (branchName) return branchName
+
+    const { stdout: shortSha } = await execFileAsync('git', ['-C', rootPath, 'rev-parse', '--short', 'HEAD'], {
+      encoding: 'utf8',
+      timeout: 5_000,
+      windowsHide: true,
+    })
+    return `HEAD@${shortSha.trim()}`
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       logError('Git executable unavailable', error)
