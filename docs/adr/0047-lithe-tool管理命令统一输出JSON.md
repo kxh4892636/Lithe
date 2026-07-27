@@ -4,3 +4,8 @@
 成功使用 `ok: true` 与 `data`，失败使用 `ok: false` 及稳定英文 `error.code` 和简短
 英文 `message`。stdout 不混入日志、进度动画或本地化文案，成功退出码为零、失败
 为非零；诊断进入 Lithe 日志系统且不得包含 capability。
+
+唯一例外是受管 `SessionStart` Hook 调用的
+`lithe-tool agent bind --hook-input`：成功时 stdout 必须为空，避免 Hook 输出
+进入 Agent 上下文；失败时只向 stderr 写入简短错误并返回非零退出码。手工使用
+`agent bind --session-id` 仍遵循上述 JSON 契约。

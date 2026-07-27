@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0075
+---
+
 # lithe-tool 固定为十六个命令
 
 首版 `lithe-tool` 只暴露只读的 `context`，`workspace create|rename|delete`，

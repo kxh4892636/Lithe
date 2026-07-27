@@ -3,8 +3,6 @@
 遵循原则：第一性原理；结构化思维；批判性思维；奥卡姆剃刀原理；对抗性审查；
 推理原则：优先采用基于检索的推理，而不是基于预训练知识的推理。
 
-没有指定目录的临时文件保存至 `temp/` 目录。
-
 <!-- GENERAL RULES END -->
 
 <!-- LOOP KIT START -->
@@ -56,5 +54,6 @@ This repository uses a single-context domain documentation layout. See `docs/age
 
 - codin-d2c-cli: invoke `codin-d2c` for Figma design-to-code，d2c 静态资源统一使用 svg 格式；
 - lithe-tool: invoke `lithe-tool` after first user input；使用代码开发环境
+  - 当 code agent 自己的会话 ID 生成后，使用 `lithe-tool agent bind --session-id <id>` 绑定会话 ID，只需要绑定一次即可。
 
 <!-- PROJECT RULES END -->

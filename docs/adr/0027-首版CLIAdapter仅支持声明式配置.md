@@ -1,18 +1,19 @@
 # 首版 CLI Adapter 仅支持声明式配置
 
-首版 CLI Adapter 只声明可执行文件、参数模板与 `start`、`resume`、`fork` 能力，
-Lithe 通过通用执行器直接创建进程，不加载 JavaScript、Node 模块或其他进程内
-插件。需要条件判断或额外集成逻辑的 Agent 可以显式配置独立外部包装程序，从而
-保留扩展能力，同时不把第三方代码引入 Electron main 进程的特权边界。
+首版 CLI Adapter 只声明可执行文件、参数模板、PTY 交互步骤与 `start`、`resume`、
+`fork` 能力，Lithe 通过通用执行器创建进程并执行交互步骤，不加载 JavaScript、
+Node 模块或其他进程内插件。需要声明模型之外的条件判断或额外集成逻辑时，Agent
+可以显式配置独立外部包装程序，从而保留扩展能力，同时不把第三方代码引入
+Electron main 进程的特权边界。
 
 Adapter 不提供通用 `env` 配置，也不保存、引用、校验或展示 Coding Agent 的
 API Key 与认证环境变量。CLI 继承 Lithe 启动时的系统环境并使用自身认证配置；
 Lithe 只额外注入访问 `lithe-tool` 所需的当前 CLI 实例 capability。
 
-声明模型不增加 `sessionIdEnv`、会话 ID 提取命令或提供方输出解析规则。除内置
-Adapter 在 Lithe Tool Skill 中说明的已知方式外，自定义 Coding Agent 负责自行
-判断如何取得当前会话 ID 并调用 `agent bind`；无法取得时保持未绑定，不能恢复或
-fork，Lithe 不替其推断。
+声明模型不增加 `sessionIdEnv`、会话 ID 提取命令或用于推断会话 ID 的提供方输出
+解析规则。除内置 Adapter 在 Lithe Tool Skill 中说明的已知方式外，自定义 Coding
+Agent 负责自行判断如何取得当前会话 ID 并调用 `agent bind`；无法取得时保持未
+绑定，不能恢复或 fork，Lithe 不替其推断。
 
 Lithe 对自定义 Adapter 只做静态校验：可执行文件能够解析、模板变量合法，并且
 `resume`、`fork` 模板引用必要的源会话 ID。校验不得实际启动 CLI 或探测提供方
