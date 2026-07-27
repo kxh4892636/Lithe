@@ -77,6 +77,9 @@ describe('terminal view', (): void => {
     expect(window.lithe.terminals.onData).toHaveBeenCalledOnce()
     expect(window.lithe.terminals.onExit).toHaveBeenCalledOnce()
     expect(terminalInstances[0]?.dispose).not.toHaveBeenCalled()
+    const host = terminalInstances[0]?.open.mock.calls[0]?.[0] as HTMLElement | undefined
+    expect(host).toBeInstanceOf(HTMLElement)
+    expect(host).toHaveClass('size-full')
   })
 
   it('keeps consuming output while a task-owned terminal view has no open tab', (): void => {

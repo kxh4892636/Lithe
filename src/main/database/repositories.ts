@@ -114,7 +114,7 @@ export const createPreferenceRepository = (database: Database): PreferenceReposi
         .where(eq(appPreferences.key, 'sidebar-width'))
         .get()
       const width = Number(preference?.value)
-      return Number.isFinite(width) && width >= 200 && width <= 360 ? width : 256
+      return Number.isFinite(width) && width >= 280 && width <= 360 ? width : 280
     },
     getTheme: (): Theme => {
       const preference = database

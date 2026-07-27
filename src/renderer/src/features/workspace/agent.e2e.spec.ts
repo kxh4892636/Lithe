@@ -13,6 +13,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
 }: ElectronTestFixtures): Promise<void> => {
   const projectDirectory = mkdtempSync(join(tmpdir(), 'lithe-agent-project-'))
   const cliPath = resolve('packages/lithe-tool/dist/index.cjs')
+  const taskName = 'Review this deliberately long agent task title beneath its floating actions'
   let page: Page | undefined
   try {
     await electronSession.application.evaluate(({ dialog }, selectedDirectory): void => {
@@ -65,7 +66,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await workspaceRow.hover()
     await workspaceRow.getByRole('button', { name: /创建任务/ }).click()
     const taskDialog = page.getByRole('dialog')
-    await taskDialog.getByLabel('任务名称').fill('Review')
+    await taskDialog.getByLabel('任务名称').fill(taskName)
     await taskDialog.getByRole('button', { name: '创建任务' }).click()
     await expect(page.locator('[data-agent-id]')).toHaveCount(1)
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_READY')
@@ -85,7 +86,17 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
       )
       .toBe(true)
 
-    const sourceTaskButton = page.getByText('-Review', { exact: true }).locator('..')
+    const sourceTaskTitle = page.getByTitle(taskName, { exact: true })
+    const sourceTaskButton = sourceTaskTitle.locator('..')
+    const sourceTaskRow = sourceTaskButton.locator('..')
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await sourceTaskButton.hover()
+    await expect(sourceTaskTitle).toHaveAttribute('data-overflow', 'true')
+    await expect(sourceTaskTitle.locator('.task-title-track')).toHaveCSS('animation-name', 'task-title-marquee')
+    await expect(sourceTaskRow.locator('[data-slot="task-actions"]')).toHaveCSS('position', 'absolute')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expect(sourceTaskTitle.locator('.task-title-track')).toHaveCSS('animation-name', 'none')
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
     await expect(page.getByRole('button', { name: '停止' })).toHaveCount(0)
     await sourceTaskButton.click({ button: 'right' })
     await page.getByRole('menuitem', { name: '停止' }).click()
@@ -96,8 +107,8 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await sourceTaskButton.click({ button: 'right' })
     await page.getByRole('menuitem', { name: '停止' }).click()
     await sourceTaskButton.hover()
-    await page.getByRole('button', { name: 'Fork Review' }).click()
-    await expect(page.getByText('-Review', { exact: true })).toHaveCount(2)
+    await page.getByRole('button', { name: `Fork ${taskName}` }).click()
+    await expect(page.getByTitle(taskName, { exact: true })).toHaveCount(2)
     await expect
       .poll(async (): Promise<string | null> => {
         if (!page) return null
@@ -111,17 +122,17 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
       })
       .toBe('fake-session-fork-1')
 
-    const sourceTaskId = await page.evaluate(async (): Promise<string> => {
+    const sourceTaskId = await page.evaluate(async (expectedName: string): Promise<string> => {
       const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
       const navigation = await bridge.projects.getNavigation()
       if (!navigation.activeWorkspaceId) throw new Error('Active workspace is missing')
       const source = (await bridge.tasks.list(navigation.activeWorkspaceId)).find(
-        (task): boolean => task.name === 'Review',
+        (task): boolean => task.name === expectedName,
       )
       if (!source) throw new Error('Source task is missing')
       await bridge.tasks.setVisible(null)
       return source.id
-    })
+    }, taskName)
     const runTool = (...arguments_: string[]): ReturnType<typeof spawnSync> =>
       spawnSync(process.execPath, [cliPath, ...arguments_], {
         encoding: 'utf8',

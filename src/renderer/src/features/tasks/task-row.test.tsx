@@ -54,6 +54,7 @@ const adapter: AdapterSummary = {
 
 afterEach((): void => {
   cleanup()
+  vi.restoreAllMocks()
   vi.clearAllMocks()
 })
 
@@ -68,7 +69,7 @@ describe('task row', (): void => {
     expect(screen.queryByRole('button', { name: '停止' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Fork Review' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Fork Review' })).toHaveAttribute('title', '请先停止任务')
-    const taskButton = screen.getByText('-Review').closest('button')
+    const taskButton = screen.getByTitle('Review').closest('button')
     if (!taskButton) throw new Error('任务按钮未渲染')
     fireEvent.contextMenu(taskButton)
     fireEvent.click(await screen.findByRole('menuitem', { name: '停止' }))
@@ -84,5 +85,19 @@ describe('task row', (): void => {
 
     expect(screen.getByRole('button', { name: 'Fork Review' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Fork Review' })).toHaveAttribute('title', '任务尚未绑定 Agent 会话')
+  })
+
+  it('uses the whole row for an overflowing title while actions float above it', (): void => {
+    window.lithe = {} as unknown as LitheBridge
+    useTaskStore.setState({ launchesByTask: {} })
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(160)
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(240)
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(48)
+
+    render(<TaskRow adapter={adapter} onOpen={vi.fn<() => void>()} task={task} />)
+
+    expect(screen.queryByText('-Review')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Review')).toHaveAttribute('data-overflow', 'true')
+    expect(screen.getByRole('button', { name: 'Fork Review' }).parentElement).toHaveClass('absolute')
   })
 })

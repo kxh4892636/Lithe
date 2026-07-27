@@ -84,7 +84,16 @@ test('E2E-LITHE-005 restores a collapsed sidebar and expands it as an overlay on
   if (!resizeBox) throw new Error('侧栏宽度控制柄不可见')
   await window.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + 20)
   await window.mouse.down()
-  await window.mouse.move(resizeBox.x + 40, resizeBox.y + 20)
+  await window.mouse.move(resizeBox.x - 400, resizeBox.y + 20)
+  await window.mouse.up()
+  await expect
+    .poll(async (): Promise<number> => (await window.locator('[data-slot="sidebar-gap"]').boundingBox())?.width ?? 0)
+    .toBe(280)
+  const minimumResizeBox = await resizeHandle.boundingBox()
+  if (!minimumResizeBox) throw new Error('最小宽度下侧栏控制柄不可见')
+  await window.mouse.move(minimumResizeBox.x + minimumResizeBox.width / 2, minimumResizeBox.y + 20)
+  await window.mouse.down()
+  await window.mouse.move(minimumResizeBox.x + 40, minimumResizeBox.y + 20)
   await window.mouse.up()
   await expect
     .poll(async (): Promise<number> => (await window.locator('[data-slot="sidebar-gap"]').boundingBox())?.width ?? 0)

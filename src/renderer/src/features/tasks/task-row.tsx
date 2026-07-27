@@ -1,5 +1,5 @@
 import { ArchiveIcon, BotIcon, CircleIcon, GitForkIcon, PencilIcon, SquareIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -84,10 +84,85 @@ interface TaskActionsProps {
   taskName: string
 }
 
-const TaskToolbar = (props: TaskActionsProps): React.JSX.Element => {
-  const { archive, fork, forkDisabledReason, isRunning, taskName } = props
+interface TaskToolbarProps extends TaskActionsProps {
+  containerRef: RefObject<HTMLDivElement | null>
+}
+
+interface TaskTitleProps {
+  actionsRef: RefObject<HTMLDivElement | null>
+  isUnread: boolean
+  name: string
+}
+
+interface TaskTitleMetrics {
+  distance: number
+  overflow: boolean
+}
+
+const taskTitleGap = 32
+const taskTitleMaskWidth = 20
+const taskTitleSpeed = 30
+
+const TaskTitle = (props: TaskTitleProps): React.JSX.Element => {
+  const { actionsRef, isUnread, name } = props
+  const textRef = useRef<HTMLSpanElement>(null)
+  const viewportRef = useRef<HTMLSpanElement>(null)
+  const [metrics, setMetrics] = useState<TaskTitleMetrics>({ distance: 0, overflow: false })
+  const measure = useCallback((): void => {
+    const textWidth = textRef.current?.scrollWidth ?? 0
+    const viewportWidth = viewportRef.current?.clientWidth ?? 0
+    const actionsWidth = actionsRef.current?.offsetWidth ?? 0
+    const overflow = textWidth > Math.max(0, viewportWidth - actionsWidth - taskTitleMaskWidth)
+    const distance = overflow ? textWidth + taskTitleGap : 0
+    setMetrics(
+      (current): TaskTitleMetrics =>
+        current.distance === distance && current.overflow === overflow ? current : { distance, overflow },
+    )
+  }, [actionsRef])
+  useLayoutEffect((): (() => void) => {
+    measure()
+    if (!globalThis.ResizeObserver) return (): void => undefined
+    const observer = new ResizeObserver(measure)
+    if (viewportRef.current) observer.observe(viewportRef.current)
+    if (textRef.current) observer.observe(textRef.current)
+    if (actionsRef.current) observer.observe(actionsRef.current)
+    return (): void => observer.disconnect()
+  }, [actionsRef, measure, name])
+  const style = {
+    '--task-title-distance': `${metrics.distance}px`,
+    '--task-title-duration': `${metrics.distance / taskTitleSpeed}s`,
+  } as CSSProperties
   return (
-    <div className="invisible flex items-center pr-1 group-focus-within/task:visible group-hover/task:visible">
+    <span
+      className={
+        isUnread ? 'text-foreground min-w-0 flex-1 overflow-hidden font-medium' : 'min-w-0 flex-1 overflow-hidden'
+      }
+      data-overflow={String(metrics.overflow)}
+      data-slot="task-title"
+      ref={viewportRef}
+      style={style}
+      title={name}
+    >
+      <span className="task-title-track">
+        <span ref={textRef}>{name}</span>
+        {metrics.overflow ? (
+          <span aria-hidden className="ml-8">
+            {name}
+          </span>
+        ) : null}
+      </span>
+    </span>
+  )
+}
+
+const TaskToolbar = (props: TaskToolbarProps): React.JSX.Element => {
+  const { archive, containerRef, fork, forkDisabledReason, isRunning, taskName } = props
+  return (
+    <div
+      className="invisible absolute top-1/2 right-1 z-10 flex -translate-y-1/2 items-center group-focus-within/task:visible group-hover/task:visible"
+      data-slot="task-actions"
+      ref={containerRef}
+    >
       <Button
         aria-label={`Fork ${taskName}`}
         className="hover:bg-transparent"
@@ -146,6 +221,7 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
   const forkTask = useTaskStore((state: TaskState) => state.forkTask)
   const launch = useTaskStore((state: TaskState) => state.launchesByTask[task.id])
   const stopTask = useTaskStore((state: TaskState) => state.stopTask)
+  const actionsRef = useRef<HTMLDivElement>(null)
   const [renaming, setRenaming] = useState(false)
   const isRunning = launch?.isRunning ?? task.isRunning
   const forkDisabledReason = isRunning
@@ -163,11 +239,11 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
       <ContextMenu>
         <ContextMenuTrigger
           render={
-            <div className="group/task flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
+            <div className="group/task relative flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
           }
         >
           <button
-            className="text-muted-foreground hover:text-foreground flex min-w-0 flex-1 items-center gap-1 py-1 pl-5 text-left text-xs"
+            className="text-muted-foreground hover:text-foreground flex min-w-0 flex-1 items-center gap-1 py-1 pl-5 text-left text-sm"
             onClick={onOpen}
             type="button"
           >
@@ -176,14 +252,15 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
             ) : (
               <BotIcon className="size-3 shrink-0" />
             )}
-            <Badge className="h-4 shrink-0 px-1 text-[9px]" variant="secondary">
+            <Badge className="h-4 shrink-0 px-1 text-xs" variant="secondary">
               {adapter?.name ?? 'agent'}
             </Badge>
-            <span className={task.isUnread ? 'text-foreground truncate font-medium' : 'truncate'}>-{task.name}</span>
+            <TaskTitle actionsRef={actionsRef} isUnread={Boolean(task.isUnread)} name={task.name} />
             {task.isUnread ? <span className="bg-primary ml-auto size-1.5 rounded-full" aria-label="未读" /> : null}
           </button>
           <TaskToolbar
             archive={archive}
+            containerRef={actionsRef}
             fork={fork}
             forkDisabledReason={forkDisabledReason}
             isRunning={isRunning}

@@ -56,6 +56,14 @@ test('E2E-LITHE-006 runs a local PTY and restores tabbed panels without output',
 
     const terminalPanel = terminals.first().locator('xpath=ancestor::*[@data-terminal-id][1]')
     await expect(terminalPanel).toHaveAttribute('data-terminal-ready', 'true')
+    await expect
+      .poll(async (): Promise<number> => {
+        const panelBounds = await terminalPanel.boundingBox()
+        const hostBounds = await terminalPanel.locator('[data-terminal-host]').boundingBox()
+        if (!panelBounds || !hostBounds) return Number.POSITIVE_INFINITY
+        return Math.abs(panelBounds.height - 8 - hostBounds.height)
+      })
+      .toBeLessThanOrEqual(2)
     const terminalId = await terminalPanel.getAttribute('data-terminal-id')
     if (!terminalId) throw new Error('终端面板缺少标识')
     await page.evaluate(

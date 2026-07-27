@@ -44,7 +44,7 @@ const workspaceRowOf = (page: Page, projectName: string): Locator =>
     .first()
 
 const createTask = async (page: Page, workspaceRow: Locator, taskName: string): Promise<void> => {
-  await workspaceRow.hover()
+  await workspaceRow.getByRole('button').first().hover()
   await workspaceRow.getByRole('button', { name: /创建任务/ }).click()
   const taskDialog = page.getByRole('dialog')
   await taskDialog.getByLabel('任务名称').fill(taskName)
@@ -83,7 +83,7 @@ test('E2E-LITHE-015 keeps a closed or manually switched Agent panel as the final
     await expect(page.locator('[data-agent-id]')).toHaveCount(2)
 
     // 侧边栏点击任务始终聚焦对应 Agent 面板（ADR 0021）
-    await page.getByText('-Alpha', { exact: true }).locator('..').click()
+    await page.getByTitle('Alpha', { exact: true }).locator('..').click()
     await expect(selectedTab(page)).toContainText('Alpha')
     const alphaTaskId = await page.evaluate(async (): Promise<string> => {
       const bridge = (window as typeof window & { lithe: LitheBridge }).lithe
@@ -108,7 +108,7 @@ test('E2E-LITHE-015 keeps a closed or manually switched Agent panel as the final
     await expect(selectedTab(page)).toContainText('Beta')
 
     // ADR 0069：手动切换标签不被任务事件拉回
-    await page.getByText('-Alpha', { exact: true }).locator('..').click()
+    await page.getByTitle('Alpha', { exact: true }).locator('..').click()
     await expect(selectedTab(page)).toContainText('Alpha')
     await expect.poll(async (): Promise<number> => latestTick(alphaTerminal)).toBeGreaterThan(tickBeforeClose + 3)
     await page.locator('.flexlayout__tab_button', { hasText: 'Beta' }).click()

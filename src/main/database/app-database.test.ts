@@ -40,7 +40,7 @@ describe('app database', (): void => {
     const database = createTestDatabase()
 
     expect(database.preferences.getSidebarOpen()).toBe(true)
-    expect(database.preferences.getSidebarWidth()).toBe(256)
+    expect(database.preferences.getSidebarWidth()).toBe(280)
     expect(database.preferences.getPinnedGroupOpen()).toBe(true)
     expect(database.preferences.getProjectGroupOpen()).toBe(true)
     database.preferences.setSidebarOpen(false)

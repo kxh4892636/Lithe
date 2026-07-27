@@ -50,7 +50,7 @@ const assertBoolean = (value: unknown): boolean => {
 }
 
 const assertSidebarWidth = (value: unknown): number => {
-  if (typeof value === 'number' && Number.isFinite(value) && value >= 200 && value <= 360) return Math.round(value)
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 280 && value <= 360) return Math.round(value)
   throw new TypeError('无效的侧栏宽度')
 }
 

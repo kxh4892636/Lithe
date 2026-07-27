@@ -170,8 +170,8 @@
 }
 
 .flexlayout__tabset_tabbar_outer {
-  height: 24px;
-  min-height: 24px;
+  height: 28px;
+  min-height: 28px;
   background: var(--background);
 }
 
@@ -181,8 +181,8 @@
 
 .flexlayout__tabset_tabbar_inner,
 .flexlayout__tabset_tabbar_inner_tab_container {
-  height: 23px;
-  min-height: 23px;
+  height: 27px;
+  min-height: 27px;
 }
 
 .flexlayout__tabset_tabbar_inner_tab_container {
@@ -192,13 +192,13 @@
 }
 
 .flexlayout__tab_button {
-  height: 22px;
+  height: 26px;
   gap: 4px;
   padding: 0 7px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  font-size: 11px;
+  font-size: 14px;
   box-shadow: none;
 }
 
@@ -214,7 +214,7 @@
 }
 
 .flexlayout__tab_toolbar {
-  height: 23px;
+  height: 27px;
   gap: 0;
   padding-left: 2px;
 }
@@ -222,4 +222,30 @@
 .flexlayout__tab_toolbar_sticky_buttons_container {
   gap: 0;
   padding-left: 2px;
+}
+
+.task-title-track {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+}
+
+.group\/task:hover [data-slot='task-title'][data-overflow='true'] .task-title-track {
+  animation: task-title-marquee var(--task-title-duration) linear 300ms infinite;
+}
+
+[data-slot='task-actions'] {
+  background: var(--sidebar-accent);
+}
+
+@keyframes task-title-marquee {
+  to {
+    transform: translateX(calc(var(--task-title-distance) * -1));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group\/task:hover [data-slot='task-title'][data-overflow='true'] .task-title-track {
+    animation: none;
+  }
 }

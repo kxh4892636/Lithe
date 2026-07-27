@@ -10,7 +10,7 @@ const persistPreference = (operation: string, promise: Promise<void>): void => {
   })
 }
 
-const clampSidebarWidth = (width: number): number => Math.min(360, Math.max(200, width))
+const clampSidebarWidth = (width: number): number => Math.min(360, Math.max(280, width))
 
 interface SidebarResizeHandlers {
   onPointerDown: (event: ReactPointerEvent<HTMLHRElement>) => void
@@ -64,7 +64,7 @@ export const useNavigationAppearance = (): NavigationAppearance => {
   const [isPinnedGroupOpen, setIsPinnedGroupOpenState] = useState(true)
   const [isProjectGroupOpen, setIsProjectGroupOpenState] = useState(true)
   const [platform, setPlatform] = useState('')
-  const [sidebarWidth, setSidebarWidth] = useState(256)
+  const [sidebarWidth, setSidebarWidth] = useState(280)
   const resizeHandlers = useSidebarResize(sidebarWidth, setSidebarWidth)
 
   useEffect((): void => {

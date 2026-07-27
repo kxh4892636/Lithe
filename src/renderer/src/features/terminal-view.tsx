@@ -62,6 +62,7 @@ const createEntry = (
   const terminal = createTerminal()
   const fit = new FitAddon()
   const host = document.createElement('div')
+  host.className = 'size-full'
   host.dataset.terminalHost = panelId
   terminal.loadAddon(fit)
   terminal.open(host)
