@@ -2,6 +2,7 @@ import {
   ChevronRightIcon,
   FolderIcon,
   FolderPlusIcon,
+  GitBranchIcon,
   GitForkIcon,
   PencilIcon,
   PinIcon,
@@ -34,15 +35,16 @@ import {
 import type { AdapterSummary, ProjectWithWorkspaces, Task, Workspace } from '../../../../shared/app-contract'
 import { useNavigationSearchStore } from '../../app/navigation-search-store'
 import { TaskCreateDialog } from '../tasks/task-create-dialog'
-import { TaskRow } from '../tasks/task-row'
 import { useTaskStore, type TaskState } from '../tasks/task-store'
 import { useAdaptersByVersion } from '../tasks/use-adapters-by-version'
+import { useNavigationRowOpen } from './navigation-row-collapse'
 import { ProjectCreateDialog } from './project-create-dialog'
 import { filterProjects } from './project-navigation-filter'
 import { ProjectOperationDialog, type ProjectOperation } from './project-operation-dialog'
 import { useProjectStore } from './project-store'
 import { ScratchTaskRows } from './scratch-task-rows'
 import { WorkspaceNavigationRow, workspaceNavigationTitle, workspaceRowIsActive } from './workspace-navigation-row'
+import { WorkspaceTaskList } from './workspace-task-list'
 
 interface NavigationGroupProps {
   isOpen: boolean
@@ -54,6 +56,7 @@ interface ProjectTreeProps {
   adaptersByVersion: Map<string, AdapterSummary>
   openTaskDialog: (workspace: Workspace) => void
   projects: ProjectWithWorkspaces[]
+  query: string
   selectWorkspace: (workspaceId: string) => Promise<void>
   setOperation: (operation: ProjectOperation) => void
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
@@ -68,6 +71,7 @@ interface ProjectRowProps extends Omit<ProjectTreeProps, 'projects'> {
 
 const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
   const { project, setOperation } = props
+  const { isOpen, toggle } = useNavigationRowOpen('project', project.id)
   const removeOperation: ProjectOperation = project.isValid ? { kind: 'remove', project } : { kind: 'forget', project }
   return (
     <SidebarMenuItem>
@@ -78,11 +82,14 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
           }
         >
           <SidebarMenuButton
+            aria-expanded={isOpen}
+            aria-label={`${isOpen ? '折叠' : '展开'} ${project.name}`}
             className={
               project.isValid
                 ? 'min-w-0 flex-1 hover:bg-transparent [&_svg]:size-3'
                 : 'text-destructive min-w-0 flex-1 hover:bg-transparent [&_svg]:size-3'
             }
+            onClick={toggle}
           >
             <FolderIcon className="size-3" />
             <span>{project.name}</span>
@@ -125,16 +132,18 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-      <SidebarMenuSub className="ml-3 mr-0 translate-x-0 px-0">
-        {project.workspaces.map((workspace) => (
-          <WorkspaceNavigationRow
-            {...props}
-            key={workspace.id}
-            tasks={props.tasksByWorkspace[workspace.id] ?? []}
-            workspace={workspace}
-          />
-        ))}
-      </SidebarMenuSub>
+      {isOpen ? (
+        <SidebarMenuSub className="ml-3 mr-0 translate-x-0 px-0">
+          {project.workspaces.map((workspace) => (
+            <WorkspaceNavigationRow
+              {...props}
+              key={workspace.id}
+              tasks={props.tasksByWorkspace[workspace.id] ?? []}
+              workspace={workspace}
+            />
+          ))}
+        </SidebarMenuSub>
+      ) : null}
     </SidebarMenuItem>
   )
 }
@@ -170,6 +179,7 @@ interface PinnedWorkspaceRowProps {
   entry: { project?: ProjectWithWorkspaces; workspace: Workspace }
   onOperation: (operation: ProjectOperation) => void
   onTaskCreate: (workspace: Workspace) => void
+  query: string
   selectWorkspace: (workspaceId: string) => Promise<void>
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
   tasks: Task[]
@@ -225,8 +235,10 @@ const PinnedContextItems = ({
 )
 
 const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element => {
-  const { activateTask, adapterByVersion, entry, selectWorkspace, setWorkspacePinned, tasks } = props
+  const { entry, selectWorkspace, setWorkspacePinned } = props
   const { workspace } = entry
+  // 置顶区与项目树中的同一工作区共用同一份折叠状态与展开计数（按工作区 ID）
+  const { isOpen, toggle } = useNavigationRowOpen('workspace', workspace.id)
   return (
     <div className={props.active ? 'rounded-md bg-sidebar-accent/60' : undefined}>
       <ContextMenu>
@@ -236,15 +248,25 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
           }
         >
           <button
+            aria-expanded={isOpen}
+            aria-label={`${isOpen ? '折叠' : '展开'} ${workspaceNavigationTitle(workspace)}`}
+            className="text-muted-foreground shrink-0 rounded-sm p-0.5 hover:text-foreground"
+            onClick={toggle}
+            type="button"
+          >
+            <ChevronRightIcon className={isOpen ? 'size-3 rotate-90' : 'size-3'} />
+          </button>
+          <button
             className={
               workspace.isValid === false
-                ? 'text-destructive min-w-0 flex-1 truncate text-left font-medium'
-                : 'min-w-0 flex-1 truncate text-left font-medium'
+                ? 'text-destructive flex min-w-0 flex-1 items-center gap-1 text-left font-medium'
+                : 'flex min-w-0 flex-1 items-center gap-1 text-left font-medium'
             }
             onClick={(): void => void selectWorkspace(workspace.id)}
             type="button"
           >
-            {workspaceNavigationTitle(workspace)}
+            {workspace.gitBranch ? <GitBranchIcon className="size-3 shrink-0" /> : null}
+            <span className="truncate">{workspaceNavigationTitle(workspace)}</span>
           </button>
           {workspace.isValid !== false ? (
             <Button
@@ -271,19 +293,17 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
           <PinnedContextItems {...props} />
         </ContextMenuContent>
       </ContextMenu>
-      {tasks.map((task) => (
-        <TaskRow
-          adapter={adapterByVersion.get(task.adapterVersionId)}
-          key={task.id}
-          onOpen={(): void =>
-            void selectWorkspace(workspace.id)
-              .then((): Promise<unknown> => activateTask(task.id))
-              .catch(globalThis.console.error)
-          }
-          selected={props.visibleTaskId === task.id}
-          task={task}
+      {isOpen ? (
+        <WorkspaceTaskList
+          activateTask={props.activateTask}
+          adaptersByVersion={props.adapterByVersion}
+          query={props.query}
+          selectWorkspace={selectWorkspace}
+          tasks={props.tasks}
+          visibleTaskId={props.visibleTaskId}
+          workspace={workspace}
         />
-      ))}
+      ) : null}
     </div>
   )
 }
@@ -374,6 +394,7 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
                   key={entry.workspace.id}
                   onOperation={setOperation}
                   onTaskCreate={setTaskWorkspace}
+                  query={normalizedQuery}
                   selectWorkspace={selectWorkspace}
                   setWorkspacePinned={setWorkspacePinned}
                   tasks={tasksByWorkspace[entry.workspace.id] ?? []}
@@ -492,6 +513,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
               adaptersByVersion={adaptersByVersion}
               openTaskDialog={setTaskWorkspace}
               projects={filteredProjects}
+              query={normalizedQuery}
               selectWorkspace={selectWorkspace}
               setOperation={setOperation}
               setWorkspacePinned={setWorkspacePinned}

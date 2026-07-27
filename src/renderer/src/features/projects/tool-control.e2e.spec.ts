@@ -73,11 +73,14 @@ test('E2E-LITHE-007 queries the running app through the built global CLI entry',
     await window.getByRole('button', { name: '创建项目' }).click()
 
     const cliBinDirectory = process.platform === 'win32' ? cliInstallDirectory : join(cliInstallDirectory, 'bin')
-    const cliEnvironment = {
+    const cliEnvironment: NodeJS.ProcessEnv = {
       ...process.env,
       LITHE_CONTROL_DISCOVERY_PATH: electronSession.controlDiscoveryPath,
       PATH: `${cliBinDirectory}${delimiter}${process.env.PATH ?? ''}`,
     }
+    delete cliEnvironment.LITHE_CAPABILITY
+    delete cliEnvironment.LITHE_CONTROL_ENDPOINT
+    delete cliEnvironment.LITHE_CONTROL_TOKEN
     const { exitCode, stderr, stdout } = await runCommand('lithe-tool', ['context'], {
       env: cliEnvironment,
     })

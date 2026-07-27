@@ -49,6 +49,21 @@ const assertBoolean = (value: unknown): boolean => {
   throw new TypeError('无效的布尔参数')
 }
 
+// 与 renderer 的 navigationRowPreferenceKey 保持一致，仅放行导航行折叠键，
+// 避免经 set-row-open 覆写任意偏好
+const rowOpenPreferencePrefixes = ['project-row-open:', 'workspace-row-open:'] as const
+
+const assertPreferenceKey = (value: unknown): string => {
+  if (
+    typeof value === 'string' &&
+    value.length <= 160 &&
+    rowOpenPreferencePrefixes.some((prefix): boolean => value.startsWith(prefix))
+  ) {
+    return value
+  }
+  throw new TypeError('无效的偏好键')
+}
+
 const assertSidebarWidth = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value) && value >= 280 && value <= 360) return Math.round(value)
   throw new TypeError('无效的侧栏宽度')
@@ -156,6 +171,10 @@ export const registerIpcHandlers = ({
     assertTrustedSender(event, window)
     return database.preferences.getProjectGroupOpen()
   })
+  ipcMain.handle(ipcChannels.getRowOpen, (event, key: unknown): boolean => {
+    assertTrustedSender(event, window)
+    return database.preferences.getRowOpen(assertPreferenceKey(key))
+  })
   ipcMain.handle(ipcChannels.setTheme, (event, value: unknown): void => {
     assertTrustedSender(event, window)
     database.preferences.setTheme(assertTheme(value))
@@ -179,6 +198,10 @@ export const registerIpcHandlers = ({
   ipcMain.handle(ipcChannels.setProjectGroupOpen, (event, value: unknown): void => {
     assertTrustedSender(event, window)
     database.preferences.setProjectGroupOpen(assertBoolean(value))
+  })
+  ipcMain.handle(ipcChannels.setRowOpen, (event, key: unknown, value: unknown): void => {
+    assertTrustedSender(event, window)
+    database.preferences.setRowOpen(assertPreferenceKey(key), assertBoolean(value))
   })
   ipcMain.handle(ipcChannels.pickProjectSourceFolder, async (event): Promise<string | null> => {
     assertTrustedSender(event, window)
@@ -226,12 +249,14 @@ export const removeIpcHandlers = (): void => {
   ipcMain.removeHandler(ipcChannels.getPinnedGroupOpen)
   ipcMain.removeHandler(ipcChannels.getNotificationsEnabled)
   ipcMain.removeHandler(ipcChannels.getProjectGroupOpen)
+  ipcMain.removeHandler(ipcChannels.getRowOpen)
   ipcMain.removeHandler(ipcChannels.setTheme)
   ipcMain.removeHandler(ipcChannels.setSidebarOpen)
   ipcMain.removeHandler(ipcChannels.setSidebarWidth)
   ipcMain.removeHandler(ipcChannels.setPinnedGroupOpen)
   ipcMain.removeHandler(ipcChannels.setNotificationsEnabled)
   ipcMain.removeHandler(ipcChannels.setProjectGroupOpen)
+  ipcMain.removeHandler(ipcChannels.setRowOpen)
   ipcMain.removeHandler(ipcChannels.createProject)
   ipcMain.removeHandler(ipcChannels.pickProjectSourceFolder)
   ipcMain.removeHandler(ipcChannels.getWorkspaceNavigation)

@@ -1,4 +1,4 @@
-import { GitForkIcon, PencilIcon, PinIcon, SquarePenIcon, Trash2Icon } from 'lucide-react'
+import { GitForkIcon, PencilIcon, PinIcon, SquarePenIcon, Trash2Icon, GitBranch } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -11,8 +11,9 @@ import {
 import { SidebarMenuSubButton, SidebarMenuSubItem } from '@/components/ui/sidebar'
 
 import type { AdapterSummary, ProjectWithWorkspaces, Task, Workspace } from '../../../../shared/app-contract'
-import { TaskRow } from '../tasks/task-row'
+import { useNavigationRowOpen } from './navigation-row-collapse'
 import type { ProjectOperation } from './project-operation-dialog'
+import { WorkspaceTaskList } from './workspace-task-list'
 
 interface WorkspaceRowProps {
   activateTask: (taskId: string) => Promise<unknown>
@@ -20,6 +21,7 @@ interface WorkspaceRowProps {
   adaptersByVersion: Map<string, AdapterSummary>
   openTaskDialog: (workspace: Workspace) => void
   project: ProjectWithWorkspaces
+  query: string
   selectWorkspace: (workspaceId: string) => Promise<void>
   setOperation: (operation: ProjectOperation) => void
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
@@ -79,9 +81,28 @@ const WorkspaceContextItems = ({
   </>
 )
 
+interface WorkspaceCollapseToggleProps {
+  isOpen: boolean
+  onToggle: () => void
+  title: string
+}
+
+const WorkspaceCollapseToggle = ({ isOpen, onToggle, title }: WorkspaceCollapseToggleProps): React.JSX.Element => (
+  <button
+    aria-expanded={isOpen}
+    aria-label={`${isOpen ? '折叠' : '展开'} ${title}`}
+    className="text-muted-foreground shrink-0 rounded-sm p-0.5 hover:text-foreground"
+    onClick={onToggle}
+    type="button"
+  >
+    <GitBranch className="size-3!" />
+  </button>
+)
+
 export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Element => {
-  const { activateTask, activeWorkspaceId, adaptersByVersion, selectWorkspace, tasks, visibleTaskId, workspace } = props
+  const { activeWorkspaceId, selectWorkspace, visibleTaskId, workspace } = props
   const active = workspaceRowIsActive(activeWorkspaceId, visibleTaskId, workspace.id)
+  const { isOpen, toggle } = useNavigationRowOpen('workspace', workspace.id)
   return (
     <SidebarMenuSubItem>
       <ContextMenu>
@@ -98,6 +119,7 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
             />
           }
         >
+          <WorkspaceCollapseToggle isOpen={isOpen} onToggle={toggle} title={workspaceNavigationTitle(workspace)} />
           <SidebarMenuSubButton
             className={
               workspace.isValid === false
@@ -120,7 +142,6 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
               <>
                 <Button
                   aria-label={`在 ${workspace.name} 创建任务`}
-
                   onClick={(): void => props.openTaskDialog(workspace)}
                   size="icon-xs"
                   title="创建任务"
@@ -130,7 +151,6 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
                 </Button>
                 <Button
                   aria-label={workspace.pinnedAt ? '取消置顶此工作区' : '置顶此工作区'}
-
                   onClick={(): void => void props.setWorkspacePinned(workspace.id, !workspace.pinnedAt)}
                   size="icon-xs"
                   variant="ghost"
@@ -145,19 +165,17 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
           <WorkspaceContextItems {...props} />
         </ContextMenuContent>
       </ContextMenu>
-      {tasks.map((task) => (
-        <TaskRow
-          adapter={adaptersByVersion.get(task.adapterVersionId)}
-          key={task.id}
-          onOpen={(): void =>
-            void selectWorkspace(workspace.id)
-              .then((): Promise<unknown> => activateTask(task.id))
-              .catch(globalThis.console.error)
-          }
-          selected={visibleTaskId === task.id}
-          task={task}
+      {isOpen ? (
+        <WorkspaceTaskList
+          activateTask={props.activateTask}
+          adaptersByVersion={props.adaptersByVersion}
+          query={props.query}
+          selectWorkspace={selectWorkspace}
+          tasks={props.tasks}
+          visibleTaskId={visibleTaskId}
+          workspace={workspace}
         />
-      ))}
+      ) : null}
     </SidebarMenuSubItem>
   )
 }

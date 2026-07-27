@@ -128,12 +128,14 @@ export interface LitheBridge {
     getPinnedGroupOpen: () => Promise<boolean>
     getNotificationsEnabled: () => Promise<boolean>
     getProjectGroupOpen: () => Promise<boolean>
+    getRowOpen: (key: string) => Promise<boolean>
     getSidebarOpen: () => Promise<boolean>
     getSidebarWidth: () => Promise<number>
     getTheme: () => Promise<Theme>
     setPinnedGroupOpen: (isOpen: boolean) => Promise<void>
     setNotificationsEnabled: (isEnabled: boolean) => Promise<void>
     setProjectGroupOpen: (isOpen: boolean) => Promise<void>
+    setRowOpen: (key: string, isOpen: boolean) => Promise<void>
     setSidebarOpen: (isOpen: boolean) => Promise<void>
     setSidebarWidth: (width: number) => Promise<void>
     setTheme: (theme: Theme) => Promise<void>

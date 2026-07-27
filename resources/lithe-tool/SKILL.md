@@ -16,7 +16,7 @@ Lithe Tool 以 npm 包分发，不内置运行时，要求 PATH 中存在 Node.j
 
 ```sh
 pnpm run build:cli
-npm install --global ./packages/lithe-tool
+pnpm install --global ./packages/lithe-tool
 lithe-tool install
 ```
 
@@ -49,12 +49,10 @@ Lithe 不管理提供方历史，也不推断该 ID。受管 Hook 使用
    问题或审批请求。
 3. 将控制权交还用户或等待后续工作前，立即运行 `lithe-tool task idle`。
 
-每次 `running` 最终都必须与一次 `idle` 配对，即使工作以错误或阻塞结束；需要用户
-关注时，先报告 `unread`，再报告 `idle`。
+每次 `running` 最终都必须与一次 `idle` 配对，即使工作以错误或阻塞结束；`idle` 必须在 `unread` 之后。
 
 在 Lithe Agent 内，`running` 和 `idle` 只作用于当前 capability 绑定的任务，
-不接受目标参数；普通外部终端不能报告 Agent 状态。其他任务命令在没有绑定当前
-任务时需要 `--task-id`。运行中的任务不能归档或派生。
+不接受目标参数；普通外部终端不能报告 Agent 状态。其他任务命令在没有绑定当前任务时需要 `--task-id`。运行中的任务不能归档或派生。
 
 ## 命令参考
 

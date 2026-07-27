@@ -65,6 +65,8 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.getNotificationsEnabled) as Promise<boolean>,
     getProjectGroupOpen: async (): Promise<boolean> =>
       ipcRenderer.invoke(ipcChannels.getProjectGroupOpen) as Promise<boolean>,
+    getRowOpen: async (key: string): Promise<boolean> =>
+      ipcRenderer.invoke(ipcChannels.getRowOpen, key) as Promise<boolean>,
     getSidebarOpen: async (): Promise<boolean> => ipcRenderer.invoke(ipcChannels.getSidebarOpen) as Promise<boolean>,
     getSidebarWidth: async (): Promise<number> => ipcRenderer.invoke(ipcChannels.getSidebarWidth) as Promise<number>,
     getTheme: async (): Promise<Theme> => ipcRenderer.invoke(ipcChannels.getTheme) as Promise<Theme>,
@@ -74,6 +76,8 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.setNotificationsEnabled, isEnabled) as Promise<void>,
     setProjectGroupOpen: async (isOpen: boolean): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.setProjectGroupOpen, isOpen) as Promise<void>,
+    setRowOpen: async (key: string, isOpen: boolean): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.setRowOpen, key, isOpen) as Promise<void>,
     setSidebarOpen: async (isOpen: boolean): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.setSidebarOpen, isOpen) as Promise<void>,
     setSidebarWidth: async (width: number): Promise<void> =>

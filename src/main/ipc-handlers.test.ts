@@ -190,6 +190,28 @@ describe('project IPC', (): void => {
     expect(unmaximize).not.toHaveBeenCalled()
   })
 
+  it('rejects row open preferences outside the navigation row keys', (): void => {
+    const userDataDirectory = mkdtempSync(join(tmpdir(), 'lithe-ipc-'))
+    temporaryDirectories.push(userDataDirectory)
+    const database = createAppDatabase({ databasePath: join(userDataDirectory, 'lithe.db') })
+    openDatabases.push(database)
+    const webContents = { mainFrame: {} }
+    const window = { webContents } as unknown as BrowserWindow
+    const event = { sender: webContents, senderFrame: webContents.mainFrame } as unknown as IpcMainInvokeEvent
+    registerIpcHandlers({ database, managedProjectsRoot: join(userDataDirectory, 'projects'), window })
+    const setRowOpen = electronMocks.handlers.get(ipcChannels.setRowOpen)
+    const getRowOpen = electronMocks.handlers.get(ipcChannels.getRowOpen)
+    if (!setRowOpen || !getRowOpen) throw new Error('行折叠偏好 IPC 未注册')
+
+    expect((): unknown => setRowOpen(event, 'workspace-row-open:workspace-1', false)).not.toThrow()
+    expect(getRowOpen(event, 'workspace-row-open:workspace-1')).toBe(false)
+    expect((): unknown => getRowOpen(event, 'project-row-open:project-1')).not.toThrow()
+    expect((): unknown => setRowOpen(event, 'sidebar-open', false)).toThrow('无效的偏好键')
+    expect((): unknown => getRowOpen(event, 'theme')).toThrow('无效的偏好键')
+
+    expect(database.preferences.getSidebarOpen()).toBe(true)
+  })
+
   it('adds a selected directory through the trusted narrow channel', async (): Promise<void> => {
     const userDataDirectory = mkdtempSync(join(tmpdir(), 'lithe-ipc-'))
     const projectDirectory = mkdtempSync(join(tmpdir(), 'lithe-ipc-project-'))
