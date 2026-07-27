@@ -250,7 +250,11 @@ export const TaskRow = ({ adapter, onOpen, selected, task }: TaskRowProps): Reac
             onClick={onOpen}
             type="button"
           >
-            {task.agentStatus === 'running' ? (
+            {task.isUnread ? (
+              <span aria-label="未读" title="未读">
+                <CircleIcon aria-hidden className="size-3 shrink-0 fill-unread text-unread" />
+              </span>
+            ) : task.agentStatus === 'running' ? (
               <span aria-label="运行中" title="运行中">
                 <CircleIcon aria-hidden className="size-3 shrink-0 fill-emerald-500 text-emerald-500" />
               </span>
@@ -267,7 +271,6 @@ export const TaskRow = ({ adapter, onOpen, selected, task }: TaskRowProps): Reac
               {adapter?.name ?? 'agent'}
             </Badge>
             <TaskTitle actionsRef={actionsRef} name={task.name} />
-            {task.isUnread ? <span className="bg-unread ml-auto size-1.5 rounded-full" aria-label="未读" /> : null}
           </button>
           <TaskToolbar
             archive={archive}

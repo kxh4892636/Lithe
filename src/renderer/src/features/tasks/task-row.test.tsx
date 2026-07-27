@@ -59,13 +59,14 @@ afterEach((): void => {
 })
 
 describe('task row', (): void => {
-  it('shows a yellow dot for an unread task without emboldening the title', (): void => {
+  it('replaces the left status icon with a yellow dot for an unread task', (): void => {
     window.lithe = {} as unknown as LitheBridge
     useTaskStore.setState({ launchesByTask: {} })
 
     render(<TaskRow onOpen={vi.fn<() => void>()} task={{ ...task, isUnread: true }} />)
 
-    expect(screen.getByLabelText('未读')).toHaveClass('bg-unread')
+    expect(screen.getByLabelText('未读').querySelector('svg')).toHaveClass('fill-unread', 'text-unread')
+    expect(screen.queryByLabelText('关闭')).not.toBeInTheDocument()
     expect(screen.getByTitle('Review')).not.toHaveClass('font-medium')
   })
 
