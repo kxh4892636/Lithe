@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -198,6 +199,32 @@ describe('app database', (): void => {
     expect(() => database.tasks.bindSession(task.id, 'provider-2')).toThrow('already bound')
     database.tasks.add({ ...task, id: 'task-agent-2', name: 'Review 2' })
     expect(() => database.tasks.bindSession('task-agent-2', 'provider-1')).toThrow('another task')
+  })
+
+  it('refreshes built-in Adapter definitions when the application reopens', (): void => {
+    const directory = mkdtempSync(join(tmpdir(), 'lithe-database-'))
+    const databasePath = join(directory, 'lithe.db')
+    temporaryDirectories.push(directory)
+    createAppDatabase({ databasePath }).close()
+    const sqlite = new DatabaseSync(databasePath)
+    sqlite.prepare('UPDATE adapter_versions SET definition = ? WHERE id = ?').run(
+      JSON.stringify({
+        executable: 'kimi',
+        start: [],
+        resume: ['--session', '{{agentSessionId}}'],
+        fork: ['--session', '{{agentSessionId}}'],
+        interactions: { fork: [{ input: '/fork\r', timeoutMs: 30_000, waitFor: '›' }] },
+      }),
+      'builtin-kimi-code-v1',
+    )
+    sqlite.close()
+
+    const database = createAppDatabase({ databasePath })
+    openDatabases.push(database)
+
+    expect(database.adapters.getVersion('builtin-kimi-code-v1')?.definition.interactions?.fork).toEqual([
+      { input: '/fork\r', timeoutMs: 30_000, waitFor: '>' },
+    ])
   })
 
   it('keeps an old custom Adapter version readable after edits and deletion', (): void => {

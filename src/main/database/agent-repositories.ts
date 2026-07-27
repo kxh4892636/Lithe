@@ -201,7 +201,10 @@ export const createAdapterRepository = (database: Database, sqlite: DatabaseSync
           definition: JSON.stringify(version.definition),
           createdAt: version.createdAt,
         })
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: adapterVersions.id,
+          set: { definition: JSON.stringify(version.definition) },
+        })
         .run()
     }
   },

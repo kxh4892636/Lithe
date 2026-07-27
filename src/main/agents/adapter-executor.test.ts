@@ -55,7 +55,7 @@ describe('declarative Adapter executor', (): void => {
       executable: 'kimi',
       resume: ['--session', '{{agentSessionId}}'],
       fork: ['--session', '{{agentSessionId}}'],
-      interactions: { fork: [{ input: '/fork\r' }] },
+      interactions: { fork: [{ input: '/fork\r', waitFor: '>' }] },
     })
   })
 })

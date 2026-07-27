@@ -43,7 +43,7 @@ export const builtinAdapterVersions: AdapterVersion[] = [
       resume: ['--session', '{{agentSessionId}}'],
       fork: ['--session', '{{agentSessionId}}'],
       interactions: {
-        fork: [{ input: '/fork\r', timeoutMs: 30_000, waitFor: '›' }],
+        fork: [{ input: '/fork\r', timeoutMs: 30_000, waitFor: '>' }],
       },
     },
     createdAt,
