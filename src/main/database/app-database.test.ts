@@ -248,12 +248,13 @@ describe('app database', (): void => {
     expect(database.tasks.listRunning()).toEqual([])
   })
 
-  it('refreshes built-in Adapter definitions when the application reopens', (): void => {
+  it('refreshes built-in Adapter names and definitions when the application reopens', (): void => {
     const directory = mkdtempSync(join(tmpdir(), 'lithe-database-'))
     const databasePath = join(directory, 'lithe.db')
     temporaryDirectories.push(directory)
     createAppDatabase({ databasePath }).close()
     const sqlite = new DatabaseSync(databasePath)
+    sqlite.prepare("UPDATE adapters SET name = 'Kimi Code' WHERE id = 'builtin-kimi-code'").run()
     sqlite.prepare('UPDATE adapter_versions SET definition = ? WHERE id = ?').run(
       JSON.stringify({
         executable: 'kimi',
@@ -269,6 +270,7 @@ describe('app database', (): void => {
     const database = createAppDatabase({ databasePath })
     openDatabases.push(database)
 
+    expect(database.adapters.getVersion('builtin-kimi-code-v1')?.name).toBe('Kimi')
     expect(database.adapters.getVersion('builtin-kimi-code-v1')?.definition.interactions?.fork).toEqual([
       { input: '/fork\r', timeoutMs: 30_000, waitFor: '>' },
     ])

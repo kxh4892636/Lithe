@@ -47,8 +47,8 @@ describe('declarative Adapter executor', (): void => {
     ).toThrow('resume must reference agentSessionId')
   })
 
-  it('defines Codex, Claude Code, and Kimi Code through the same immutable model', (): void => {
-    expect(builtinAdapterVersions.map((adapter) => adapter.name)).toEqual(['Codex', 'Claude Code', 'Kimi Code'])
+  it('defines Codex, Claude, and Kimi through the same immutable model', (): void => {
+    expect(builtinAdapterVersions.map((adapter) => adapter.name)).toEqual(['Codex', 'Claude', 'Kimi'])
     expect(builtinAdapterVersions[0]?.definition.fork).toEqual(['fork', '{{agentSessionId}}'])
     expect(builtinAdapterVersions[1]?.definition.fork).toEqual(['--resume', '{{agentSessionId}}', '--fork-session'])
     expect(builtinAdapterVersions[2]?.definition).toMatchObject({

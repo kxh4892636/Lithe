@@ -20,7 +20,7 @@ export const builtinAdapterVersions: AdapterVersion[] = [
   {
     id: 'builtin-claude-code-v1',
     adapterId: 'builtin-claude-code',
-    name: 'Claude Code',
+    name: 'Claude',
     kind: 'builtin',
     version: 1,
     definition: {
@@ -34,7 +34,7 @@ export const builtinAdapterVersions: AdapterVersion[] = [
   {
     id: 'builtin-kimi-code-v1',
     adapterId: 'builtin-kimi-code',
-    name: 'Kimi Code',
+    name: 'Kimi',
     kind: 'builtin',
     version: 1,
     definition: {

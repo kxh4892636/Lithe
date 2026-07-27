@@ -183,7 +183,10 @@ export const createAdapterRepository = (database: Database, sqlite: DatabaseSync
           isDeleted: false,
           createdAt: version.createdAt,
         })
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: adapters.id,
+          set: { name: version.name },
+        })
         .run()
       database
         .insert(adapterVersions)
