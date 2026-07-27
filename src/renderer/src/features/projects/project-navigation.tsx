@@ -173,6 +173,7 @@ interface PinnedWorkspaceRowProps {
   selectWorkspace: (workspaceId: string) => Promise<void>
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
   tasks: Task[]
+  visibleTaskId: string | null
 }
 
 interface PinnedContextItemsProps {
@@ -279,6 +280,7 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
               .then((): Promise<unknown> => activateTask(task.id))
               .catch(globalThis.console.error)
           }
+          selected={props.visibleTaskId === task.id}
           task={task}
         />
       ))}
@@ -375,6 +377,7 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
                   selectWorkspace={selectWorkspace}
                   setWorkspacePinned={setWorkspacePinned}
                   tasks={tasksByWorkspace[entry.workspace.id] ?? []}
+                  visibleTaskId={visibleTaskId}
                 />
               ))}
             </div>
@@ -501,6 +504,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
             query={normalizedQuery}
             selectWorkspace={selectWorkspace}
             tasksByWorkspace={tasksByWorkspace}
+            visibleTaskId={visibleTaskId}
             workspaces={scratchWorkspaces}
           />
           {error ? <p className="text-destructive px-2 py-2 text-xs">{error}</p> : null}

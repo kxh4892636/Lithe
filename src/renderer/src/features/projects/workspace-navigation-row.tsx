@@ -154,6 +154,7 @@ export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Elem
               .then((): Promise<unknown> => activateTask(task.id))
               .catch(globalThis.console.error)
           }
+          selected={visibleTaskId === task.id}
           task={task}
         />
       ))}
