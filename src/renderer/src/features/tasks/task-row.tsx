@@ -100,7 +100,6 @@ interface TaskTitleMetrics {
 }
 
 const taskTitleGap = 32
-const taskTitleMaskWidth = 20
 const taskTitleSpeed = 30
 
 const TaskTitle = (props: TaskTitleProps): React.JSX.Element => {
@@ -112,7 +111,7 @@ const TaskTitle = (props: TaskTitleProps): React.JSX.Element => {
     const textWidth = textRef.current?.scrollWidth ?? 0
     const viewportWidth = viewportRef.current?.clientWidth ?? 0
     const actionsWidth = actionsRef.current?.offsetWidth ?? 0
-    const overflow = textWidth > Math.max(0, viewportWidth - actionsWidth - taskTitleMaskWidth)
+    const overflow = textWidth > Math.max(0, viewportWidth - actionsWidth)
     const distance = overflow ? textWidth + taskTitleGap : 0
     setMetrics(
       (current): TaskTitleMetrics =>
