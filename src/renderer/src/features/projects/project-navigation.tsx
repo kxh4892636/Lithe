@@ -42,7 +42,7 @@ import { filterProjects } from './project-navigation-filter'
 import { ProjectOperationDialog, type ProjectOperation } from './project-operation-dialog'
 import { useProjectStore } from './project-store'
 import { ScratchTaskRows } from './scratch-task-rows'
-import { WorkspaceNavigationRow, workspaceNavigationTitle } from './workspace-navigation-row'
+import { WorkspaceNavigationRow, workspaceNavigationTitle, workspaceRowIsActive } from './workspace-navigation-row'
 
 interface NavigationGroupProps {
   isOpen: boolean
@@ -57,6 +57,7 @@ interface ProjectTreeProps {
   selectWorkspace: (workspaceId: string) => Promise<void>
   setOperation: (operation: ProjectOperation) => void
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
+  visibleTaskId: string | null
 }
 
 interface ProjectRowProps extends Omit<ProjectTreeProps, 'projects'> {
@@ -124,7 +125,7 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-      <SidebarMenuSub className="mx-3 translate-x-0 px-0">
+      <SidebarMenuSub className="ml-3 mr-0 translate-x-0 px-0">
         {project.workspaces.map((workspace) => (
           <WorkspaceNavigationRow
             {...props}
@@ -320,6 +321,7 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
   const activateTask = useTaskStore((state: TaskState) => state.activateTask)
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
   const tasksByWorkspace = useTaskStore((state: TaskState) => state.tasksByWorkspace)
+  const visibleTaskId = useTaskStore((state: TaskState) => state.visibleTaskId)
   const normalizedQuery = useNavigationSearchStore((state) => state.query.trim().toLocaleLowerCase())
   const [operation, setOperation] = useState<ProjectOperation | null>(null)
   const [taskWorkspace, setTaskWorkspace] = useState<Workspace | null>(null)
@@ -363,7 +365,7 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
             <div className="space-y-2">
               {pinned.map((entry) => (
                 <PinnedWorkspaceRow
-                  active={entry.workspace.id === activeWorkspaceId}
+                  active={workspaceRowIsActive(activeWorkspaceId, visibleTaskId, entry.workspace.id)}
                   activateTask={activateTask}
                   adapterByVersion={adaptersByVersion}
                   entry={entry}
@@ -400,7 +402,7 @@ interface ProjectGroupHeaderProps extends NavigationGroupProps {
 const ProjectGroupHeader = (props: ProjectGroupHeaderProps): React.JSX.Element => {
   const { t } = useTranslation()
   return (
-    <>
+    <div className="flex items-center">
       <SidebarGroupLabel
         render={
           <button
@@ -417,7 +419,7 @@ const ProjectGroupHeader = (props: ProjectGroupHeaderProps): React.JSX.Element =
       {props.projectCount > 0 ? (
         <SidebarGroupAction
           aria-label={t('projects.add')}
-          className="right-2 size-6 [&>svg]:size-3"
+          className="right-2 size-6 [&>svg]:size-3.5"
           disabled={props.isLoading}
           onClick={props.onAdd}
           title={t('projects.add')}
@@ -425,7 +427,7 @@ const ProjectGroupHeader = (props: ProjectGroupHeaderProps): React.JSX.Element =
           <FolderPlusIcon />
         </SidebarGroupAction>
       ) : null}
-    </>
+    </div>
   )
 }
 
@@ -441,6 +443,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
   const activateTask = useTaskStore((state: TaskState) => state.activateTask)
   const hydrateWorkspace = useTaskStore((state: TaskState) => state.hydrateWorkspace)
   const tasksByWorkspace = useTaskStore((state: TaskState) => state.tasksByWorkspace)
+  const visibleTaskId = useTaskStore((state: TaskState) => state.visibleTaskId)
   const [operation, setOperation] = useState<ProjectOperation | null>(null)
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const [taskWorkspace, setTaskWorkspace] = useState<Workspace | null>(null)
@@ -489,6 +492,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
               selectWorkspace={selectWorkspace}
               setOperation={setOperation}
               setWorkspacePinned={setWorkspacePinned}
+              visibleTaskId={visibleTaskId}
             />
           )}
           <ScratchTaskRows

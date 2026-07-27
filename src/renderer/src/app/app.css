@@ -235,7 +235,11 @@
 }
 
 [data-slot='task-actions'] {
-  background: var(--sidebar-accent);
+  background-color: var(--sidebar);
+  background-image: linear-gradient(
+    color-mix(in oklab, var(--sidebar-accent) 50%, transparent),
+    color-mix(in oklab, var(--sidebar-accent) 50%, transparent)
+  );
 }
 
 @keyframes task-title-marquee {

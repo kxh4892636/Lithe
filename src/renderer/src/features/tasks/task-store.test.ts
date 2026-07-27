@@ -29,7 +29,16 @@ describe('task store', (): void => {
       openTaskId: null,
       panelRemovals: [],
       tasksByWorkspace: { 'workspace-1': [] },
+      visibleTaskId: null,
     })
+  })
+
+  it('tracks the task currently visible in the workspace layout', (): void => {
+    useTaskStore.getState().setVisibleTaskId(restoredTask.id)
+    expect(useTaskStore.getState().visibleTaskId).toBe(restoredTask.id)
+
+    useTaskStore.getState().setVisibleTaskId(null)
+    expect(useTaskStore.getState().visibleTaskId).toBeNull()
   })
 
   it('keeps a restored task unique when the change event arrives before the IPC response', async (): Promise<void> => {

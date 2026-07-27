@@ -102,7 +102,7 @@ const SettingsSidebar = ({ appearance }: { appearance: NavigationAppearance }): 
           to="/"
         >
           <ArrowLeftIcon className="size-4" />
-          返回中间主界面
+          返回主界面
         </Link>
       </SidebarHeader>
       <SidebarContent className="p-2">

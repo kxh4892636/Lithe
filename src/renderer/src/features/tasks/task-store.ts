@@ -13,6 +13,7 @@ export interface TaskState {
   openTaskId: string | null
   panelRemovals: Array<{ taskId: string; workspaceId: string }>
   tasksByWorkspace: Record<string, Task[]>
+  visibleTaskId: string | null
   activateTask: (taskId: string) => Promise<AgentLaunch | undefined>
   autoRestoreTask: (taskId: string) => Promise<AgentLaunch | undefined>
   addLaunch: (launch: AgentLaunch) => void
@@ -29,6 +30,7 @@ export interface TaskState {
   openTask: (taskId: string) => void
   renameTask: (taskId: string, name: string) => Promise<Task>
   restoreTask: (taskId: string) => Promise<void>
+  setVisibleTaskId: (taskId: string | null) => void
   stopTask: (taskId: string) => Promise<void>
 }
 
@@ -397,10 +399,12 @@ export const useTaskStore = create<TaskState>(
     openTaskId: null,
     panelRemovals: [],
     tasksByWorkspace: {},
+    visibleTaskId: null,
     ...createActivationActions(set, get),
     ...createTaskChangeAction(set),
     ...createAgentMutationActions(set),
     ...createArchiveActions(set),
     ...createHydrationActions(set),
+    setVisibleTaskId: (visibleTaskId: string | null): void => set({ visibleTaskId }),
   }),
 )

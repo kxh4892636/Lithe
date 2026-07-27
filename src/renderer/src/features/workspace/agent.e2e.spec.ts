@@ -78,6 +78,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
     await taskDialog.getByLabel('任务名称').fill(taskName)
     await taskDialog.getByRole('button', { name: '创建任务' }).click()
     await expect(page.locator('[data-agent-id]')).toHaveCount(1)
+    await expect(workspaceRow.locator('[data-slot="workspace-row"]')).toHaveAttribute('data-active', 'false')
     await expect(page.locator('.xterm-rows')).toContainText('LITHE_AGENT_READY')
     await page.locator('[data-agent-id] [data-terminal-host]').evaluate((element: HTMLElement): void => {
       element.setAttribute('data-view-identity', 'source-agent-terminal')

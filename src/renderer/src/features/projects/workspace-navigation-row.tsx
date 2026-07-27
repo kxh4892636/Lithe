@@ -24,11 +24,18 @@ interface WorkspaceRowProps {
   setOperation: (operation: ProjectOperation) => void
   setWorkspacePinned: (workspaceId: string, isPinned: boolean) => Promise<void>
   tasks: Task[]
+  visibleTaskId: string | null
   workspace: Workspace
 }
 
 export const workspaceNavigationTitle = (workspace: Workspace): string =>
   workspace.gitBranch ? `${workspace.gitBranch} - ${workspace.name}` : workspace.name
+
+export const workspaceRowIsActive = (
+  activeWorkspaceId: string | null,
+  visibleTaskId: string | null,
+  workspaceId: string,
+): boolean => activeWorkspaceId === workspaceId && visibleTaskId === null
 
 const WorkspaceContextItems = ({
   openTaskDialog,
@@ -73,17 +80,20 @@ const WorkspaceContextItems = ({
 )
 
 export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Element => {
-  const { activateTask, activeWorkspaceId, adaptersByVersion, selectWorkspace, tasks, workspace } = props
+  const { activateTask, activeWorkspaceId, adaptersByVersion, selectWorkspace, tasks, visibleTaskId, workspace } = props
+  const active = workspaceRowIsActive(activeWorkspaceId, visibleTaskId, workspace.id)
   return (
     <SidebarMenuSubItem>
       <ContextMenu>
         <ContextMenuTrigger
           render={
             <div
+              data-active={String(active)}
+              data-slot="workspace-row"
               className={
-                workspace.id === activeWorkspaceId
-                  ? 'group/workspace flex min-w-0 items-center rounded-md bg-sidebar-accent/60'
-                  : 'group/workspace flex min-w-0 items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50'
+                active
+                  ? 'group/workspace flex min-w-0 items-center rounded-md bg-sidebar-accent/60 mb-0.5'
+                  : 'group/workspace flex min-w-0 items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50 mb-0.5'
               }
             />
           }

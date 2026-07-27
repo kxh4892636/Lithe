@@ -250,6 +250,7 @@ const selectedTaskId = (layout: WorkspaceLayoutAdapter): string | null => {
 
 const reportVisibleTask = (layout: WorkspaceLayoutAdapter): void => {
   const taskId = selectedTaskId(layout)
+  useTaskStore.getState().setVisibleTaskId(taskId)
   void window.lithe.tasks
     .setVisible(taskId)
     .then((): Promise<Task> | undefined => (taskId ? window.lithe.tasks.markViewed(taskId) : undefined))
@@ -264,6 +265,7 @@ const useVisibleTaskReporting = (layout: WorkspaceLayoutAdapter | undefined, vis
     globalThis.addEventListener('focus', report)
     return (): void => {
       globalThis.removeEventListener('focus', report)
+      useTaskStore.getState().setVisibleTaskId(null)
       void window.lithe.tasks.setVisible(null).catch(globalThis.console.error)
     }
   }, [layout, visible])
