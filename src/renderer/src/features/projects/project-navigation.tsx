@@ -69,11 +69,11 @@ const ProjectRow = (props: ProjectRowProps): React.JSX.Element => {
   const { project, setOperation } = props
   const removeOperation: ProjectOperation = project.isValid ? { kind: 'remove', project } : { kind: 'forget', project }
   return (
-    <SidebarMenuItem className="group/project">
+    <SidebarMenuItem>
       <ContextMenu>
         <ContextMenuTrigger
           render={
-            <div className="flex min-w-0 items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
+            <div className="group/project flex min-w-0 items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
           }
         >
           <SidebarMenuButton
@@ -226,11 +226,11 @@ const PinnedWorkspaceRow = (props: PinnedWorkspaceRowProps): React.JSX.Element =
   const { activateTask, adapterByVersion, entry, selectWorkspace, setWorkspacePinned, tasks } = props
   const { workspace } = entry
   return (
-    <div className={props.active ? 'group/pinned rounded-md bg-sidebar-accent/60' : 'group/pinned'}>
+    <div className={props.active ? 'rounded-md bg-sidebar-accent/60' : undefined}>
       <ContextMenu>
         <ContextMenuTrigger
           render={
-            <div className="flex items-center rounded-md px-2 py-1 text-xs hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
+            <div className="group/pinned flex items-center rounded-md px-2 py-1 text-xs hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50" />
           }
         >
           <button
@@ -508,9 +508,9 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
             open={taskWorkspace !== null}
             workspace={taskWorkspace}
           />
-          <ProjectCreateDialog onOpenChange={setProjectDialogOpen} open={projectDialogOpen} />
         </SidebarGroupContent>
       ) : null}
+      <ProjectCreateDialog onOpenChange={setProjectDialogOpen} open={projectDialogOpen} />
     </SidebarGroup>
   )
 }

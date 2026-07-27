@@ -46,6 +46,15 @@ export const inspectAdapterAvailability = async (adapter: AdapterVersion): Promi
 
   const help = await probe(executable, ['--help'])
   if (!help.succeeded) return availability(false, `${adapter.name} version could not be inspected`, false, false)
+  if (adapter.adapterId === 'builtin-kimi-code') {
+    const sessionAvailable = /--session\b/i.test(help.output)
+    return availability(
+      true,
+      null,
+      sessionAvailable && adapter.definition.resume !== null,
+      sessionAvailable && adapter.definition.fork !== null,
+    )
+  }
   const resumeAvailable =
     adapter.adapterId === 'builtin-codex' ? /\bresume\b/i.test(help.output) : /--resume\b/i.test(help.output)
   const forkAvailable =

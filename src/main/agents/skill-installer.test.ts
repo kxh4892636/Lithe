@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { installLitheToolSkill } from './skill-installer'
 
@@ -57,5 +57,23 @@ describe('Lithe Tool Skill installer', (): void => {
 
     expect(result.conflicts).toContain(target)
     expect(readFileSync(join(target, 'SKILL.md'), 'utf8')).toBe('user modification')
+  })
+
+  it('isolates a copy filesystem failure and installs the remaining copies', (): void => {
+    const home = temporaryHome()
+    const logError = vi.fn<(message: string, error: unknown) => void>()
+    writeFileSync(join(home, '.agents'), 'not a directory', 'utf8')
+
+    const result = installLitheToolSkill(home, 'managed content', logError)
+
+    expect(result.status).toBe('conflict')
+    expect(result.installed).toEqual([
+      join(home, '.lithe', 'skills', 'lithe-tool'),
+      join(home, '.claude', 'skills', 'lithe-tool'),
+    ])
+    expect(logError).toHaveBeenCalledWith(
+      expect.stringContaining('Lithe Tool Skill installation failed'),
+      expect.any(Error),
+    )
   })
 })

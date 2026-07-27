@@ -74,6 +74,73 @@ interface TaskRowProps {
   task: Task
 }
 
+interface TaskActionsProps {
+  archive: () => void
+  fork: () => void
+  forkDisabledReason: string | null
+  isRunning: boolean
+  onRename: () => void
+  stop: () => void
+  taskName: string
+}
+
+const TaskToolbar = (props: TaskActionsProps): React.JSX.Element => {
+  const { archive, fork, forkDisabledReason, isRunning, taskName } = props
+  return (
+    <div className="invisible flex items-center pr-1 group-focus-within/task:visible group-hover/task:visible">
+      <Button
+        aria-label={`Fork ${taskName}`}
+        className="hover:bg-transparent"
+        disabled={forkDisabledReason !== null}
+        onClick={fork}
+        size="icon-xs"
+        title={forkDisabledReason ?? 'Fork'}
+        variant="ghost"
+      >
+        <GitForkIcon />
+      </Button>
+      <Button
+        aria-label={`归档 ${taskName}`}
+        className="hover:bg-transparent"
+        disabled={isRunning}
+        onClick={archive}
+        size="icon-xs"
+        title={isRunning ? '运行中任务不能归档' : '归档'}
+        variant="ghost"
+      >
+        <ArchiveIcon />
+      </Button>
+    </div>
+  )
+}
+
+const TaskContextMenu = (props: TaskActionsProps): React.JSX.Element => {
+  const { archive, fork, forkDisabledReason, isRunning, onRename, stop } = props
+  return (
+    <ContextMenuContent className="[&_svg]:size-3">
+      <ContextMenuItem onClick={onRename}>
+        <PencilIcon />
+        重命名
+      </ContextMenuItem>
+      <ContextMenuItem disabled={forkDisabledReason !== null} onClick={fork} title={forkDisabledReason ?? 'Fork'}>
+        <GitForkIcon className="size-3" />
+        Fork
+      </ContextMenuItem>
+      {isRunning ? (
+        <ContextMenuItem onClick={stop}>
+          <SquareIcon className="size-3" />
+          停止
+        </ContextMenuItem>
+      ) : null}
+      <ContextMenuSeparator />
+      <ContextMenuItem disabled={isRunning} onClick={archive}>
+        <ArchiveIcon className="size-3" />
+        归档
+      </ContextMenuItem>
+    </ContextMenuContent>
+  )
+}
+
 export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Element => {
   const archiveTask = useTaskStore((state: TaskState) => state.archiveTask)
   const forkTask = useTaskStore((state: TaskState) => state.forkTask)
@@ -115,52 +182,25 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
             <span className={task.isUnread ? 'text-foreground truncate font-medium' : 'truncate'}>-{task.name}</span>
             {task.isUnread ? <span className="bg-primary ml-auto size-1.5 rounded-full" aria-label="未读" /> : null}
           </button>
-          <div className="invisible flex items-center pr-1 group-focus-within/task:visible group-hover/task:visible">
-            <Button
-              aria-label={`Fork ${task.name}`}
-              className="hover:bg-transparent"
-              disabled={forkDisabledReason !== null}
-              onClick={fork}
-              size="icon-xs"
-              title={forkDisabledReason ?? 'Fork'}
-              variant="ghost"
-            >
-              <GitForkIcon />
-            </Button>
-            <Button
-              aria-label={`归档 ${task.name}`}
-              disabled={isRunning}
-              className="hover:bg-transparent"
-              onClick={archive}
-              size="icon-xs"
-              title={isRunning ? '运行中任务不能归档' : '归档'}
-              variant="ghost"
-            >
-              <ArchiveIcon />
-            </Button>
-          </div>
+          <TaskToolbar
+            archive={archive}
+            fork={fork}
+            forkDisabledReason={forkDisabledReason}
+            isRunning={isRunning}
+            onRename={(): void => setRenaming(true)}
+            stop={stop}
+            taskName={task.name}
+          />
         </ContextMenuTrigger>
-        <ContextMenuContent className="[&_svg]:size-3">
-          <ContextMenuItem onClick={(): void => setRenaming(true)}>
-            <PencilIcon />
-            重命名
-          </ContextMenuItem>
-          <ContextMenuItem disabled={forkDisabledReason !== null} onClick={fork} title={forkDisabledReason ?? 'Fork'}>
-            <GitForkIcon className="size-3" />
-            Fork
-          </ContextMenuItem>
-          {isRunning ? (
-            <ContextMenuItem onClick={stop}>
-              <SquareIcon className="size-3" />
-              停止
-            </ContextMenuItem>
-          ) : null}
-          <ContextMenuSeparator />
-          <ContextMenuItem disabled={isRunning} onClick={archive}>
-            <ArchiveIcon className="size-3" />
-            归档
-          </ContextMenuItem>
-        </ContextMenuContent>
+        <TaskContextMenu
+          archive={archive}
+          fork={fork}
+          forkDisabledReason={forkDisabledReason}
+          isRunning={isRunning}
+          onRename={(): void => setRenaming(true)}
+          stop={stop}
+          taskName={task.name}
+        />
       </ContextMenu>
       <TaskRenameDialog onOpenChange={setRenaming} open={renaming} task={task} />
     </>

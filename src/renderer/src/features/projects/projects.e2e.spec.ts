@@ -28,6 +28,13 @@ test('E2E-LITHE-003 adds a directory and restores its default workspace', async 
     await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()
     await expect(window.getByRole('button', { name: '默认' })).toBeVisible()
 
+    const projectGroup = window.getByRole('button', { name: '项目', exact: true })
+    await projectGroup.click()
+    await window.getByRole('button', { name: '添加项目' }).click()
+    await expect(window.getByRole('dialog', { name: '创建项目' })).toBeVisible()
+    await window.getByRole('button', { name: '取消' }).click()
+    await projectGroup.click()
+
     await electronSession.restart()
     window = await electronSession.application.firstWindow()
     await expect(window.getByRole('region', { name: '默认 工作区' })).toBeVisible()

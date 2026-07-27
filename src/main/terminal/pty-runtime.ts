@@ -41,6 +41,8 @@ interface InteractionController {
   onData: (data: string) => void
 }
 
+type ClosingSession = { finish: () => void; session: PtyProcess }
+
 const oscSequence = new RegExp(String.raw`\u001B\][^\u0007]*(?:\u0007|\u001B\\)`, 'g')
 const csiSequence = new RegExp(String.raw`\u001B\[[0-?]*[ -/]*[@-~]`, 'g')
 const stripAnsi = (value: string): string => value.replaceAll(oscSequence, '').replaceAll(csiSequence, '')
@@ -82,10 +84,58 @@ const createInteractionController = (
   return { dispose, onData }
 }
 
+const removeLiveSession = (
+  sessionId: string,
+  session: PtyProcess,
+  sessions: Map<string, PtyProcess>,
+  interactions: Map<string, InteractionController>,
+): boolean => {
+  if (sessions.get(sessionId) !== session) return false
+  sessions.delete(sessionId)
+  interactions.get(sessionId)?.dispose()
+  interactions.delete(sessionId)
+  return true
+}
+
+const attachSession = (
+  request: PtyCreateRequest,
+  session: PtyProcess,
+  sessions: Map<string, PtyProcess>,
+  interactions: Map<string, InteractionController>,
+  closing: Map<string, ClosingSession>,
+  options: Pick<CreatePtyRuntimeOptions, 'onClose' | 'onData' | 'onExit'>,
+): void => {
+  const interaction = createInteractionController(
+    request.interactions ?? [],
+    (data): void => session.write(data),
+    (message): void => {
+      if (!removeLiveSession(request.sessionId, session, sessions, interactions)) return
+      options.onData(request.sessionId, `\r\n[Lithe] PTY ${message}\r\n`)
+      session.kill()
+      options.onClose?.(request.sessionId)
+    },
+  )
+  interactions.set(request.sessionId, interaction)
+  session.onData((data): void => {
+    options.onData(request.sessionId, data)
+    interaction.onData(data)
+  })
+  session.onExit((exitCode): void => {
+    const pendingClose = closing.get(request.sessionId)
+    if (pendingClose?.session === session) {
+      closing.delete(request.sessionId)
+      pendingClose.finish()
+      return
+    }
+    if (!removeLiveSession(request.sessionId, session, sessions, interactions)) return
+    options.onExit(request.sessionId, exitCode)
+  })
+}
+
 export const createPtyRuntime = ({ adapter, onClose, onData, onExit }: CreatePtyRuntimeOptions): PtyRuntime => {
   const sessions = new Map<string, PtyProcess>()
   const interactions = new Map<string, InteractionController>()
-  const closing = new Map<string, { finish: () => void; session: PtyProcess }>()
+  const closing = new Map<string, ClosingSession>()
   const requireSession = (sessionId: string): PtyProcess => {
     const session = sessions.get(sessionId)
     if (!session) throw new TypeError('终端会话不存在')
@@ -119,9 +169,7 @@ export const createPtyRuntime = ({ adapter, onClose, onData, onExit }: CreatePty
     close: (sessionId: string): void => {
       const session = sessions.get(sessionId)
       if (!session) return
-      sessions.delete(sessionId)
-      interactions.get(sessionId)?.dispose()
-      interactions.delete(sessionId)
+      removeLiveSession(sessionId, session, sessions, interactions)
       session.kill()
       onClose?.(sessionId)
     },
@@ -148,37 +196,7 @@ export const createPtyRuntime = ({ adapter, onClose, onData, onExit }: CreatePty
       if (sessions.has(request.sessionId)) throw new TypeError('终端会话已存在')
       const session = adapter.spawn(request)
       sessions.set(request.sessionId, session)
-      const interaction = createInteractionController(
-        request.interactions ?? [],
-        (data): void => session.write(data),
-        (message): void => {
-          if (sessions.get(request.sessionId) !== session) return
-          onData(request.sessionId, `\r\n[Lithe] PTY ${message}\r\n`)
-          sessions.delete(request.sessionId)
-          interactions.get(request.sessionId)?.dispose()
-          interactions.delete(request.sessionId)
-          session.kill()
-          onClose?.(request.sessionId)
-        },
-      )
-      interactions.set(request.sessionId, interaction)
-      session.onData((data): void => {
-        onData(request.sessionId, data)
-        interaction.onData(data)
-      })
-      session.onExit((exitCode): void => {
-        const pendingClose = closing.get(request.sessionId)
-        if (pendingClose?.session === session) {
-          closing.delete(request.sessionId)
-          pendingClose.finish()
-          return
-        }
-        if (sessions.get(request.sessionId) !== session) return
-        sessions.delete(request.sessionId)
-        interactions.get(request.sessionId)?.dispose()
-        interactions.delete(request.sessionId)
-        onExit(request.sessionId, exitCode)
-      })
+      attachSession(request, session, sessions, interactions, closing, { onClose, onData, onExit })
     },
     resize: (sessionId: string, columns: number, rows: number): void => requireSession(sessionId).resize(columns, rows),
     write: (sessionId: string, data: string): void => requireSession(sessionId).write(data),

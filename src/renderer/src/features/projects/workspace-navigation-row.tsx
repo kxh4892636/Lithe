@@ -75,15 +75,15 @@ const WorkspaceContextItems = ({
 export const WorkspaceNavigationRow = (props: WorkspaceRowProps): React.JSX.Element => {
   const { activateTask, activeWorkspaceId, adaptersByVersion, selectWorkspace, tasks, workspace } = props
   return (
-    <SidebarMenuSubItem className="group/workspace">
+    <SidebarMenuSubItem>
       <ContextMenu>
         <ContextMenuTrigger
           render={
             <div
               className={
                 workspace.id === activeWorkspaceId
-                  ? 'flex min-w-0 items-center rounded-md bg-sidebar-accent/60'
-                  : 'flex min-w-0 items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50'
+                  ? 'group/workspace flex min-w-0 items-center rounded-md bg-sidebar-accent/60'
+                  : 'group/workspace flex min-w-0 items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50'
               }
             />
           }

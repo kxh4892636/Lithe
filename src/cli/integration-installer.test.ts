@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { parse as parseToml } from 'smol-toml'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { installAgentIntegrations } from './integration-installer'
 
@@ -98,5 +98,81 @@ describe('Agent integration installer', (): void => {
     expect(content).toMatch(/^model = "kimi-for-coding"/)
     expect(content).toContain('event = "SessionStart"')
     expect(content).toContain('command = "lithe-tool agent bind --hook-input"')
+  })
+
+  it('reports a filesystem failure for one provider and continues the others', (): void => {
+    const home = temporaryHome()
+    const logError = vi.fn<(message: string, error: unknown) => void>()
+    writeFileSync(join(home, '.kimi-code'), 'not a directory', 'utf8')
+
+    const result = installAgentIntegrations({
+      homeDirectory: home,
+      isCommandAvailable: (): boolean => true,
+      logError,
+      skillContent: 'managed skill',
+    })
+
+    expect(result.data.providers).toEqual({ claude: 'installed', codex: 'installed', kimi: 'conflict' })
+    expect(result.ok).toBe(false)
+    expect(logError).toHaveBeenCalledWith('Kimi Code integration installation failed', expect.any(Error))
+    expect(readFileSync(join(home, '.codex', 'hooks.json'), 'utf8')).toContain('SessionStart')
+  })
+
+  it('rejects an unmanaged matching JSON hook instead of claiming ownership', (): void => {
+    const home = temporaryHome()
+    const directory = join(home, '.codex')
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(
+      join(directory, 'hooks.json'),
+      `${JSON.stringify({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: 'startup',
+              hooks: [{ type: 'command', command: 'lithe-tool agent bind --hook-input', timeout: 30 }],
+            },
+          ],
+        },
+      })}\n`,
+      'utf8',
+    )
+
+    const result = installAgentIntegrations({
+      homeDirectory: home,
+      isCommandAvailable: (command: string): boolean => command === 'codex',
+      skillContent: 'managed skill',
+    })
+
+    expect(result.data.providers.codex).toBe('conflict')
+  })
+
+  it('upgrades a changed managed JSON hook using its sidecar marker', (): void => {
+    const home = temporaryHome()
+    const available = (command: string): boolean => command === 'codex'
+    installAgentIntegrations({
+      homeDirectory: home,
+      isCommandAvailable: available,
+      skillContent: 'managed skill',
+    })
+    const hookPath = join(home, '.codex', 'hooks.json')
+    const changed = JSON.parse(readFileSync(hookPath, 'utf8')) as {
+      hooks: { SessionStart: Array<{ hooks: Array<{ timeout: number }> }> }
+    }
+    const hook = changed.hooks.SessionStart[0]?.hooks[0]
+    if (!hook) throw new Error('Managed Codex hook is missing')
+    hook.timeout = 30
+    writeFileSync(hookPath, `${JSON.stringify(changed, null, 2)}\n`, 'utf8')
+
+    const result = installAgentIntegrations({
+      homeDirectory: home,
+      isCommandAvailable: available,
+      skillContent: 'managed skill',
+    })
+    const upgraded = JSON.parse(readFileSync(hookPath, 'utf8')) as {
+      hooks: { SessionStart: Array<{ hooks: Array<{ timeout: number }> }> }
+    }
+
+    expect(result.data.providers.codex).toBe('updated')
+    expect(upgraded.hooks.SessionStart[0]?.hooks[0]?.timeout).toBe(5)
   })
 })

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 import { parse as parseToml } from 'smol-toml'
@@ -18,15 +18,24 @@ interface IntegrationInstallResult {
 interface IntegrationInstallerOptions {
   homeDirectory: string
   isCommandAvailable: (command: string) => boolean
+  logError?: (message: string, error: unknown) => void
   skillContent: string
 }
 
 const hookCommand = 'lithe-tool agent bind --hook-input'
+const jsonHookMarkerName = '.lithe-managed-session-start.json'
+const managedJsonHook = {
+  matcher: 'startup|resume',
+  hooks: [{ type: 'command', command: hookCommand, timeout: 5 }],
+}
+const defaultLogError = (message: string, error: unknown): void => {
+  process.stderr.write(`${message}: ${error instanceof Error ? error.message : String(error)}\n`)
+}
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const containsHookCommand = (groups: unknown[]): boolean =>
-  groups.some((group: unknown): boolean => {
+const findHookCommand = (groups: unknown[]): number =>
+  groups.findIndex((group: unknown): boolean => {
     if (!isRecord(group) || !Array.isArray(group.hooks)) return false
     return group.hooks.some(
       (hook: unknown): boolean => isRecord(hook) && hook.type === 'command' && hook.command === hookCommand,
@@ -35,10 +44,14 @@ const containsHookCommand = (groups: unknown[]): boolean =>
 
 const installJsonHook = (path: string): InstallStatus => {
   const existed = existsSync(path)
+  const markerPath = join(dirname(path), jsonHookMarkerName)
+  const markerExists = existsSync(markerPath)
+  const originalConfig = existed ? readFileSync(path, 'utf8') : undefined
+  const originalMarker = markerExists ? readFileSync(markerPath, 'utf8') : undefined
   let root: Record<string, unknown> = {}
   if (existed) {
     try {
-      const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
+      const parsed: unknown = JSON.parse(originalConfig ?? '')
       if (!isRecord(parsed)) return 'conflict'
       root = parsed
     } catch {
@@ -49,16 +62,40 @@ const installJsonHook = (path: string): InstallStatus => {
   const hooks = (root.hooks ?? {}) as Record<string, unknown>
   if (hooks.SessionStart !== undefined && !Array.isArray(hooks.SessionStart)) return 'conflict'
   const sessionStart = (hooks.SessionStart ?? []) as unknown[]
-  if (containsHookCommand(sessionStart)) return 'unchanged'
-  sessionStart.push({
-    matcher: 'startup|resume',
-    hooks: [{ type: 'command', command: hookCommand, timeout: 5 }],
-  })
+  const managedIndex = findHookCommand(sessionStart)
+  if (managedIndex >= 0 && !markerExists) return 'conflict'
+  if (managedIndex < 0 && markerExists) return 'conflict'
+  if (markerExists) {
+    try {
+      const saved: unknown = JSON.parse(originalMarker ?? '')
+      if (!isRecord(saved) || saved.version !== 1 || saved.command !== hookCommand) return 'conflict'
+    } catch {
+      return 'conflict'
+    }
+  }
+  if (managedIndex >= 0 && JSON.stringify(sessionStart[managedIndex]) === JSON.stringify(managedJsonHook)) {
+    return 'unchanged'
+  }
+  if (managedIndex >= 0) sessionStart[managedIndex] = managedJsonHook
+  else sessionStart.push(managedJsonHook)
   hooks.SessionStart = sessionStart
   root.hooks = hooks
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, `${JSON.stringify(root, null, 2)}\n`, 'utf8')
-  return existed ? 'updated' : 'installed'
+  try {
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, `${JSON.stringify(root, null, 2)}\n`, 'utf8')
+    writeFileSync(markerPath, `${JSON.stringify({ command: hookCommand, version: 1 }, null, 2)}\n`, 'utf8')
+  } catch (error: unknown) {
+    try {
+      if (originalConfig === undefined) rmSync(path, { force: true })
+      else writeFileSync(path, originalConfig, 'utf8')
+      if (originalMarker === undefined) rmSync(markerPath, { force: true })
+      else writeFileSync(markerPath, originalMarker, 'utf8')
+    } catch (rollbackError: unknown) {
+      throw new Error('JSON hook installation and rollback failed', { cause: rollbackError })
+    }
+    throw error
+  }
+  return managedIndex >= 0 || existed ? 'updated' : 'installed'
 }
 
 const kimiMarkerStart = '# lithe-managed:session-start-hook:start'
@@ -97,16 +134,34 @@ const installKimiHook = (path: string): InstallStatus => {
 }
 
 export const installAgentIntegrations = (options: IntegrationInstallerOptions): IntegrationInstallResult => {
-  const skill = installLitheToolSkill(options.homeDirectory, options.skillContent)
+  const logError = options.logError ?? defaultLogError
+  const installProvider = (name: string, install: () => InstallStatus): InstallStatus => {
+    try {
+      return install()
+    } catch (error: unknown) {
+      logError(`${name} integration installation failed`, error)
+      return 'conflict'
+    }
+  }
+  const skill = installLitheToolSkill(options.homeDirectory, options.skillContent, logError)
   const providers = {
     claude: options.isCommandAvailable('claude')
-      ? installJsonHook(join(options.homeDirectory, '.claude', 'settings.json'))
+      ? installProvider(
+          'Claude Code',
+          (): InstallStatus => installJsonHook(join(options.homeDirectory, '.claude', 'settings.json')),
+        )
       : ('skipped' as const),
     codex: options.isCommandAvailable('codex')
-      ? installJsonHook(join(options.homeDirectory, '.codex', 'hooks.json'))
+      ? installProvider(
+          'Codex',
+          (): InstallStatus => installJsonHook(join(options.homeDirectory, '.codex', 'hooks.json')),
+        )
       : ('skipped' as const),
     kimi: options.isCommandAvailable('kimi')
-      ? installKimiHook(join(options.homeDirectory, '.kimi-code', 'config.toml'))
+      ? installProvider(
+          'Kimi Code',
+          (): InstallStatus => installKimiHook(join(options.homeDirectory, '.kimi-code', 'config.toml')),
+        )
       : ('skipped' as const),
   }
   return {
