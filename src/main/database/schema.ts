@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { foreignKey, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const appPreferences = sqliteTable('app_preferences', {
   key: text('key').primaryKey(),
@@ -62,7 +62,6 @@ export const adapters = sqliteTable('adapters', {
 export const adapterVersions = sqliteTable(
   'adapter_versions',
   {
-    id: text('id').primaryKey(),
     adapterId: text('adapter_id')
       .notNull()
       .references(() => adapters.id),
@@ -70,7 +69,7 @@ export const adapterVersions = sqliteTable(
     definition: text('definition').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
-  (table) => [uniqueIndex('adapter_versions_adapter_version_unique').on(table.adapterId, table.version)],
+  (table) => [primaryKey({ columns: [table.adapterId, table.version] })],
 )
 
 export const tasks = sqliteTable(
@@ -82,9 +81,8 @@ export const tasks = sqliteTable(
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     nameKey: text('name_key').notNull(),
-    adapterVersionId: text('adapter_version_id')
-      .notNull()
-      .references(() => adapterVersions.id),
+    adapterId: text('adapter_id').notNull(),
+    adapterVersion: integer('adapter_version').notNull(),
     agentStatus: text('agent_status', { enum: ['closed', 'idle', 'running'] })
       .notNull()
       .default('closed'),
@@ -98,6 +96,10 @@ export const tasks = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.adapterId, table.adapterVersion],
+      foreignColumns: [adapterVersions.adapterId, adapterVersions.version],
+    }),
     index('tasks_workspace_name_index').on(table.workspaceId, table.nameKey),
     uniqueIndex('tasks_agent_session_unique').on(table.agentSessionId),
   ],

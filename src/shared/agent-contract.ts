@@ -35,7 +35,6 @@ export type AdapterDefinition = z.infer<typeof adapterDefinitionSchema>
 export type PtyInteractionStep = z.infer<typeof ptyInteractionStepSchema>
 
 export interface AdapterVersion {
-  id: string
   adapterId: string
   name: string
   kind: 'builtin' | 'custom'
@@ -64,7 +63,8 @@ export interface Task {
   id: string
   workspaceId: string
   name: string
-  adapterVersionId: string
+  adapterId: string
+  adapterVersion: number
   agentStatus: AgentStatus
   agentSessionId: string | null
   archivedAt?: Date | null

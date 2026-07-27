@@ -61,7 +61,7 @@ test('E2E-LITHE-008 creates, binds, stops, resumes, and forks an Agent task', as
           fork: ['-e', forkScript, '{{agentSessionId}}'],
         }
         const adapter = await bridge.adapters.create('Deterministic Agent', definition)
-        await bridge.adapters.setDefault(adapter.currentVersion.id)
+        await bridge.adapters.setDefault(adapter.id)
       },
       { executable: process.execPath, statePath: stateControlPath, toolPath: cliPath },
     )

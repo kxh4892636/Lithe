@@ -11,7 +11,8 @@ const task: Task = {
   id: 'task-1',
   workspaceId: 'workspace-1',
   name: 'Review',
-  adapterVersionId: 'adapter-v1',
+  adapterId: 'adapter',
+  adapterVersion: 1,
   agentStatus: 'closed',
   agentSessionId: null,
   archivedAt: null,
@@ -33,7 +34,6 @@ const workspace: Workspace = {
   createdAt: new Date(0),
 }
 const adapter: AdapterVersion = {
-  id: 'adapter-v1',
   adapterId: 'adapter',
   name: 'Test',
   kind: 'custom',

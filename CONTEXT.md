@@ -125,6 +125,10 @@ _避免使用_：全屏
 为特定 Coding Agent CLI 定义启动、会话控制与 PTY 交互步骤的声明式适配描述。
 _避免使用_：Adaptor
 
+**Adapter 版本**：
+由稳定 Adapter 身份与其递增 `version` 共同标明的不可变 Adapter 配置；不具有
+独立版本 ID，任务同时固定 Adapter 身份与 `version`。
+
 **PTY 交互步骤**：
 CLI Adapter 在进程启动后按顺序等待终端输出并模拟用户输入的声明；输出匹配忽略
 ANSI 控制序列，每次等待都具有明确超时。

@@ -21,7 +21,7 @@ interface TaskServiceOptions {
 
 export interface TaskService {
   create: (input: CreateTaskInput) => Promise<Task>
-  createPinned: (input: CreateTaskInput, adapterVersionId: string) => Task
+  createPinned: (input: CreateTaskInput, adapter: Pick<AdapterVersion, 'adapterId' | 'version'>) => Task
   rename: (task: Task, name: string) => Task
 }
 
@@ -30,13 +30,14 @@ export const createTaskService = (options: TaskServiceOptions): TaskService => {
     if (!name.trim()) throw new TypeError('Task name is required')
     return name.trim()
   }
-  const createPinned = (input: CreateTaskInput, adapterVersionId: string): Task => {
+  const createPinned = (input: CreateTaskInput, adapter: Pick<AdapterVersion, 'adapterId' | 'version'>): Task => {
     if (!options.getWorkspace(input.workspaceId)) throw new TypeError('Workspace does not exist')
     const task: Task = {
       id: options.createId(),
       workspaceId: input.workspaceId,
       name: normalizeName(input.name),
-      adapterVersionId,
+      adapterId: adapter.adapterId,
+      adapterVersion: adapter.version,
       agentStatus: 'closed',
       agentSessionId: null,
       archivedAt: null,
@@ -62,7 +63,7 @@ export const createTaskService = (options: TaskServiceOptions): TaskService => {
           adapterId ? 'Adapter executable is unavailable' : 'Default Adapter executable is unavailable',
         )
       }
-      const task = createPinned({ workspaceId, name }, adapter.id)
+      const task = createPinned({ workspaceId, name }, adapter)
       options.incrementAdapterUsage(adapter.adapterId)
       return task
     },

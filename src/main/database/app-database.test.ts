@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -185,12 +185,13 @@ describe('app database', (): void => {
     database.projects.add(project, workspace)
     const codex = database.adapters.listCurrent().find((adapter): boolean => adapter.name === 'Codex')
     if (!codex) throw new Error('Codex Adapter was not seeded')
-    database.adapters.setDefault(codex.id)
+    database.adapters.setDefault(codex.adapterId)
     const task = {
       id: 'task-agent',
       workspaceId: workspace.id,
       name: 'Review',
-      adapterVersionId: codex.id,
+      adapterId: codex.adapterId,
+      adapterVersion: codex.version,
       agentStatus: 'closed' as const,
       agentSessionId: null,
       archivedAt: null,
@@ -204,7 +205,10 @@ describe('app database', (): void => {
 
     database.tasks.add(task)
 
-    expect(database.adapters.getDefault()?.id).toBe(codex.id)
+    expect(database.adapters.getDefault()).toMatchObject({
+      adapterId: codex.adapterId,
+      version: codex.version,
+    })
     expect(database.tasks.list(workspace.id)).toEqual([task])
     expect(database.tasks.bindSession(task.id, 'provider-1').agentSessionId).toBe('provider-1')
     expect(database.tasks.bindSession(task.id, 'provider-1').agentSessionId).toBe('provider-1')
@@ -238,7 +242,8 @@ describe('app database', (): void => {
       id: 'task-status',
       workspaceId: workspace.id,
       name: 'Status',
-      adapterVersionId: adapter.id,
+      adapterId: adapter.adapterId,
+      adapterVersion: adapter.version,
       agentStatus: 'closed',
       agentSessionId: null,
       archivedAt: null,
@@ -288,7 +293,8 @@ describe('app database', (): void => {
     if (!adapter) throw new Error('Expected a built-in Adapter')
     const base = {
       workspaceId: workspace.id,
-      adapterVersionId: adapter.id,
+      adapterId: adapter.adapterId,
+      adapterVersion: adapter.version,
       agentStatus: 'closed' as const,
       agentSessionId: null,
       archivedAt: null,
@@ -339,7 +345,8 @@ describe('app database', (): void => {
     if (!adapter) throw new Error('Expected a built-in Adapter')
     const base = {
       workspaceId: workspace.id,
-      adapterVersionId: adapter.id,
+      adapterId: adapter.adapterId,
+      adapterVersion: adapter.version,
       agentStatus: 'closed' as const,
       agentSessionId: null,
       archivedAt: null,
@@ -372,7 +379,7 @@ describe('app database', (): void => {
     createAppDatabase({ databasePath }).close()
     const sqlite = new DatabaseSync(databasePath)
     sqlite.prepare("UPDATE adapters SET name = 'Kimi Code' WHERE id = 'builtin-kimi-code'").run()
-    sqlite.prepare('UPDATE adapter_versions SET definition = ? WHERE id = ?').run(
+    sqlite.prepare('UPDATE adapter_versions SET definition = ? WHERE adapter_id = ? AND version = ?').run(
       JSON.stringify({
         executable: 'kimi',
         start: [],
@@ -380,28 +387,29 @@ describe('app database', (): void => {
         fork: ['--session', '{{agentSessionId}}'],
         interactions: { fork: [{ input: '/fork\r', timeoutMs: 30_000, waitFor: '›' }] },
       }),
-      'builtin-kimi-code-v1',
+      'builtin-kimi-code',
+      1,
     )
     sqlite.close()
 
     const database = createAppDatabase({ databasePath })
     openDatabases.push(database)
 
-    expect(database.adapters.getVersion('builtin-kimi-code-v1')?.name).toBe('Kimi')
-    expect(database.adapters.getVersion('builtin-kimi-code-v1')?.definition.interactions?.fork).toEqual([
+    expect(database.adapters.getVersion('builtin-kimi-code', 1)?.name).toBe('Kimi')
+    expect(database.adapters.getVersion('builtin-kimi-code', 1)?.definition.interactions?.fork).toEqual([
       { input: '/fork\r', timeoutMs: 30_000, waitFor: '>' },
     ])
   })
 
   it('keeps an old custom Adapter version readable after edits and deletion', (): void => {
     const database = createTestDatabase()
-    const first = database.adapters.createCustom('custom-1', 'custom-1-v1', 'Wrapper', {
+    const first = database.adapters.createCustom('custom-1', 'Wrapper', {
       executable: 'wrapper',
       start: [],
       resume: null,
       fork: null,
     })
-    const second = database.adapters.updateCustom('custom-1', 'custom-1-v2', 'Wrapper 2', {
+    const second = database.adapters.updateCustom('custom-1', 'Wrapper 2', {
       executable: 'wrapper',
       start: ['--new'],
       resume: null,
@@ -413,6 +421,97 @@ describe('app database', (): void => {
     expect(first.version).toBe(1)
     expect(second.version).toBe(2)
     expect(database.adapters.listCurrent().some((adapter): boolean => adapter.adapterId === 'custom-1')).toBe(false)
-    expect(database.adapters.getVersion(first.id)?.definition.start).toEqual([])
+    expect(database.adapters.getVersion(first.adapterId, first.version)?.definition.start).toEqual([])
+  })
+
+  it('resolves the default Adapter to its current version after an edit', (): void => {
+    const database = createTestDatabase()
+    const first = database.adapters.createCustom('custom-default', 'Wrapper', {
+      executable: 'wrapper',
+      start: [],
+      resume: null,
+      fork: null,
+    })
+    database.adapters.setDefault(first.adapterId)
+
+    const second = database.adapters.updateCustom(first.adapterId, 'Wrapper 2', {
+      executable: 'wrapper',
+      start: ['--new'],
+      resume: null,
+      fork: null,
+    })
+
+    expect(database.adapters.getDefault()).toMatchObject({
+      adapterId: first.adapterId,
+      version: second.version,
+      definition: { start: ['--new'] },
+    })
+    expect(() => database.adapters.deleteCustom(first.adapterId)).toThrow('Default Adapter cannot be deleted')
+  })
+
+  it('migrates Adapter version references without losing tasks or attention events', (): void => {
+    const directory = mkdtempSync(join(tmpdir(), 'lithe-adapter-version-migration-'))
+    temporaryDirectories.push(directory)
+    const sqlite = new DatabaseSync(join(directory, 'lithe.db'))
+    try {
+      sqlite.exec('PRAGMA foreign_keys = ON')
+      const migrationsRoot = join(process.cwd(), 'drizzle')
+      const migrationDirectories = readdirSync(migrationsRoot, { withFileTypes: true })
+        .filter(
+          (entry): boolean => entry.isDirectory() && existsSync(join(migrationsRoot, entry.name, 'migration.sql')),
+        )
+        .map((entry): string => entry.name)
+        .sort()
+      const currentMigration = migrationDirectories.find((name): boolean =>
+        name.endsWith('_adapter-version-composite-key'),
+      )
+      if (!currentMigration) throw new Error('Adapter version migration was not found')
+      for (const migration of migrationDirectories) {
+        if (migration === currentMigration) break
+        sqlite.exec(readFileSync(join(migrationsRoot, migration, 'migration.sql'), 'utf8'))
+      }
+      const definition = JSON.stringify({ executable: 'agent', start: [], resume: null, fork: null })
+      sqlite.exec(`
+      INSERT INTO adapters (id, name, kind, current_version, is_deleted, created_at)
+      VALUES ('custom', 'Custom', 'custom', 2, 0, 0);
+      INSERT INTO adapter_versions (id, adapter_id, version, definition, created_at)
+      VALUES ('custom-v1', 'custom', 1, '${definition}', 0);
+      INSERT INTO adapter_versions (id, adapter_id, version, definition, created_at)
+      VALUES ('custom-v2', 'custom', 2, '${definition}', 1);
+      INSERT INTO projects (id, name, root_path, is_valid, created_at)
+      VALUES ('project', 'Project', 'D:\\projects\\migration', 1, 0);
+      INSERT INTO workspaces (
+        id, project_id, name, root_path, git_branch, kind, is_valid, pinned_at, created_at
+      )
+      VALUES ('workspace', 'project', 'Default', 'D:\\projects\\migration', 'main', 'default', 1, NULL, 0);
+      INSERT INTO tasks (
+        id, workspace_id, name, name_key, adapter_version_id, agent_status, agent_session_id,
+        lifecycle, archived_at, last_viewed_at, should_auto_restore, created_at
+      )
+      VALUES ('task', 'workspace', 'Task', 'task', 'custom-v1', 'idle', 'session', 'active', NULL, NULL, 1, 0);
+      INSERT INTO task_attention_events (id, task_id, created_at) VALUES ('event', 'task', 1);
+      INSERT INTO app_preferences (key, value, updated_at)
+      VALUES ('default-adapter-version', 'custom-v2', 1);
+    `)
+
+      sqlite.exec(readFileSync(join(migrationsRoot, currentMigration, 'migration.sql'), 'utf8'))
+
+      expect(sqlite.prepare('SELECT adapter_id, adapter_version FROM tasks WHERE id = ?').get('task')).toEqual({
+        adapter_id: 'custom',
+        adapter_version: 1,
+      })
+      expect(sqlite.prepare('SELECT task_id FROM task_attention_events WHERE id = ?').get('event')).toEqual({
+        task_id: 'task',
+      })
+      expect(sqlite.prepare('SELECT value FROM app_preferences WHERE key = ?').get('default-adapter')).toEqual({
+        value: 'custom',
+      })
+      expect(
+        sqlite.prepare("SELECT name FROM pragma_table_info('adapter_versions') WHERE name = 'id'").get(),
+      ).toBeUndefined()
+      expect(sqlite.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      sqlite.close()
+    }
   })
 })

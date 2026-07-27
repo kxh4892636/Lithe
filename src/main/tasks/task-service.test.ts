@@ -15,7 +15,6 @@ const workspace: Workspace = {
 }
 
 const adapter: AdapterVersion = {
-  id: 'adapter-v1',
   adapterId: 'adapter',
   name: 'Test Agent',
   kind: 'custom',
@@ -80,14 +79,14 @@ describe('task service', (): void => {
     const first = await service.create({ workspaceId: workspace.id, name: '  Review  ' })
     const second = await service.create({ workspaceId: workspace.id, name: 'Review' })
 
-    expect(first).toMatchObject({ id: 'task-1', name: 'Review', adapterVersionId: 'adapter-v1' })
-    expect(second).toMatchObject({ id: 'task-2', name: 'Review', adapterVersionId: 'adapter-v1' })
+    expect(first).toMatchObject({ id: 'task-1', name: 'Review', adapterId: 'adapter', adapterVersion: 1 })
+    expect(second).toMatchObject({ id: 'task-2', name: 'Review', adapterId: 'adapter', adapterVersion: 1 })
     expect(tasks).toHaveLength(2)
     expect(usage).toEqual(['adapter', 'adapter'])
   })
 
   it('uses an explicitly selected available Adapter instead of the global default', async (): Promise<void> => {
-    const selected = { ...adapter, id: 'selected-v2', adapterId: 'selected', version: 2 }
+    const selected = { ...adapter, adapterId: 'selected', version: 2 }
     const { service, usage } = setup({ adapters: [selected], defaultAdapter: adapter })
 
     const task = await service.create({
@@ -96,7 +95,7 @@ describe('task service', (): void => {
       adapterId: selected.adapterId,
     })
 
-    expect(task.adapterVersionId).toBe(selected.id)
+    expect(task).toMatchObject({ adapterId: selected.adapterId, adapterVersion: selected.version })
     expect(usage).toEqual([selected.adapterId])
   })
 

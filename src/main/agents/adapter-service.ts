@@ -22,9 +22,9 @@ interface AdapterServiceOptions {
 export interface AdapterService {
   create: (name: string, definition: AdapterDefinition) => Promise<AdapterSummary>
   delete: (adapterId: string) => void
-  get: (versionId: string) => Promise<AdapterSummary | null>
+  get: (adapterId: string, version: number) => Promise<AdapterSummary | null>
   list: () => Promise<AdapterSummary[]>
-  setDefault: (versionId: string) => Promise<void>
+  setDefault: (adapterId: string) => Promise<void>
   update: (adapterId: string, name: string, definition: AdapterDefinition) => Promise<AdapterSummary>
 }
 
@@ -39,7 +39,7 @@ export const createAdapterService = ({
   inspectAvailability,
   repository,
 }: AdapterServiceOptions): AdapterService => {
-  const summarize = async (version: AdapterVersion, defaultVersionId?: string): Promise<AdapterSummary> => {
+  const summarize = async (version: AdapterVersion, defaultAdapterId?: string): Promise<AdapterSummary> => {
     const availability = await inspectAvailability(version)
     return {
       id: version.adapterId,
@@ -47,7 +47,7 @@ export const createAdapterService = ({
       kind: version.kind,
       currentVersion: version,
       forkAvailable: availability.forkAvailable,
-      isDefault: version.id === defaultVersionId,
+      isDefault: version.adapterId === defaultAdapterId,
       isAvailable: availability.isAvailable,
       resumeAvailable: availability.resumeAvailable,
       unavailableReason: availability.reason,
@@ -58,35 +58,34 @@ export const createAdapterService = ({
   return {
     create: async (name: string, definition: AdapterDefinition): Promise<AdapterSummary> =>
       summarize(
-        repository.createCustom(createId(), createId(), assertName(name), validateAdapterDefinition(definition)),
-        repository.getDefault()?.id,
+        repository.createCustom(createId(), assertName(name), validateAdapterDefinition(definition)),
+        repository.getDefault()?.adapterId,
       ),
     delete: (adapterId: string): void => repository.deleteCustom(adapterId),
-    get: async (versionId: string): Promise<AdapterSummary | null> => {
-      const version = repository.getVersion(versionId)
-      return version ? summarize(version, repository.getDefault()?.id) : null
+    get: async (adapterId: string, versionNumber: number): Promise<AdapterSummary | null> => {
+      const version = repository.getVersion(adapterId, versionNumber)
+      return version ? summarize(version, repository.getDefault()?.adapterId) : null
     },
     list: async (): Promise<AdapterSummary[]> => {
-      const defaultVersionId = repository.getDefault()?.id
+      const defaultAdapterId = repository.getDefault()?.adapterId
       return Promise.all(
-        repository.listCurrent().map((version: AdapterVersion) => summarize(version, defaultVersionId)),
+        repository.listCurrent().map((version: AdapterVersion) => summarize(version, defaultAdapterId)),
       )
     },
-    setDefault: async (versionId: string): Promise<void> => {
-      const version = repository.getVersion(versionId)
-      if (!version) throw new TypeError('Adapter version does not exist')
-      if (!repository.listCurrent().some((current: AdapterVersion): boolean => current.id === versionId)) {
-        throw new TypeError('Only the current visible Adapter version can be selected')
-      }
+    setDefault: async (adapterId: string): Promise<void> => {
+      const version = repository
+        .listCurrent()
+        .find((current: AdapterVersion): boolean => current.adapterId === adapterId)
+      if (!version) throw new TypeError('Adapter does not exist')
       if (!(await inspectAvailability(version)).isAvailable) {
         throw new TypeError('Adapter executable is unavailable')
       }
-      repository.setDefault(versionId)
+      repository.setDefault(adapterId)
     },
     update: async (adapterId: string, name: string, definition: AdapterDefinition): Promise<AdapterSummary> =>
       summarize(
-        repository.updateCustom(adapterId, createId(), assertName(name), validateAdapterDefinition(definition)),
-        repository.getDefault()?.id,
+        repository.updateCustom(adapterId, assertName(name), validateAdapterDefinition(definition)),
+        repository.getDefault()?.adapterId,
       ),
   }
 }

@@ -111,9 +111,9 @@ export interface LitheBridge {
   adapters: {
     create: (name: string, definition: AdapterDefinition) => Promise<AdapterSummary>
     delete: (adapterId: string) => Promise<void>
-    get: (versionId: string) => Promise<AdapterSummary | null>
+    get: (adapterId: string, version: number) => Promise<AdapterSummary | null>
     list: () => Promise<AdapterSummary[]>
-    setDefault: (versionId: string) => Promise<void>
+    setDefault: (adapterId: string) => Promise<void>
     update: (adapterId: string, name: string, definition: AdapterDefinition) => Promise<AdapterSummary>
   }
   agents: {

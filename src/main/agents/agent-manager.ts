@@ -61,7 +61,7 @@ const createAgentLauncher =
     if (workspace.projectId && options.database.projects.get?.(workspace.projectId)?.isValid === false) {
       throw new TypeError('Project is invalid')
     }
-    const adapter = options.database.adapters.getVersion(task.adapterVersionId)
+    const adapter = options.database.adapters.getVersion(task.adapterId, task.adapterVersion)
     if (!adapter) throw new TypeError('Task Adapter version does not exist')
     const command = renderAdapterCommand(adapter.definition, operation, {
       agentSessionId: operation === 'fork' ? sourceAgentSessionId : (task.agentSessionId ?? undefined),

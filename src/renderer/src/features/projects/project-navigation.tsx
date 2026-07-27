@@ -350,7 +350,7 @@ export const PinnedNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps)
   const adaptersByVersion = useAdaptersByVersion(
     Object.values(tasksByWorkspace)
       .flat()
-      .map((task): string => task.adapterVersionId),
+      .map((task) => ({ adapterId: task.adapterId, version: task.adapterVersion })),
   )
   const pinned = useMemo(
     () => selectPinnedEntries(projects, scratchWorkspaces, tasksByWorkspace, normalizedQuery),
@@ -475,7 +475,7 @@ export const ProjectNavigation = ({ isOpen, onOpenChange }: NavigationGroupProps
   const adaptersByVersion = useAdaptersByVersion(
     Object.values(tasksByWorkspace)
       .flat()
-      .map((task): string => task.adapterVersionId),
+      .map((task) => ({ adapterId: task.adapterId, version: task.adapterVersion })),
   )
   const filteredProjects = useMemo(
     (): ProjectWithWorkspaces[] => filterProjects(projects, tasksByWorkspace, normalizedQuery),

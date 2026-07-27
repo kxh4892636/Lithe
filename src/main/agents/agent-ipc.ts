@@ -40,6 +40,11 @@ const assertName = (value: unknown): string => {
   throw new TypeError('Invalid name')
 }
 
+const assertVersion = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return value
+  throw new TypeError('Invalid Adapter version')
+}
+
 export const registerAgentIpc = ({
   adapters,
   application,
@@ -83,9 +88,9 @@ export const registerAgentIpc = ({
   })
   ipcMain.handle(
     ipcChannels.adapterGet,
-    async (event: IpcMainInvokeEvent, versionId: unknown): Promise<AdapterSummary | null> => {
+    async (event: IpcMainInvokeEvent, adapterId: unknown, version: unknown): Promise<AdapterSummary | null> => {
       assertTrustedSender(event, window)
-      return adapters.get(assertIdentifier(versionId))
+      return adapters.get(assertIdentifier(adapterId), assertVersion(version))
     },
   )
   ipcMain.handle(ipcChannels.taskList, (event: IpcMainInvokeEvent, workspaceId: unknown): Task[] => {

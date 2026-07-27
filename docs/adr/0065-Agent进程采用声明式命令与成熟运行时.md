@@ -26,6 +26,7 @@ Adapter 配置不接受 shell 字符串、任意环境变量、Hook 或脚本正
 `executable`。这让 Lithe 的执行边界保持窄小，也避免配置内容获得超出启动 Agent
 所需的权限。
 
-任务创建时固定当前 Adapter 版本 ID。编辑自定义 Adapter 会追加新版本，删除只从
-后续选择列表隐藏，旧任务仍能用原版本恢复或 fork。渲染层只能取得启动结果和
-不可变配置，不取得注入 Agent 子进程的 capability。
+任务创建时固定 Adapter 身份与当前 `version`，二者共同标明版本，不另设版本 ID。
+编辑自定义 Adapter 会追加新版本，删除只从后续选择列表隐藏，旧任务仍能用原版本
+恢复或 fork。渲染层只能取得启动结果和不可变配置，不取得注入 Agent 子进程的
+capability。

@@ -32,12 +32,12 @@ const bridge: LitheBridge = {
       ipcRenderer.invoke(ipcChannels.adapterCreate, name, definition) as Promise<AdapterSummary>,
     delete: async (adapterId: string): Promise<void> =>
       ipcRenderer.invoke(ipcChannels.adapterDelete, adapterId) as Promise<void>,
-    get: async (versionId: string): Promise<AdapterSummary | null> =>
-      ipcRenderer.invoke(ipcChannels.adapterGet, versionId) as Promise<AdapterSummary | null>,
+    get: async (adapterId: string, version: number): Promise<AdapterSummary | null> =>
+      ipcRenderer.invoke(ipcChannels.adapterGet, adapterId, version) as Promise<AdapterSummary | null>,
     list: async (): Promise<AdapterSummary[]> =>
       ipcRenderer.invoke(ipcChannels.adapterList) as Promise<AdapterSummary[]>,
-    setDefault: async (versionId: string): Promise<void> =>
-      ipcRenderer.invoke(ipcChannels.adapterSetDefault, versionId) as Promise<void>,
+    setDefault: async (adapterId: string): Promise<void> =>
+      ipcRenderer.invoke(ipcChannels.adapterSetDefault, adapterId) as Promise<void>,
     update: async (adapterId: string, name: string, definition: AdapterDefinition): Promise<AdapterSummary> =>
       ipcRenderer.invoke(ipcChannels.adapterUpdate, adapterId, name, definition) as Promise<AdapterSummary>,
   },

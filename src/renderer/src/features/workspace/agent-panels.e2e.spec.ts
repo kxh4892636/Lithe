@@ -31,7 +31,7 @@ const createDefaultAdapter = async (page: Page, script: string): Promise<void> =
         resume: ['-e', bindPrefix + scriptBody, '{{agentSessionId}}'],
       }
       const adapter = await bridge.adapters.create('Deterministic Agent', definition)
-      await bridge.adapters.setDefault(adapter.currentVersion.id)
+      await bridge.adapters.setDefault(adapter.id)
     },
     { executable: process.execPath, scriptBody: script, toolPath: cliPath },
   )

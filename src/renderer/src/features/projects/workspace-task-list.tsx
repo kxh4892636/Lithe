@@ -1,5 +1,6 @@
 import type { AdapterSummary, Task, Workspace } from '../../../../shared/app-contract'
 import { TaskRow } from '../tasks/task-row'
+import { adapterVersionKey } from '../tasks/use-adapters-by-version'
 import { useVisibleTaskList } from './task-list-expansion'
 import { TaskListShowMoreRow } from './task-list-show-more-row'
 
@@ -21,7 +22,7 @@ export const WorkspaceTaskList = (props: WorkspaceTaskListProps): React.JSX.Elem
     <>
       {visibleTasks.map((task) => (
         <TaskRow
-          adapter={adaptersByVersion.get(task.adapterVersionId)}
+          adapter={adaptersByVersion.get(adapterVersionKey(task.adapterId, task.adapterVersion))}
           key={task.id}
           onOpen={(): void =>
             void selectWorkspace(workspace.id)

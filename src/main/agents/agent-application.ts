@@ -49,12 +49,15 @@ export const createAgentApplication = ({
     if (!source) throw new TypeError('Task does not exist')
     if (source.agentStatus === 'running') throw new TypeError('Running task cannot be forked')
     if (!source.agentSessionId) throw new TypeError('Task Agent session is not bound')
-    const adapter = database.adapters.getVersion(source.adapterVersionId)
+    const adapter = database.adapters.getVersion(source.adapterId, source.adapterVersion)
     if (!adapter?.definition.fork) throw new TypeError('Adapter does not support fork')
     if (!(await inspectAvailability(adapter)).forkAvailable) {
       throw new TypeError('Installed Adapter version does not support fork')
     }
-    const forked = tasks.createPinned({ workspaceId: source.workspaceId, name: source.name }, source.adapterVersionId)
+    const forked = tasks.createPinned(
+      { workspaceId: source.workspaceId, name: source.name },
+      { adapterId: source.adapterId, version: source.adapterVersion },
+    )
     const launch = manager.launch(forked.id, 'fork', source.agentSessionId)
     if (!launch.error) return launch
     database.tasks.delete(forked.id)
@@ -68,7 +71,7 @@ export const createAgentApplication = ({
   resume: async (taskId: string): Promise<AgentLaunch> => {
     const task = database.tasks.get(taskId)
     if (!task) throw new TypeError('Task does not exist')
-    const adapter = database.adapters.getVersion(task.adapterVersionId)
+    const adapter = database.adapters.getVersion(task.adapterId, task.adapterVersion)
     if (!adapter?.definition.resume || !(await inspectAvailability(adapter)).resumeAvailable) {
       throw new TypeError('Installed Adapter version does not support resume')
     }

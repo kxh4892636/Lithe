@@ -15,16 +15,16 @@ import { adapterVersions, adapters, appPreferences, taskAttentionEvents, tasks }
 type Database = ReturnType<typeof drizzle>
 
 export interface AdapterRepository {
-  createCustom: (adapterId: string, versionId: string, name: string, definition: AdapterDefinition) => AdapterVersion
+  createCustom: (adapterId: string, name: string, definition: AdapterDefinition) => AdapterVersion
   deleteCustom: (adapterId: string) => void
   ensureVersions: (versions: AdapterVersion[]) => void
   getDefault: () => AdapterVersion | undefined
   getUsageCount: (adapterId: string) => number
-  getVersion: (versionId: string) => AdapterVersion | undefined
+  getVersion: (adapterId: string, version: number) => AdapterVersion | undefined
   incrementUsage: (adapterId: string) => void
   listCurrent: () => AdapterVersion[]
-  setDefault: (versionId: string) => void
-  updateCustom: (adapterId: string, versionId: string, name: string, definition: AdapterDefinition) => AdapterVersion
+  setDefault: (adapterId: string) => void
+  updateCustom: (adapterId: string, name: string, definition: AdapterDefinition) => AdapterVersion
 }
 
 export interface TaskRepository {
@@ -50,7 +50,6 @@ const mapVersion = (
   row: typeof adapterVersions.$inferSelect,
   adapter: typeof adapters.$inferSelect,
 ): AdapterVersion => ({
-  id: row.id,
   adapterId: row.adapterId,
   name: adapter.name,
   kind: adapter.kind,
@@ -72,7 +71,8 @@ const createTaskMapper =
       id: row.id,
       workspaceId: row.workspaceId,
       name: row.name,
-      adapterVersionId: row.adapterVersionId,
+      adapterId: row.adapterId,
+      adapterVersion: row.adapterVersion,
       agentStatus: row.agentStatus,
       agentSessionId: row.agentSessionId,
       archivedAt: row.archivedAt,
@@ -85,8 +85,12 @@ const createTaskMapper =
     }
   }
 
-const getAdapterVersion = (database: Database, versionId: string): AdapterVersion | undefined => {
-  const row = database.select().from(adapterVersions).where(eq(adapterVersions.id, versionId)).get()
+const getAdapterVersion = (database: Database, adapterId: string, version: number): AdapterVersion | undefined => {
+  const row = database
+    .select()
+    .from(adapterVersions)
+    .where(and(eq(adapterVersions.adapterId, adapterId), eq(adapterVersions.version, version)))
+    .get()
   if (!row) return undefined
   const adapter = database.select().from(adapters).where(eq(adapters.id, row.adapterId)).get()
   return adapter ? mapVersion(row, adapter) : undefined
@@ -96,7 +100,6 @@ const createCustomAdapter = (
   database: Database,
   sqlite: DatabaseSync,
   adapterId: string,
-  versionId: string,
   name: string,
   definition: AdapterDefinition,
 ): AdapterVersion => {
@@ -109,14 +112,14 @@ const createCustomAdapter = (
       .run()
     database
       .insert(adapterVersions)
-      .values({ id: versionId, adapterId, version: 1, definition: JSON.stringify(definition), createdAt })
+      .values({ adapterId, version: 1, definition: JSON.stringify(definition), createdAt })
       .run()
     sqlite.exec('COMMIT')
   } catch (error: unknown) {
     sqlite.exec('ROLLBACK')
     throw error
   }
-  const saved = getAdapterVersion(database, versionId)
+  const saved = getAdapterVersion(database, adapterId, 1)
   if (!saved) throw new Error('Adapter version was not persisted')
   return saved
 }
@@ -125,7 +128,6 @@ const updateCustomAdapter = (
   database: Database,
   sqlite: DatabaseSync,
   adapterId: string,
-  versionId: string,
   name: string,
   definition: AdapterDefinition,
 ): AdapterVersion => {
@@ -137,7 +139,7 @@ const updateCustomAdapter = (
   try {
     database
       .insert(adapterVersions)
-      .values({ id: versionId, adapterId, version: nextVersion, definition: JSON.stringify(definition), createdAt })
+      .values({ adapterId, version: nextVersion, definition: JSON.stringify(definition), createdAt })
       .run()
     database
       .update(adapters)
@@ -149,26 +151,23 @@ const updateCustomAdapter = (
     sqlite.exec('ROLLBACK')
     throw error
   }
-  const saved = getAdapterVersion(database, versionId)
+  const saved = getAdapterVersion(database, adapterId, nextVersion)
   if (!saved) throw new Error('Adapter version was not persisted')
   return saved
 }
 
 export const createAdapterRepository = (database: Database, sqlite: DatabaseSync): AdapterRepository => ({
-  createCustom: (adapterId: string, versionId: string, name: string, definition: AdapterDefinition): AdapterVersion =>
-    createCustomAdapter(database, sqlite, adapterId, versionId, name, definition),
+  createCustom: (adapterId: string, name: string, definition: AdapterDefinition): AdapterVersion =>
+    createCustomAdapter(database, sqlite, adapterId, name, definition),
   deleteCustom: (adapterId: string): void => {
     const adapter = database.select().from(adapters).where(eq(adapters.id, adapterId)).get()
     if (!adapter || adapter.kind !== 'custom') throw new TypeError('Custom Adapter does not exist')
     const preference = database
       .select({ value: appPreferences.value })
       .from(appPreferences)
-      .where(eq(appPreferences.key, 'default-adapter-version'))
+      .where(eq(appPreferences.key, 'default-adapter'))
       .get()
-    if (preference) {
-      const selected = getAdapterVersion(database, preference.value)
-      if (selected?.adapterId === adapterId) throw new TypeError('Default Adapter cannot be deleted')
-    }
+    if (preference?.value === adapterId) throw new TypeError('Default Adapter cannot be deleted')
     database.update(adapters).set({ isDeleted: true }).where(eq(adapters.id, adapterId)).run()
   },
   ensureVersions: (versions: AdapterVersion[]): void => {
@@ -191,14 +190,13 @@ export const createAdapterRepository = (database: Database, sqlite: DatabaseSync
       database
         .insert(adapterVersions)
         .values({
-          id: version.id,
           adapterId: version.adapterId,
           version: version.version,
           definition: JSON.stringify(version.definition),
           createdAt: version.createdAt,
         })
         .onConflictDoUpdate({
-          target: adapterVersions.id,
+          target: [adapterVersions.adapterId, adapterVersions.version],
           set: { definition: JSON.stringify(version.definition) },
         })
         .run()
@@ -208,14 +206,11 @@ export const createAdapterRepository = (database: Database, sqlite: DatabaseSync
     const preference = database
       .select({ value: appPreferences.value })
       .from(appPreferences)
-      .where(eq(appPreferences.key, 'default-adapter-version'))
+      .where(eq(appPreferences.key, 'default-adapter'))
       .get()
     if (!preference) return undefined
-    const version = getAdapterVersion(database, preference.value)
-    const adapter = version
-      ? database.select().from(adapters).where(eq(adapters.id, version.adapterId)).get()
-      : undefined
-    return adapter && !adapter.isDeleted && adapter.currentVersion === version?.version ? version : undefined
+    const adapter = database.select().from(adapters).where(eq(adapters.id, preference.value)).get()
+    return adapter && !adapter.isDeleted ? getAdapterVersion(database, adapter.id, adapter.currentVersion) : undefined
   },
   getUsageCount: (adapterId: string): number => {
     const row = database
@@ -226,7 +221,8 @@ export const createAdapterRepository = (database: Database, sqlite: DatabaseSync
     const count = Number.parseInt(row?.value ?? '0', 10)
     return Number.isSafeInteger(count) && count >= 0 ? count : 0
   },
-  getVersion: (versionId: string): AdapterVersion | undefined => getAdapterVersion(database, versionId),
+  getVersion: (adapterId: string, version: number): AdapterVersion | undefined =>
+    getAdapterVersion(database, adapterId, version),
   incrementUsage: (adapterId: string): void => {
     const key = `adapter-usage:${adapterId}`
     const current = database
@@ -261,19 +257,20 @@ export const createAdapterRepository = (database: Database, sqlite: DatabaseSync
       return version ? [mapVersion(version, adapter)] : []
     })
   },
-  setDefault: (versionId: string): void => {
-    if (!getAdapterVersion(database, versionId)) throw new TypeError('Adapter version does not exist')
+  setDefault: (adapterId: string): void => {
+    const adapter = database.select().from(adapters).where(eq(adapters.id, adapterId)).get()
+    if (!adapter || adapter.isDeleted) throw new TypeError('Adapter does not exist')
     database
       .insert(appPreferences)
-      .values({ key: 'default-adapter-version', value: versionId, updatedAt: new Date() })
+      .values({ key: 'default-adapter', value: adapterId, updatedAt: new Date() })
       .onConflictDoUpdate({
         target: appPreferences.key,
-        set: { value: versionId, updatedAt: new Date() },
+        set: { value: adapterId, updatedAt: new Date() },
       })
       .run()
   },
-  updateCustom: (adapterId: string, versionId: string, name: string, definition: AdapterDefinition): AdapterVersion =>
-    updateCustomAdapter(database, sqlite, adapterId, versionId, name, definition),
+  updateCustom: (adapterId: string, name: string, definition: AdapterDefinition): AdapterVersion =>
+    updateCustomAdapter(database, sqlite, adapterId, name, definition),
 })
 
 export const createTaskRepository = (database: Database): TaskRepository => ({
@@ -285,7 +282,8 @@ export const createTaskRepository = (database: Database): TaskRepository => ({
         workspaceId: task.workspaceId,
         name: task.name,
         nameKey: task.name.trim().toLocaleLowerCase(),
-        adapterVersionId: task.adapterVersionId,
+        adapterId: task.adapterId,
+        adapterVersion: task.adapterVersion,
         agentStatus: task.agentStatus,
         agentSessionId: task.agentSessionId,
         lifecycle: task.lifecycle,

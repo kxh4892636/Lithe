@@ -8,7 +8,7 @@ import { findActiveWorkspace, useProjectStore } from '@/features/projects/projec
 
 import type { Task } from '../../../../shared/app-contract'
 import { useTaskStore, type TaskState } from './task-store'
-import { useAdaptersByVersion } from './use-adapters-by-version'
+import { adapterVersionKey, useAdaptersByVersion } from './use-adapters-by-version'
 
 export const ArchivedTaskSettings = (): React.JSX.Element => {
   const archivedTasks = useTaskStore((state: TaskState) => state.archivedTasks)
@@ -17,7 +17,9 @@ export const ArchivedTaskSettings = (): React.JSX.Element => {
   const restoreTask = useTaskStore((state: TaskState) => state.restoreTask)
   const projects = useProjectStore((state) => state.projects)
   const scratchWorkspaces = useProjectStore((state) => state.scratchWorkspaces)
-  const adaptersByVersion = useAdaptersByVersion(archivedTasks.map((task): string => task.adapterVersionId))
+  const adaptersByVersion = useAdaptersByVersion(
+    archivedTasks.map((task) => ({ adapterId: task.adapterId, version: task.adapterVersion })),
+  )
   const reportTaskAction = (action: Promise<unknown>): void => {
     void action.catch(globalThis.console.error)
   }
@@ -38,7 +40,7 @@ export const ArchivedTaskSettings = (): React.JSX.Element => {
         ) : (
           archivedTasks.map((task: Task) => {
             const workspace = findActiveWorkspace(projects, scratchWorkspaces, task.workspaceId)
-            const adapter = adaptersByVersion.get(task.adapterVersionId)
+            const adapter = adaptersByVersion.get(adapterVersionKey(task.adapterId, task.adapterVersion))
             return (
               <ContextMenu key={task.id}>
                 <ContextMenuTrigger render={<article className="flex items-center gap-4 p-4" />}>

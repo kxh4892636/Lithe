@@ -4,7 +4,6 @@ const createdAt = new Date(0)
 
 export const builtinAdapterVersions: AdapterVersion[] = [
   {
-    id: 'builtin-codex-v1',
     adapterId: 'builtin-codex',
     name: 'Codex',
     kind: 'builtin',
@@ -18,7 +17,6 @@ export const builtinAdapterVersions: AdapterVersion[] = [
     createdAt,
   },
   {
-    id: 'builtin-claude-code-v1',
     adapterId: 'builtin-claude-code',
     name: 'Claude',
     kind: 'builtin',
@@ -32,7 +30,6 @@ export const builtinAdapterVersions: AdapterVersion[] = [
     createdAt,
   },
   {
-    id: 'builtin-kimi-code-v1',
     adapterId: 'builtin-kimi-code',
     name: 'Kimi',
     kind: 'builtin',

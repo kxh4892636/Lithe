@@ -33,7 +33,8 @@ describe('settings page', (): void => {
 
   it('stays in archive settings while restoring and deleting tasks', async (): Promise<void> => {
     const archivedTask: Task = {
-      adapterVersionId: 'adapter-v1',
+      adapterId: 'adapter',
+      adapterVersion: 1,
       agentSessionId: 'session-1',
       agentStatus: 'closed',
       archivedAt: new Date(1),

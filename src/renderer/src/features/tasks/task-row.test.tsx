@@ -9,7 +9,8 @@ const task: Task = {
   id: 'task-1',
   workspaceId: 'workspace-1',
   name: 'Review',
-  adapterVersionId: 'adapter-v1',
+  adapterId: 'adapter',
+  adapterVersion: 1,
   agentStatus: 'closed',
   agentSessionId: 'session-1',
   archivedAt: null,
@@ -36,7 +37,6 @@ const adapter: AdapterSummary = {
   name: 'Agent',
   kind: 'custom',
   currentVersion: {
-    id: 'adapter-v1',
     adapterId: 'adapter-1',
     name: 'Agent',
     kind: 'custom',

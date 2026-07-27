@@ -108,7 +108,7 @@ export const AdapterSettings = (): React.JSX.Element => {
               adapter={adapter}
               key={adapter.id}
               onDefault={(value: AdapterSummary): void => {
-                void apply((): Promise<void> => window.lithe.adapters.setDefault(value.currentVersion.id))
+                void apply((): Promise<void> => window.lithe.adapters.setDefault(value.id))
               }}
               onDelete={(value: AdapterSummary): void => {
                 void apply((): Promise<void> => window.lithe.adapters.delete(value.id))

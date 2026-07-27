@@ -10,7 +10,8 @@ const source: Task = {
   id: 'task-1',
   workspaceId: 'workspace-1',
   name: 'Review',
-  adapterVersionId: 'adapter-v1',
+  adapterId: 'adapter-1',
+  adapterVersion: 1,
   agentStatus: 'idle',
   agentSessionId: 'provider-1',
   archivedAt: null,
@@ -22,7 +23,6 @@ const source: Task = {
   shouldAutoRestore: true,
 }
 const adapter: AdapterVersion = {
-  id: 'adapter-v1',
   adapterId: 'adapter-1',
   name: 'Test Agent',
   kind: 'custom',
@@ -42,7 +42,9 @@ describe('Agent application', (): void => {
     } as unknown as AgentManager
     const tasks = {
       createPinned: vi
-        .fn<(input: { workspaceId: string; name: string }, versionId: string) => Task>()
+        .fn<
+          (input: { workspaceId: string; name: string }, adapter: Pick<AdapterVersion, 'adapterId' | 'version'>) => Task
+        >()
         .mockReturnValue(forked),
     } as unknown as TaskService
     const database = {
@@ -62,7 +64,7 @@ describe('Agent application', (): void => {
     await expect(application.fork(source.id)).resolves.toBe(launch)
     expect(tasks.createPinned).toHaveBeenCalledWith(
       { workspaceId: source.workspaceId, name: source.name },
-      source.adapterVersionId,
+      { adapterId: source.adapterId, version: source.adapterVersion },
     )
     expect(manager.launch).toHaveBeenCalledWith(forked.id, 'fork', source.agentSessionId)
   })
