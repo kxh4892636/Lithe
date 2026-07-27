@@ -131,4 +131,22 @@ describe('task row', (): void => {
     expect(screen.getByTitle('Review')).toHaveAttribute('data-overflow', 'true')
     expect(screen.getByRole('button', { name: 'Fork Review' }).parentElement).toHaveClass('absolute')
   })
+
+  it('highlights the row only while selected, without revealing the hover-gated actions', (): void => {
+    window.lithe = {} as unknown as LitheBridge
+    useTaskStore.setState({ launchesByTask: {} })
+
+    const { rerender } = render(<TaskRow onOpen={vi.fn<() => void>()} selected task={task} />)
+
+    const row = screen.getByTitle('Review').closest('[data-selected]')
+    if (!row) throw new Error('任务行未渲染')
+    expect(row).toHaveAttribute('data-selected', 'true')
+    expect(row).toHaveClass('bg-sidebar-accent/60')
+    expect(screen.getByRole('button', { name: 'Fork Review' }).parentElement).toHaveClass('invisible')
+
+    rerender(<TaskRow onOpen={vi.fn<() => void>()} task={task} />)
+
+    expect(row).toHaveAttribute('data-selected', 'false')
+    expect(row).not.toHaveClass('bg-sidebar-accent/60')
+  })
 })

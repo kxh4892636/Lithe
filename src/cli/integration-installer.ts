@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 
 import { parse as parseToml } from 'smol-toml'
 
-import { installLitheToolSkill, type SkillInstallResult } from '../main/agents/skill-installer'
+import { installLitheToolSkill, type SkillInstallResult } from './skill-installer'
 
 export type InstallStatus = 'conflict' | 'installed' | 'skipped' | 'unchanged' | 'updated'
 

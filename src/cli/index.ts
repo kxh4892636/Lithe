@@ -85,7 +85,7 @@ const executeHookBind = async (): Promise<void> => {
 const program = new Command()
   .name('lithe-tool')
   .description('Manage Lithe and its Coding Agent integrations')
-  .version('1.0.0')
+  .version(__LITHE_TOOL_VERSION__)
   .exitOverride()
 
 program

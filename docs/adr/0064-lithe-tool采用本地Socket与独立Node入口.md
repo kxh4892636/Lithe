@@ -33,6 +33,5 @@ Commander、Node `net` 和 tsup 都是成熟、MIT 兼容的现成能力。Lithe
 
 ## 后果
 
-全局 CLI 要求安装包的 `bin` 入口可被系统 Node 运行。桌面安装器若未来需要在
-没有 Node 的机器上提供同名原生可执行文件，应保持本协议不变，只替换 CLI
-包装层。
+全局 CLI 要求安装包的 `bin` 入口可被系统 Node 运行。同名原生可执行
+包装层的预留方向已由 ADR-0076 取消，`lithe-tool` 只以 npm 包分发。

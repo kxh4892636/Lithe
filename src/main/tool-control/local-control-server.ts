@@ -7,6 +7,7 @@ import {
   parseToolRequest,
   serializeToolResponse,
   toolMessageMaxBytes,
+  toolProtocolVersion,
   type ToolResponse,
 } from '../../shared/tool-protocol'
 import type { ToolCommandDispatcher } from './command-dispatcher'
@@ -25,10 +26,17 @@ export interface LocalControlServer {
 }
 
 const failure = (
-  code: 'INTERNAL_ERROR' | 'INVALID_REQUEST' | 'UNAUTHORIZED' | 'UNKNOWN_COMMAND',
+  code: 'INCOMPATIBLE_VERSION' | 'INTERNAL_ERROR' | 'INVALID_REQUEST' | 'UNAUTHORIZED' | 'UNKNOWN_COMMAND',
   message: string,
   id: string | null = null,
 ): ToolResponse => ({ id, ok: false, error: { code, message } })
+
+const incompatibleVersion = (version: unknown, id: string | null): ToolResponse =>
+  failure(
+    'INCOMPATIBLE_VERSION',
+    `lithe-tool protocol version ${String(version)} is not supported by this Lithe, which speaks version ${toolProtocolVersion}; upgrade Lithe or reinstall a matching lithe-tool`,
+    id,
+  )
 
 const closeServer = (server: Server): Promise<void> =>
   new Promise<void>((resolve: () => void): void => {
@@ -72,7 +80,12 @@ const createConnectionHandler =
       const newline = buffer.indexOf(0x0a)
       if (newline < 0) return
       try {
-        const request = parseToolRequest(JSON.parse(buffer.subarray(0, newline).toString('utf8')) as unknown)
+        const raw = JSON.parse(buffer.subarray(0, newline).toString('utf8')) as { id?: unknown; version?: unknown }
+        if (raw.version !== undefined && raw.version !== toolProtocolVersion) {
+          answer(incompatibleVersion(raw.version, typeof raw.id === 'string' ? raw.id : null))
+          return
+        }
+        const request = parseToolRequest(raw)
         processing = true
         void dispatcher
           .dispatch(request, connectionId)

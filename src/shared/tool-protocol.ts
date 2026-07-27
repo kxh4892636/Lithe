@@ -3,6 +3,8 @@ import { z } from 'zod'
 import type { AgentStatus } from './agent-contract'
 
 export const toolProtocolVersion = 1 as const
+// Requests without a version field are treated as this legacy protocol version.
+const legacyToolProtocolVersion = 1 as const
 export const toolMessageMaxBytes = 64 * 1024
 
 const externalAuthorizationSchema = z
@@ -20,7 +22,7 @@ const agentAuthorizationSchema = z
 
 export const toolRequestSchema = z
   .object({
-    version: z.literal(toolProtocolVersion),
+    version: z.literal(toolProtocolVersion).optional().default(legacyToolProtocolVersion),
     id: z.string().min(1).max(128),
     command: z.string().min(1).max(64),
     authorization: z.discriminatedUnion('kind', [externalAuthorizationSchema, agentAuthorizationSchema]),
@@ -65,6 +67,7 @@ export type ToolJson = boolean | null | number | string | ToolJson[] | { [key: s
 
 export type ToolErrorCode =
   | 'APPROVAL_TIMEOUT'
+  | 'INCOMPATIBLE_VERSION'
   | 'INTERNAL_ERROR'
   | 'INVALID_REQUEST'
   | 'LITHE_NOT_RUNNING'
@@ -79,6 +82,7 @@ export type ToolResponse<T = ToolJson> =
 
 const toolErrorCodeSchema = z.enum([
   'APPROVAL_TIMEOUT',
+  'INCOMPATIBLE_VERSION',
   'INTERNAL_ERROR',
   'INVALID_REQUEST',
   'LITHE_NOT_RUNNING',

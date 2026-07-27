@@ -7,6 +7,7 @@ interface ScratchTaskRowsProps {
   query: string
   selectWorkspace: (workspaceId: string) => Promise<void>
   tasksByWorkspace: Record<string, Task[]>
+  visibleTaskId: string | null
   workspaces: Workspace[]
 }
 
@@ -25,6 +26,7 @@ export const ScratchTaskRows = (props: ScratchTaskRowsProps): React.JSX.Element 
                 .then((): Promise<unknown> => props.activateTask(task.id))
                 .catch(globalThis.console.error)
             }
+            selected={props.visibleTaskId === task.id}
             task={task}
           />
         )),

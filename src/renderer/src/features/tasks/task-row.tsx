@@ -71,6 +71,7 @@ const TaskRenameDialog = ({ onOpenChange, open, task }: TaskRenameDialogProps): 
 interface TaskRowProps {
   adapter?: AdapterSummary
   onOpen: () => void
+  selected?: boolean
   task: Task
 }
 
@@ -214,7 +215,7 @@ const TaskContextMenu = (props: TaskActionsProps): React.JSX.Element => {
   )
 }
 
-export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Element => {
+export const TaskRow = ({ adapter, onOpen, selected, task }: TaskRowProps): React.JSX.Element => {
   const archiveTask = useTaskStore((state: TaskState) => state.archiveTask)
   const forkTask = useTaskStore((state: TaskState) => state.forkTask)
   const stopTask = useTaskStore((state: TaskState) => state.stopTask)
@@ -237,7 +238,14 @@ export const TaskRow = ({ adapter, onOpen, task }: TaskRowProps): React.JSX.Elem
       <ContextMenu>
         <ContextMenuTrigger
           render={
-            <div className="group/task relative flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50 ml-3" />
+            <div
+              className={
+                selected
+                  ? 'group/task relative flex items-center rounded-md bg-sidebar-accent/60 ml-3'
+                  : 'group/task relative flex items-center rounded-md hover:bg-sidebar-accent/50 focus-within:bg-sidebar-accent/50 ml-3'
+              }
+              data-selected={String(selected ?? false)}
+            />
           }
         >
           <button

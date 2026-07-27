@@ -194,6 +194,43 @@ describe('local tool control', (): void => {
     expect(JSON.parse(response)).toMatchObject({ ok: false, error: { code: 'INVALID_REQUEST' } })
   })
 
+  it('rejects an unsupported protocol version with upgrade guidance', async (): Promise<void> => {
+    const endpoint = createEndpoint()
+    const server = createLocalControlServer({
+      dispatcher: createToolCommandDispatcher(
+        createContextCommand({
+          capabilities: createCapabilityRegistry(),
+          externalToken: 'e'.repeat(32),
+          getActiveWorkspaceId: (): null => null,
+          listProjects: (): ProjectWithWorkspaces[] => [],
+          listTasks: () => [],
+        }),
+      ),
+      endpoint,
+    })
+    servers.push(server)
+    await server.listen()
+
+    const response = await sendRawRequest(
+      endpoint,
+      `${JSON.stringify({
+        version: toolProtocolVersion + 1,
+        id: 'version-1',
+        command: 'context',
+        authorization: { kind: 'external', token: 'e'.repeat(32) },
+      })}\n`,
+    )
+
+    expect(JSON.parse(response)).toMatchObject({
+      id: 'version-1',
+      ok: false,
+      error: {
+        code: 'INCOMPATIBLE_VERSION',
+        message: `lithe-tool protocol version ${toolProtocolVersion + 1} is not supported by this Lithe, which speaks version ${toolProtocolVersion}; upgrade Lithe or reinstall a matching lithe-tool`,
+      },
+    })
+  })
+
   it('returns UNKNOWN_COMMAND for a valid envelope with an unregistered command', async (): Promise<void> => {
     const endpoint = createEndpoint()
     const server = createLocalControlServer({
@@ -225,6 +262,39 @@ describe('local tool control', (): void => {
       id: 'unknown-1',
       ok: false,
       error: { code: 'UNKNOWN_COMMAND' },
+    })
+  })
+
+  it('treats a request without a version field as protocol version 1', async (): Promise<void> => {
+    const endpoint = createEndpoint()
+    const server = createLocalControlServer({
+      dispatcher: createToolCommandDispatcher(
+        createContextCommand({
+          capabilities: createCapabilityRegistry(),
+          externalToken: 'e'.repeat(32),
+          getActiveWorkspaceId: (): string => 'workspace-1',
+          listProjects: (): ProjectWithWorkspaces[] => [project],
+          listTasks: () => [],
+        }),
+      ),
+      endpoint,
+    })
+    servers.push(server)
+    await server.listen()
+
+    const response = await sendRawRequest(
+      endpoint,
+      `${JSON.stringify({
+        id: 'legacy-1',
+        command: 'context',
+        authorization: { kind: 'external', token: 'e'.repeat(32) },
+      })}\n`,
+    )
+
+    expect(JSON.parse(response)).toMatchObject({
+      id: 'legacy-1',
+      ok: true,
+      data: { activeWorkspaceId: 'workspace-1' },
     })
   })
 

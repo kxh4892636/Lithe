@@ -53,5 +53,6 @@ This repository uses a single-context domain documentation layout. See `docs/age
 <!-- PROJECT RULES START -->
 
 - codin-d2c-cli: invoke `codin-d2c` for Figma design-to-code，d2c 静态资源统一使用 svg 格式；
+- lithe-tool： invoke `lithe-tool`，维护 Lithe 状态；
 
 <!-- PROJECT RULES END -->

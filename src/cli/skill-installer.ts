@@ -107,6 +107,3 @@ export const installLitheToolSkill = (
           : 'unchanged',
   }
 }
-
-export const readLitheToolSkill = (resourcePath: string): string =>
-  readFileSync(join(resourcePath, 'lithe-tool', 'SKILL.md'), 'utf8')

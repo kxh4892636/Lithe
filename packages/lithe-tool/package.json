@@ -11,5 +11,8 @@
   ],
   "scripts": {
     "prepack": "pnpm --dir ../.. run build:cli"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
